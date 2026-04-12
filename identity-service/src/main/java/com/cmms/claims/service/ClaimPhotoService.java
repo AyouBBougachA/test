@@ -143,6 +143,32 @@ public class ClaimPhotoService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PhotoFile loadFile(Integer claimId, Integer photoId) {
+        Actor actor = getCurrentActorRequired();
+        Claim claim = getClaimOrThrow(claimId);
+        assertCanView(claim, actor);
+
+        ClaimPhoto photo = claimPhotoRepository.findById(photoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Photo not found with ID: " + photoId));
+
+        if (!Objects.equals(photo.getClaimId(), claimId)) {
+            throw new IllegalArgumentException("Photo does not belong to the specified claim");
+        }
+
+        String filePath = photo.getFilePath();
+        if (filePath == null || filePath.isBlank()) {
+            throw new ResourceNotFoundException("Photo file not found for ID: " + photoId);
+        }
+
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            throw new ResourceNotFoundException("Photo file not found for ID: " + photoId);
+        }
+
+        return new PhotoFile(path, photo.getContentType(), photo.getOriginalName());
+    }
+
     private ClaimPhotoResponse toResponse(ClaimPhoto photo) {
         return ClaimPhotoResponse.builder()
                 .photoId(photo.getPhotoId())
@@ -210,5 +236,8 @@ public class ClaimPhotoService {
         boolean isAdminOrManager() {
             return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
         }
+    }
+
+    public record PhotoFile(Path path, String contentType, String fileName) {
     }
 }

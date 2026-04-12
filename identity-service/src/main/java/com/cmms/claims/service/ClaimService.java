@@ -115,8 +115,8 @@ public class ClaimService {
         Specification<Claim> baseSpec = Specification.where(accessScopeSpec(actor));
 
         long total = claimRepository.count(baseSpec);
-        long pending = claimRepository.count(baseSpec.and(statusInSpec(List.of(ClaimStatus.OPEN, ClaimStatus.QUALIFIED, ClaimStatus.ASSIGNED))));
-        long inProgress = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.IN_PROGRESS)));
+        long pending = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.OPEN)));
+        long inProgress = claimRepository.count(baseSpec.and(statusInSpec(List.of(ClaimStatus.ASSIGNED, ClaimStatus.IN_PROGRESS))));
         long closed = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.CLOSED)));
 
         return ClaimStatsResponse.builder()

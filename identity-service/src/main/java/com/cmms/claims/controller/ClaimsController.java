@@ -8,13 +8,18 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
 import java.util.List;
 
 @RestController
@@ -107,6 +112,26 @@ public class ClaimsController {
     public ClaimPhotoResponse uploadPhoto(@PathVariable Integer id, @RequestPart("file") MultipartFile file) throws IOException {
         return claimPhotoService.upload(id, file);
     }
+
+        @GetMapping("/{id}/photos/{photoId}/file")
+        @Operation(summary = "Download a claim photo")
+        public ResponseEntity<Resource> downloadPhoto(@PathVariable Integer id, @PathVariable Integer photoId) throws MalformedURLException {
+            ClaimPhotoService.PhotoFile photoFile = claimPhotoService.loadFile(id, photoId);
+            Path path = photoFile.path();
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String contentType = photoFile.contentType();
+            MediaType mediaType = contentType == null || contentType.isBlank()
+                    ? MediaType.APPLICATION_OCTET_STREAM
+                    : MediaType.parseMediaType(contentType);
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .body(resource);
+        }
 
     @DeleteMapping("/{id}/photos/{photoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

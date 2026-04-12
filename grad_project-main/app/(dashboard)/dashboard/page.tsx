@@ -21,7 +21,9 @@ import { AuditTrail, type AuditEntry } from "@/components/audit-trail"
 import { equipmentApi } from "@/lib/api/equipment"
 import { metersApi } from "@/lib/api/meters"
 import { auditLogsApi } from "@/lib/api/audit-logs"
+import { claimsApi } from "@/lib/api/claims"
 import { mapAuditLogToAuditEntry, mapMeterResponseToUiCard } from "@/lib/adapters"
+import type { ClaimListItemResponse } from "@/lib/api/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -56,7 +58,9 @@ export default function DashboardPage() {
 
   const [equipmentCount, setEquipmentCount] = useState<number | null>(null)
   const [meterAlerts, setMeterAlerts] = useState<{ warning: number; critical: number }>({ warning: 0, critical: 0 })
+  const [pendingClaims, setPendingClaims] = useState<number | null>(null)
   const [recentMeters, setRecentMeters] = useState<Array<{ id: string; name: string; equipment: string; status: string }>>([])
+  const [recentClaims, setRecentClaims] = useState<ClaimListItemResponse[]>([])
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [isFetching, setIsFetching] = useState(true)
 
@@ -66,10 +70,12 @@ export default function DashboardPage() {
 
     const load = async () => {
       try {
-        const [equipmentRes, metersRes, logsRes] = await Promise.all([
+        const [equipmentRes, metersRes, logsRes, claimsStats, claimsRes] = await Promise.all([
           equipmentApi.getAll(),
           metersApi.getAll(),
           auditLogsApi.getRecent(20),
+          claimsApi.getStats().catch(() => null),
+          claimsApi.list().catch(() => []),
         ])
         if (cancelled) return
 
@@ -93,11 +99,16 @@ export default function DashboardPage() {
         setRecentMeters(topAlerts)
 
         setAuditEntries(logsRes.map(mapAuditLogToAuditEntry))
+
+        setPendingClaims(claimsStats?.pending ?? null)
+        setRecentClaims(claimsRes.slice(0, 5))
       } catch {
         if (cancelled) return
         setEquipmentCount(null)
         setMeterAlerts({ warning: 0, critical: 0 })
+        setPendingClaims(null)
         setRecentMeters([])
+        setRecentClaims([])
         setAuditEntries([])
       } finally {
         if (!cancelled) setIsFetching(false)
@@ -113,6 +124,7 @@ export default function DashboardPage() {
   const kpiCards = useMemo(() => {
     const totalEquipmentValue = equipmentCount == null ? "—" : String(equipmentCount)
     const criticalAlertsValue = isFetching ? "—" : String(meterAlerts.critical)
+    const pendingClaimsValue = pendingClaims == null ? "—" : String(pendingClaims)
 
     return [
       {
@@ -131,7 +143,7 @@ export default function DashboardPage() {
       },
       {
         title: t("pendingClaims"),
-        value: "—",
+        value: pendingClaimsValue,
         icon: AlertTriangle,
         color: "text-amber-600",
         bgColor: "bg-amber-50 dark:bg-amber-900/20",
@@ -144,11 +156,25 @@ export default function DashboardPage() {
         bgColor: "bg-rose-50 dark:bg-rose-900/20",
       },
     ]
-  }, [equipmentCount, isFetching, meterAlerts.critical, t])
+  }, [equipmentCount, isFetching, meterAlerts.critical, pendingClaims, t])
 
   const meterBadgeVariant = (status: string) => {
     if (status === "critical") return "destructive"
     if (status === "warning") return "secondary"
+    return "outline"
+  }
+
+  const claimStatusLabel = (claim: ClaimListItemResponse) => {
+    if (claim.statusLabel && claim.statusLabel.trim()) return claim.statusLabel
+    return String(claim.status ?? "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
+  }
+
+  const claimStatusBadge = (status: string) => {
+    const normalized = status.toLowerCase()
+    if (normalized.includes("open")) return "secondary"
+    if (normalized.includes("assigned")) return "outline"
+    if (normalized.includes("progress")) return "default"
+    if (normalized.includes("closed")) return "destructive"
     return "outline"
   }
 
@@ -280,10 +306,38 @@ export default function DashboardPage() {
 
       {/* Lower Row placeholders */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <NotAvailableCard
-          title={language === "fr" ? "Réclamations" : "Claims"}
-          description={language === "fr" ? "Module non disponible (pas d’API)." : "Module not available (no API)."}
-        />
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">
+              {language === "fr" ? "Réclamations récentes" : "Recent Claims"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recentClaims.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {language === "fr" ? "Aucune réclamation" : "No claims yet"}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {recentClaims.map((claim) => (
+                  <div key={claim.claimId} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {claim.claimCode ?? `#${claim.claimId}`} - {claim.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {claim.equipmentName ?? `Equipment #${claim.equipmentId}`}
+                      </p>
+                    </div>
+                    <Badge variant={claimStatusBadge(claim.statusLabel ?? String(claim.status ?? ""))} className="ml-2">
+                      {claimStatusLabel(claim)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <NotAvailableCard
           title={language === "fr" ? "Ordres de travail" : "Work Orders"}
           description={language === "fr" ? "Module non disponible (pas d’API)." : "Module not available (no API)."}

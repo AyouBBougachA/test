@@ -1,18 +1,12 @@
 // Mock data for Hospital CMMS/GMAO
 
-export const sites = [
-  { id: "site-1", name: "Central Hospital", code: "CH" },
-  { id: "site-2", name: "North Medical Center", code: "NMC" },
-  { id: "site-3", name: "South Clinic", code: "SC" },
-]
-
 export const departments = [
-  { id: "dept-1", name: "Radiology", siteId: "site-1" },
-  { id: "dept-2", name: "ICU", siteId: "site-1" },
-  { id: "dept-3", name: "Emergency", siteId: "site-1" },
-  { id: "dept-4", name: "Surgery", siteId: "site-2" },
-  { id: "dept-5", name: "Cardiology", siteId: "site-2" },
-  { id: "dept-6", name: "Pediatrics", siteId: "site-3" },
+  { id: "dept-1", name: "Radiology" },
+  { id: "dept-2", name: "ICU" },
+  { id: "dept-3", name: "Emergency" },
+  { id: "dept-4", name: "Surgery" },
+  { id: "dept-5", name: "Cardiology" },
+  { id: "dept-6", name: "Pediatrics" },
 ]
 
 export const equipment = [
