@@ -232,8 +232,6 @@ export interface ClaimListItemResponse {
   departmentId?: number | null
   departmentName?: string | null
 
-  departmentName?: string | null
-
   createdAt: string
   updatedAt?: string | null
   closedAt?: string | null
@@ -258,12 +256,26 @@ export interface ClaimResponse extends ClaimListItemResponse {
   photos?: ClaimPhotoResponse[]
 }
 
+export interface ClaimStatsResponse {
+  total: number
+  pending: number
+  inProgress: number
+  closed: number
+}
+
 export interface CreateClaimRequest {
   title: string
   equipmentId: number
   departmentId?: number | null
   priority: ClaimPriority | string
   description: string
+}
+
+export interface UpdateClaimRequest {
+  title: string
+  priority: ClaimPriority | string
+  description: string
+  departmentId?: number | null
 }
 
 export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'PREDICTIVE' | 'REGULATORY'

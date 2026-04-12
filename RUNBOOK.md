@@ -10,6 +10,12 @@
 - Swagger UI:
   - `http://localhost:8081/swagger-ui.html`
 
+### Admin Login (Password Recovery)
+- If `admin@hospital.com` exists in the DB but you don't know its password, you can reset it on startup (disabled by default).
+- PowerShell example (one-time session env vars):
+  - `$env:BOOTSTRAP_ADMIN_ENABLED='true'; $env:BOOTSTRAP_ADMIN_EMAIL='admin@hospital.com'; $env:BOOTSTRAP_ADMIN_PASSWORD='YourNewPasswordHere'; mvn -f identity-service/pom.xml spring-boot:run`
+- After you log in successfully, remove those env vars (or set `BOOTSTRAP_ADMIN_ENABLED=false`) to avoid accidental resets.
+
 ### Required Environment Variables
 - `DB_URL` (default: `jdbc:postgresql://127.0.0.1:5432/cmms?stringtype=unspecified`)
 - `DB_USERNAME` (default: `postgres`)
