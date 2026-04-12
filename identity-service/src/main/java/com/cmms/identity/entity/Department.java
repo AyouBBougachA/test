@@ -20,6 +20,4 @@ public class Department {
     @Column(name = "department_name", nullable = false, unique = true, length = 100)
     private String departmentName;
 
-    @Column(name = "site_id")
-    private Integer siteId;
 }

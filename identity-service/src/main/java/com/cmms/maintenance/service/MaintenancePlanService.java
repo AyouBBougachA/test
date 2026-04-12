@@ -1,0 +1,80 @@
+package com.cmms.maintenance.service;
+
+import com.cmms.maintenance.entity.MaintenancePlan;
+import com.cmms.maintenance.entity.WorkOrder;
+import com.cmms.maintenance.repository.MaintenancePlanRepository;
+import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.claims.exception.ResourceNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class MaintenancePlanService {
+
+    private final MaintenancePlanRepository planRepository;
+    private final WorkOrderRepository workOrderRepository;
+
+    @Scheduled(cron = "0 0 1 * * ?") // Run every day at 1 AM
+    @Transactional
+    public void generateScheduledWorkOrders() {
+        log.info("Starting automated Work Order generation from maintenance plans");
+        LocalDateTime now = LocalDateTime.now();
+        List<MaintenancePlan> duePlans = planRepository.findByIsActiveTrueAndNextDueDateBefore(now);
+
+        for (MaintenancePlan plan : duePlans) {
+            createWorkOrderFromPlan(plan);
+        }
+        log.info("Finished automated Work Order generation. Total created: {}", duePlans.size());
+    }
+
+    @Transactional
+    public void createWorkOrderFromPlan(MaintenancePlan plan) {
+        WorkOrder wo = WorkOrder.builder()
+                .equipmentId(plan.getEquipmentId())
+                .woType(WorkOrder.WorkOrderType.PREVENTIVE)
+                .priority(WorkOrder.WorkOrderPriority.MEDIUM)
+                .status(WorkOrder.WorkOrderStatus.OPEN)
+                .title("Scheduled: " + plan.getTitle())
+                .description(plan.getDescription())
+                .dueDate(plan.getNextDueDate())
+                .isArchived(false)
+                .build();
+
+        workOrderRepository.save(wo);
+
+        // Update plan next due date
+        plan.setLastGenerationDate(LocalDateTime.now());
+        plan.setNextDueDate(calculateNextDueDate(plan.getNextDueDate(), plan.getFrequencyType(), plan.getFrequencyValue()));
+        planRepository.save(plan);
+    }
+
+    private LocalDateTime calculateNextDueDate(LocalDateTime current, MaintenancePlan.FrequencyType type, int value) {
+        return switch (type) {
+            case DAYS -> current.plusDays(value);
+            case WEEKS -> current.plusWeeks(value);
+            case MONTHS -> current.plusMonths(value);
+            case METER -> current; // Meter based plans need external trigger
+        };
+    }
+
+    @Transactional(readOnly = true)
+    public List<MaintenancePlan> getAll() {
+        return planRepository.findAll();
+    }
+
+    @Transactional
+    public MaintenancePlan create(MaintenancePlan plan) {
+        if (plan.getNextDueDate() == null) {
+            plan.setNextDueDate(calculateNextDueDate(LocalDateTime.now(), plan.getFrequencyType(), plan.getFrequencyValue()));
+        }
+        return planRepository.save(plan);
+    }
+}

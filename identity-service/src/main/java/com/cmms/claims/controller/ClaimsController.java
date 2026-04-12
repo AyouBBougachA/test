@@ -34,12 +34,11 @@ public class ClaimsController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) Integer equipmentId,
             @RequestParam(required = false) Integer departmentId,
-            @RequestParam(required = false) Integer siteId,
             @RequestParam(required = false) Integer requesterId,
             @RequestParam(required = false) Integer assignedToUserId,
             @RequestParam(required = false) String q
     ) {
-        return claimService.listClaims(status, priority, equipmentId, departmentId, siteId, requesterId, assignedToUserId, q);
+        return claimService.listClaims(status, priority, equipmentId, departmentId, requesterId, assignedToUserId, q);
     }
 
     @GetMapping("/stats")
@@ -86,6 +85,13 @@ public class ClaimsController {
     @Operation(summary = "Update claim status", description = "Technicians can update status only for their assigned claims")
     public ClaimResponse updateStatus(@PathVariable Integer id, @Valid @RequestBody ClaimStatusUpdateRequest request) {
         return claimService.updateStatus(id, request);
+    }
+
+    @PostMapping("/{id}/convert-to-wo")
+    @PreAuthorize("hasAnyRole('ADMIN','MAINTENANCE_MANAGER')")
+    @Operation(summary = "Convert a qualified claim to a corrective work order")
+    public ClaimResponse convertToWorkOrder(@PathVariable Integer id) {
+        return claimService.convertToWorkOrder(id);
     }
 
     @GetMapping("/{id}/history")

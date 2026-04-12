@@ -25,6 +25,7 @@ interface AuditTrailProps {
   entries: AuditEntry[]
   title?: string
   description?: string
+  hideTitle?: boolean
 }
 
 const getActionIcon = (action: string) => {
@@ -91,14 +92,17 @@ export function AuditTrail({
   entries,
   title = "Audit Trail",
   description = "Complete activity log and change tracking",
+  hideTitle = false,
 }: AuditTrailProps) {
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer}>
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
+      <Card className="overflow-hidden font-sans">
+        {!hideTitle && (
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+        )}
         <CardContent>
           {entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -113,7 +117,6 @@ export function AuditTrail({
                   variants={fadeInUp}
                   className="flex gap-4 pb-4 border-b border-border last:border-b-0 last:pb-0"
                 >
-                  {/* Timeline dot */}
                   <div className="flex flex-col items-center">
                     <div className={`h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white mb-2`}>
                       {getActionIcon(entry.action)}
@@ -123,7 +126,6 @@ export function AuditTrail({
                     )}
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
                       <div className="flex-1">
@@ -148,7 +150,6 @@ export function AuditTrail({
                           <span className="text-xs font-medium">{entry.resource}</span>
                         </div>
 
-                        {/* Details */}
                         {(entry.details || entry.changedFields?.length) && (
                           <div className="mt-3 p-3 bg-muted/50 rounded-lg space-y-2">
                             {entry.details && (

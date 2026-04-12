@@ -9,5 +9,4 @@ public class DepartmentResponse {
 
     private Integer departmentId;
     private String departmentName;
-    private Integer siteId;
 }

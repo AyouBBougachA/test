@@ -49,8 +49,7 @@ public class Claim {
     @Column(name = "department_id")
     private Integer departmentId;
 
-    @Column(name = "site_id")
-    private Integer siteId;
+
 
     @Column(name = "qualification_notes")
     private String qualificationNotes;

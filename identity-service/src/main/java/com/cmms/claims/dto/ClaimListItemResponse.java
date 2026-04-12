@@ -32,8 +32,6 @@ public class ClaimListItemResponse {
     private Integer departmentId;
     private String departmentName;
 
-    private Integer siteId;
-    private String siteName;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

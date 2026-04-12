@@ -58,7 +58,6 @@ export interface CreateRoleRequest {
 export interface DepartmentResponse {
   departmentId: number
   departmentName: string
-  siteId?: number | null
 }
 
 export interface CreateDepartmentRequest {
@@ -233,8 +232,7 @@ export interface ClaimListItemResponse {
   departmentId?: number | null
   departmentName?: string | null
 
-  siteId?: number | null
-  siteName?: string | null
+  departmentName?: string | null
 
   createdAt: string
   updatedAt?: string | null
@@ -264,7 +262,119 @@ export interface CreateClaimRequest {
   title: string
   equipmentId: number
   departmentId?: number | null
-  siteId?: number | null
   priority: ClaimPriority | string
   description: string
+}
+
+export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'PREDICTIVE' | 'REGULATORY'
+export type WorkOrderPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+export type WorkOrderStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED'
+
+export interface WorkOrderResponse {
+  woId: number
+  woCode: string
+  claimId?: number | null
+  claimCode?: string | null
+  equipmentId: number
+  equipmentName?: string | null
+  woType: WorkOrderType | string
+  priority: WorkOrderPriority | string
+  status: WorkOrderStatus | string
+  title: string
+  description?: string | null
+  assignedToUserId?: number | null
+  assignedToName?: string | null
+  estimatedTimeHours?: number | null
+  actualTimeHours?: number | null
+  estimatedCost?: number | null
+  actualCost?: number | null
+  createdAt: string
+  updatedAt?: string | null
+  dueDate?: string | null
+  completedAt?: string | null
+  completionNotes?: string | null
+}
+
+export interface CreateWorkOrderRequest {
+  claimId?: number | null
+  equipmentId: number
+  woType: string
+  priority: string
+  title: string
+  description?: string | null
+  assignedToUserId?: number | null
+  estimatedTimeHours?: number | null
+  estimatedCost?: number | null
+  dueDate?: string | null
+}
+
+export interface TaskResponse {
+  taskId: number
+  woId: number
+  description: string
+  status: 'PENDING' | 'COMPLETED' | string
+  completedAt?: string | null
+  completedBy?: string | null
+  orderIndex: number
+}
+
+export interface SparePartResponse {
+  partId: number
+  name: string
+  sku: string
+  category?: string | null
+  quantityInStock: number
+  minStockLevel: number
+  unitCost?: number | null
+  location?: string | null
+  supplier?: string | null
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface CreateSparePartRequest {
+  name: string
+  sku: string
+  category?: string | null
+  quantityInStock: number
+  minStockLevel: number
+  unitCost?: number | null
+  location?: string | null
+  supplier?: string | null
+}
+
+export interface MaintenancePlanResponse {
+  planId: number
+  equipmentId: number
+  title: string
+  description?: string | null
+  frequencyType: 'DAYS' | 'WEEKS' | 'MONTHS' | 'METER' | string
+  frequencyValue: number
+  lastGenerationDate?: string | null
+  nextDueDate?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface KpiResponse {
+  totalWorkOrders: number
+  activeWorkOrders: number
+  pendingClaims: number
+  lowStockParts: number
+  totalMaintenanceCost: number
+  mtbf: number
+  mttr: number
+  woByStatus: Record<string, number>
+  woByType: Record<string, number>
+  costByDepartment: Record<string, number>
+}
+
+export interface PredictionResponse {
+  equipmentId: number
+  equipmentName: string
+  riskScore: number
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+  recommendation: string
+  factors: string[]
 }

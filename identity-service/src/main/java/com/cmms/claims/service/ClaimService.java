@@ -2,22 +2,22 @@ package com.cmms.claims.service;
 
 import com.cmms.claims.dto.*;
 import com.cmms.claims.entity.*;
-import com.cmms.claims.exception.ResourceNotFoundException;
 import com.cmms.claims.repository.ClaimPhotoRepository;
 import com.cmms.claims.repository.ClaimRepository;
 import com.cmms.claims.repository.ClaimStatusHistoryRepository;
-import com.cmms.claims.repository.SiteRepository;
+import com.cmms.claims.exception.ResourceNotFoundException;
 import com.cmms.equipment.entity.Equipment;
 import com.cmms.equipment.repository.EquipmentRepository;
-import com.cmms.identity.entity.AuditLog;
 import com.cmms.identity.entity.Department;
 import com.cmms.identity.entity.User;
-import com.cmms.identity.repository.AuditLogRepository;
 import com.cmms.identity.repository.DepartmentRepository;
 import com.cmms.identity.repository.UserRepository;
-import com.cmms.identity.security.UserPrincipal;
 import com.cmms.identity.service.AuditLogService;
-import jakarta.persistence.criteria.Predicate;
+import com.cmms.identity.repository.AuditLogRepository;
+import com.cmms.maintenance.entity.WorkOrder;
+import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.identity.entity.AuditLog;
+import com.cmms.identity.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -27,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -45,11 +46,12 @@ public class ClaimService {
     private final ClaimRepository claimRepository;
     private final ClaimPhotoRepository claimPhotoRepository;
     private final ClaimStatusHistoryRepository statusHistoryRepository;
-    private final SiteRepository siteRepository;
 
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
+
+    private final WorkOrderRepository workOrderRepository;
 
     private final AuditLogService auditLogService;
     private final AuditLogRepository auditLogRepository;
@@ -60,7 +62,6 @@ public class ClaimService {
             String priority,
             Integer equipmentId,
             Integer departmentId,
-            Integer siteId,
             Integer requesterId,
             Integer assignedToUserId,
             String q
@@ -72,7 +73,6 @@ public class ClaimService {
                 .and(optionalEquals("priority", parsePriorityOrNull(priority)))
                 .and(optionalEquals("equipmentId", equipmentId))
                 .and(optionalEquals("departmentId", departmentId))
-                .and(optionalEquals("siteId", siteId))
                 .and(optionalEquals("requesterId", requesterId))
                 .and(optionalEquals("assignedToUserId", assignedToUserId))
                 .and(freeTextSpec(q));
@@ -98,13 +98,9 @@ public class ClaimService {
                 .stream()
                 .collect(Collectors.toMap(Department::getDepartmentId, Function.identity()));
 
-        Map<Integer, Site> sitesById = siteRepository.findAllById(
-                        claims.stream().map(Claim::getSiteId).filter(Objects::nonNull).collect(Collectors.toSet()))
-                .stream()
-                .collect(Collectors.toMap(Site::getSiteId, Function.identity()));
 
         return claims.stream()
-                .map(claim -> toListItemResponse(claim, equipmentById, usersById, departmentsById, sitesById))
+                .map(claim -> toListItemResponse(claim, equipmentById, usersById, departmentsById))
                 .collect(Collectors.toList());
     }
 
@@ -144,18 +140,9 @@ public class ClaimService {
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found with ID: " + request.getEquipmentId()));
 
         Integer finalDepartmentId = request.getDepartmentId();
-        Integer finalSiteId = request.getSiteId();
         if (finalDepartmentId != null) {
-            Department dept = departmentRepository.findById(finalDepartmentId)
+            departmentRepository.findById(finalDepartmentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found with ID: " + finalDepartmentId));
-            if (finalSiteId == null) {
-                finalSiteId = dept.getSiteId();
-            } else if (dept.getSiteId() != null && !Objects.equals(dept.getSiteId(), finalSiteId)) {
-                throw new IllegalArgumentException("departmentId does not belong to the provided siteId");
-            }
-        }
-        if (finalSiteId != null && !siteRepository.existsById(finalSiteId)) {
-            throw new ResourceNotFoundException("Site not found with ID: " + finalSiteId);
         }
 
         ClaimPriority parsedPriority = parsePriorityRequired(request.getPriority());
@@ -169,7 +156,6 @@ public class ClaimService {
                 .status(ClaimStatus.OPEN)
                 .assignedToUserId(null)
                 .departmentId(finalDepartmentId)
-                .siteId(finalSiteId)
                 .qualificationNotes(null)
                 .closedAt(null)
                 .build();
@@ -204,25 +190,15 @@ public class ClaimService {
         assertCanEdit(claim, actor);
 
         Integer finalDepartmentId = request.getDepartmentId();
-        Integer finalSiteId = request.getSiteId();
         if (finalDepartmentId != null) {
-            Department dept = departmentRepository.findById(finalDepartmentId)
+            departmentRepository.findById(finalDepartmentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found with ID: " + finalDepartmentId));
-            if (finalSiteId == null) {
-                finalSiteId = dept.getSiteId();
-            } else if (dept.getSiteId() != null && !Objects.equals(dept.getSiteId(), finalSiteId)) {
-                throw new IllegalArgumentException("departmentId does not belong to the provided siteId");
-            }
-        }
-        if (finalSiteId != null && !siteRepository.existsById(finalSiteId)) {
-            throw new ResourceNotFoundException("Site not found with ID: " + finalSiteId);
         }
 
         claim.setTitle(request.getTitle().trim());
         claim.setDescription(request.getDescription().trim());
         claim.setPriority(parsePriorityRequired(request.getPriority()));
         claim.setDepartmentId(finalDepartmentId);
-        claim.setSiteId(finalSiteId);
 
         Claim saved = claimRepository.save(claim);
 
@@ -355,6 +331,70 @@ public class ClaimService {
         return toClaimResponse(saved);
     }
 
+    @Transactional
+    public ClaimResponse convertToWorkOrder(Integer claimId) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+
+        Claim claim = getClaimEntity(claimId);
+
+        if (claim.getStatus() != ClaimStatus.QUALIFIED && claim.getStatus() != ClaimStatus.ASSIGNED) {
+            throw new IllegalStateException("Only QUALIFIED or ASSIGNED claims can be converted to Work Orders");
+        }
+
+        // Check if already has a WO
+        if (workOrderRepository.existsByClaimId(claimId)) {
+            throw new IllegalStateException("This claim has already been converted to a Work Order");
+        }
+
+        WorkOrder wo = WorkOrder.builder()
+                .claimId(claim.getClaimId())
+                .equipmentId(claim.getEquipmentId())
+                .woType(WorkOrder.WorkOrderType.CORRECTIVE)
+                .priority(mapPriority(claim.getPriority()))
+                .status(WorkOrder.WorkOrderStatus.OPEN)
+                .title("WO: " + claim.getTitle())
+                .description(claim.getDescription())
+                .assignedToUserId(claim.getAssignedToUserId())
+                .isArchived(false)
+                .build();
+
+        WorkOrder savedWo = workOrderRepository.save(wo);
+
+        // Update claim status
+        ClaimStatus oldStatus = claim.getStatus();
+        claim.setStatus(ClaimStatus.IN_PROGRESS);
+        claimRepository.save(claim);
+
+        saveStatusHistory(claim.getClaimId(), oldStatus, ClaimStatus.IN_PROGRESS, actor.displayName, "Converted to Work Order " + formatWoCode(savedWo.getWoId()));
+
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "CONVERT_CLAIM_TO_WO",
+                ENTITY_NAME,
+                claim.getClaimId(),
+                "Converted claim " + formatClaimCode(claim.getClaimId()) + " to Work Order " + formatWoCode(savedWo.getWoId())
+        );
+
+        return toClaimResponse(claim);
+    }
+
+    private WorkOrder.WorkOrderPriority mapPriority(ClaimPriority claimPriority) {
+        if (claimPriority == null) return WorkOrder.WorkOrderPriority.MEDIUM;
+        return switch (claimPriority) {
+            case CRITICAL -> WorkOrder.WorkOrderPriority.CRITICAL;
+            case HIGH -> WorkOrder.WorkOrderPriority.HIGH;
+            case MEDIUM -> WorkOrder.WorkOrderPriority.MEDIUM;
+            case LOW -> WorkOrder.WorkOrderPriority.LOW;
+        };
+    }
+
+    private static String formatWoCode(Integer woId) {
+        if (woId == null) return null;
+        return String.format("WO-%03d", woId);
+    }
+
     @Transactional(readOnly = true)
     public List<ClaimHistoryEntryResponse> getHistory(Integer claimId) {
         Actor actor = getCurrentActorRequired();
@@ -423,14 +463,12 @@ public class ClaimService {
             Claim claim,
             Map<Integer, Equipment> equipmentById,
             Map<Integer, User> usersById,
-            Map<Integer, Department> departmentsById,
-            Map<Integer, Site> sitesById
+            Map<Integer, Department> departmentsById
     ) {
-        Equipment equipment = equipmentById.get(claim.getEquipmentId());
+        Equipment equipment = claim.getEquipmentId() == null ? null : equipmentById.get(claim.getEquipmentId());
         User requester = claim.getRequesterId() == null ? null : usersById.get(claim.getRequesterId());
         User assignee = claim.getAssignedToUserId() == null ? null : usersById.get(claim.getAssignedToUserId());
         Department dept = claim.getDepartmentId() == null ? null : departmentsById.get(claim.getDepartmentId());
-        Site site = claim.getSiteId() == null ? null : sitesById.get(claim.getSiteId());
 
         long photoCount = claim.getClaimId() == null ? 0 : claimPhotoRepository.countByClaimId(claim.getClaimId());
 
@@ -451,8 +489,6 @@ public class ClaimService {
                 .assignedToName(assignee == null ? null : assignee.getFullName())
                 .departmentId(claim.getDepartmentId())
                 .departmentName(dept == null ? null : dept.getDepartmentName())
-                .siteId(claim.getSiteId())
-                .siteName(site == null ? null : site.getSiteName())
                 .createdAt(claim.getCreatedAt())
                 .updatedAt(claim.getUpdatedAt())
                 .closedAt(claim.getClosedAt())
@@ -465,7 +501,6 @@ public class ClaimService {
         User requester = claim.getRequesterId() == null ? null : userRepository.findById(claim.getRequesterId()).orElse(null);
         User assignee = claim.getAssignedToUserId() == null ? null : userRepository.findById(claim.getAssignedToUserId()).orElse(null);
         Department dept = claim.getDepartmentId() == null ? null : departmentRepository.findById(claim.getDepartmentId()).orElse(null);
-        Site site = claim.getSiteId() == null ? null : siteRepository.findById(claim.getSiteId()).orElse(null);
 
         List<ClaimPhotoResponse> photos = claim.getClaimId() == null
                 ? List.of()
@@ -493,8 +528,6 @@ public class ClaimService {
                 .assignedToName(assignee == null ? null : assignee.getFullName())
                 .departmentId(claim.getDepartmentId())
                 .departmentName(dept == null ? null : dept.getDepartmentName())
-                .siteId(claim.getSiteId())
-                .siteName(site == null ? null : site.getSiteName())
                 .qualificationNotes(claim.getQualificationNotes())
                 .createdAt(claim.getCreatedAt())
                 .updatedAt(claim.getUpdatedAt())

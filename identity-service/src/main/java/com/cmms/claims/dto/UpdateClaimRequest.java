@@ -19,5 +19,4 @@ public class UpdateClaimRequest {
 
     private Integer departmentId;
 
-    private Integer siteId;
 }

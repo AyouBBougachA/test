@@ -10,7 +10,6 @@ export const claimsApi = {
     status?: string
     priority?: string
     departmentId?: number
-    siteId?: number
     equipmentId?: number
     assignedToUserId?: number
     q?: string

@@ -17,7 +17,6 @@ public class CreateClaimRequest {
 
     private Integer departmentId;
 
-    private Integer siteId;
 
     @NotBlank(message = "Priority is required")
     private String priority;

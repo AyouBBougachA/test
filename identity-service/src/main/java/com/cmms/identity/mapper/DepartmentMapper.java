@@ -13,7 +13,6 @@ public class DepartmentMapper {
         return DepartmentResponse.builder()
                 .departmentId(department.getDepartmentId())
                 .departmentName(department.getDepartmentName())
-            .siteId(department.getSiteId())
                 .build();
     }
 }

@@ -138,17 +138,6 @@ export default function ReferenceDataPage() {
   }, [language])
 
   const openAdd = () => {
-    if (tab === "sites") {
-      toast({
-        title: language === "fr" ? "Non disponible" : "Not available",
-        description:
-          language === "fr"
-            ? "L’API ne fournit pas de gestion des sites."
-            : "The API does not provide sites management.",
-        variant: "destructive",
-      })
-      return
-    }
     if (tab === "categories") setAddKind("category")
     else if (tab === "models") setAddKind("model")
     else setAddKind("department")
@@ -277,7 +266,7 @@ export default function ReferenceDataPage() {
       <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Reference Data Management</h1>
-          <p className="text-muted-foreground">Manage sites, departments, categories, and models</p>
+          <p className="text-muted-foreground">Manage departments, categories, and models</p>
         </div>
         <Button onClick={openAdd} disabled={isFetching}>
           <Plus className="h-4 w-4 mr-2" />
@@ -330,7 +319,6 @@ export default function ReferenceDataPage() {
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="sites">Sites</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="models">Models</TabsTrigger>
           </TabsList>
@@ -392,20 +380,6 @@ export default function ReferenceDataPage() {
             </Card>
           </TabsContent>
 
-          {/* Sites Tab */}
-          <TabsContent value="sites">
-            <Card>
-              <CardHeader>
-                <CardTitle>{language === "fr" ? "Sites" : "Sites"}</CardTitle>
-                <CardDescription>
-                  {language === "fr"
-                    ? "Non disponible : l’API ne fournit pas de gestion des sites."
-                    : "Not available: the API does not provide sites management."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent />
-            </Card>
-          </TabsContent>
 
           {/* Categories Tab */}
           <TabsContent value="categories">

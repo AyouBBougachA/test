@@ -63,7 +63,7 @@ class ClaimsControllerTest {
                 .photoCount(0L)
                 .build();
 
-        when(claimService.listClaims(any(), any(), any(), any(), any(), any(), any(), any()))
+        when(claimService.listClaims(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(item));
 
         mockMvc.perform(get("/api/claims"))

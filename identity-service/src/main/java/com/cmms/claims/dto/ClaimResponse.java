@@ -33,8 +33,6 @@ public class ClaimResponse {
     private Integer departmentId;
     private String departmentName;
 
-    private Integer siteId;
-    private String siteName;
 
     private String qualificationNotes;
 
