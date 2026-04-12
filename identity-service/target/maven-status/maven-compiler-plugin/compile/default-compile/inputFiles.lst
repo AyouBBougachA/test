@@ -79,12 +79,14 @@ C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmm
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\entity\Department.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\repository\RoleRepository.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\claims\entity\Claim.java
+C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\config\BootstrapAdminProperties.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\claims\entity\ClaimStatus.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\exception\ErrorResponse.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\equipment\exception\EquipmentExceptionHandler.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\security\JwtAuthenticationFilter.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\claims\dto\SiteResponse.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\equipment\controller\MeterController.java
+C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\config\BootstrapAdminRunner.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\identity\config\SecurityConfig.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\claims\dto\UpdateClaimRequest.java
 C:\Users\ASUS\Desktop\test migration\test\identity-service\src\main\java\com\cmms\equipment\repository\EquipmentHistoryRepository.java
