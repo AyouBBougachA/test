@@ -1,0 +1,528 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
+import { useTheme } from "next-themes"
+import {
+  Bell,
+  Camera,
+  Check,
+  Clock,
+  Globe,
+  Key,
+  Mail,
+  Moon,
+  Palette,
+  Save,
+  Shield,
+  Smartphone,
+  Sun,
+  User,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useI18n } from "@/lib/i18n"
+import { useAuth, getRoleLabel } from "@/lib/auth-context"
+import { AuditTrail, type AuditEntry } from "@/components/audit-trail"
+import { auditLogsApi } from "@/lib/api/audit-logs"
+import { usersApi } from "@/lib/api/users"
+import { mapAuditLogToAuditEntry } from "@/lib/adapters"
+import { useToast } from "@/components/ui/use-toast"
+import { ApiError } from "@/lib/api/client"
+
+function getApiErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    const payload = err.payload as unknown
+    if (payload && typeof payload === "object") {
+      const maybeError = (payload as Record<string, unknown>).error
+      const maybeMessage = (payload as Record<string, unknown>).message
+      if (typeof maybeError === "string" && maybeError.trim()) return maybeError
+      if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage
+    }
+    return `Request failed (${err.status})`
+  }
+  if (err instanceof Error && err.message) return err.message
+  return "Request failed"
+}
+
+function splitFullName(fullName: string | null | undefined): { firstName: string; lastName: string } {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { firstName: "", lastName: "" }
+  if (parts.length === 1) return { firstName: parts[0]!, lastName: "" }
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(" ") }
+}
+
+export default function ProfilePage() {
+  const { t, language, setLanguage } = useI18n()
+  const { user, refresh } = useAuth()
+  const { toast } = useToast()
+  const { resolvedTheme, setTheme } = useTheme()
+
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [pushNotifications, setPushNotifications] = useState(false)
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState<string | null>(null)
+
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
+
+  const isDarkMode = resolvedTheme === "dark"
+
+  useEffect(() => {
+    let cancelled = false
+    if (!user) return
+
+    const initial = splitFullName(user.name)
+    setFirstName(initial.firstName)
+    setLastName(initial.lastName)
+    setEmail(user.email ?? "")
+    setPhone("")
+
+    const load = async () => {
+      try {
+        const details = await usersApi.getById(user.id)
+        if (cancelled) return
+        const parsed = splitFullName(details.fullName)
+        setFirstName(parsed.firstName)
+        setLastName(parsed.lastName)
+        setEmail(details.email ?? "")
+        setPhone(details.phoneNumber ?? "")
+      } catch {
+        // Keep fallback values from auth context
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  const onSaveProfile = async () => {
+    if (!user || isSavingProfile) return
+
+    const fullName = `${firstName} ${lastName}`.trim()
+    const normalizedEmail = email.trim()
+    const normalizedPhone = phone.trim()
+
+    if (!fullName) {
+      toast({
+        title: language === "fr" ? "Nom requis" : "Name is required",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!normalizedEmail) {
+      toast({
+        title: language === "fr" ? "Email requis" : "Email is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingProfile(true)
+    try {
+      await usersApi.update(user.id, {
+        fullName,
+        email: normalizedEmail,
+        phoneNumber: normalizedPhone ? normalizedPhone : null,
+      })
+
+      toast({ title: language === "fr" ? "Profil mis à jour" : "Profile updated" })
+      await refresh()
+    } catch (err) {
+      toast({
+        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  const onUpdatePassword = async () => {
+    if (!user || isSavingPassword) return
+    if (!newPassword.trim()) {
+      toast({
+        title: language === "fr" ? "Nouveau mot de passe requis" : "New password is required",
+        variant: "destructive",
+      })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: language === "fr" ? "Les mots de passe ne correspondent pas" : "Passwords do not match",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingPassword(true)
+    try {
+      await usersApi.update(user.id, { password: newPassword })
+      toast({ title: language === "fr" ? "Mot de passe mis à jour" : "Password updated" })
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (err) {
+      toast({
+        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPassword(false)
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      if (!user) {
+        setAuditEntries([])
+        return
+      }
+
+      setAuditLoading(true)
+      setAuditError(null)
+      try {
+        const logs = await auditLogsApi.getRecent(50)
+        const filtered = logs.filter((l) => l.userId === user.id)
+        if (!cancelled) setAuditEntries(filtered.map(mapAuditLogToAuditEntry))
+      } catch {
+        if (!cancelled) setAuditError("failed")
+      } finally {
+        if (!cancelled) setAuditLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-8"
+      >
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
+        <div className="relative flex flex-col items-center gap-6 sm:flex-row">
+          <div className="relative">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <User className="h-12 w-12 text-white" />
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                toast({
+                  title: language === "fr" ? "Non disponible" : "Not available",
+                  description:
+                    language === "fr" ? "La gestion d’avatar n’est pas supportée." : "Avatar management is not supported.",
+                  variant: "destructive",
+                })
+              }
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-violet-600 shadow-lg transition-transform hover:scale-110"
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="text-center sm:text-left">
+            <h1 className="text-2xl font-bold text-white">{user?.name || "User"}</h1>
+            <p className="text-white/80">{user?.email || "user@hospital.com"}</p>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 backdrop-blur-sm">
+              <Shield className="h-4 w-4 text-white" />
+              <span className="text-sm font-medium text-white">
+                {user ? getRoleLabel(user.roleName, language) : "User"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Profile Tabs */}
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsTrigger value="general" className="gap-2">
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === "fr" ? "Général" : "General"}</span>
+          </TabsTrigger>
+          <TabsTrigger value="security" className="gap-2">
+            <Key className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === "fr" ? "Sécurité" : "Security"}</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === "fr" ? "Notifications" : "Notifications"}</span>
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === "fr" ? "Audit" : "Audit"}</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* General Tab */}
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{language === "fr" ? "Informations personnelles" : "Personal Information"}</CardTitle>
+              <CardDescription>
+                {language === "fr" ? "Gérez vos informations de profil" : "Manage your profile information"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">{language === "fr" ? "Prénom" : "First Name"}</Label>
+                  <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">{language === "fr" ? "Nom" : "Last Name"}</Label>
+                  <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">{language === "fr" ? "Email" : "Email"}</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">{language === "fr" ? "Téléphone" : "Phone"}</Label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder={language === "fr" ? "Optionnel" : "Optional"}
+                      className="pl-10 font-mono text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="language">{language === "fr" ? "Langue" : "Language"}</Label>
+                  <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "fr")}>
+                    <SelectTrigger>
+                      <Globe className="mr-2 h-4 w-4" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="userId">{language === "fr" ? "ID Utilisateur" : "User ID"}</Label>
+                <Input 
+                  id="userId" 
+                  value={user ? String(user.id) : "—"} 
+                  readOnly 
+                  className="font-mono text-sm bg-muted/50" 
+                />
+              </div>
+              <Button
+                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                onClick={onSaveProfile}
+                disabled={!user || isSavingProfile}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSavingProfile
+                  ? language === "fr"
+                    ? "Enregistrement..."
+                    : "Saving..."
+                  : language === "fr"
+                    ? "Enregistrer"
+                    : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Appearance */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                {language === "fr" ? "Apparence" : "Appearance"}
+              </CardTitle>
+              <CardDescription>
+                {language === "fr" ? "Personnalisez l'apparence de l'application" : "Customize the look and feel of the application"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                  <div>
+                    <p className="font-medium">{language === "fr" ? "Mode sombre" : "Dark Mode"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "fr" ? "Utiliser le thème sombre" : "Use the dark theme"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={!!isDarkMode}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{language === "fr" ? "Mot de passe" : "Password"}</CardTitle>
+              <CardDescription>
+                {language === "fr" ? "Mettez à jour votre mot de passe" : "Update your password"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">{language === "fr" ? "Mot de passe actuel" : "Current Password"}</Label>
+                <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">{language === "fr" ? "Nouveau mot de passe" : "New Password"}</Label>
+                <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">{language === "fr" ? "Confirmer le mot de passe" : "Confirm Password"}</Label>
+                <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              </div>
+              <Button
+                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                onClick={onUpdatePassword}
+                disabled={!user || isSavingPassword}
+              >
+                <Key className="mr-2 h-4 w-4" />
+                {isSavingPassword
+                  ? language === "fr"
+                    ? "Mise à jour..."
+                    : "Updating..."
+                  : language === "fr"
+                    ? "Mettre à jour"
+                    : "Update Password"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{language === "fr" ? "Authentification à deux facteurs" : "Two-Factor Authentication"}</CardTitle>
+              <CardDescription>
+                {language === "fr" ? "Ajoutez une couche de sécurité supplémentaire" : "Add an extra layer of security to your account"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-emerald-500" />
+                  <div>
+                    <p className="font-medium">2FA</p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "fr" ? "Protégez votre compte avec 2FA" : "Protect your account with 2FA"}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={twoFactor} onCheckedChange={setTwoFactor} disabled />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{language === "fr" ? "Préférences de notification" : "Notification Preferences"}</CardTitle>
+              <CardDescription>
+                {language === "fr" ? "Gérez vos notifications" : "Manage your notification settings"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5" />
+                  <div>
+                    <p className="font-medium">{language === "fr" ? "Notifications par email" : "Email Notifications"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "fr" ? "Recevoir des mises à jour par email" : "Receive updates via email"}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} disabled />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5" />
+                  <div>
+                    <p className="font-medium">{language === "fr" ? "Notifications push" : "Push Notifications"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "fr" ? "Recevoir des notifications push" : "Receive push notifications"}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} disabled />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Audit Tab */}
+        <TabsContent value="audit">
+          <AuditTrail
+            entries={auditEntries}
+            title={language === "fr" ? "Historique du profil" : "Profile History"}
+            description={
+              auditLoading
+                ? language === "fr"
+                  ? "Chargement de l'audit..."
+                  : "Loading audit..."
+                : auditError
+                  ? language === "fr"
+                    ? "Audit non disponible."
+                    : "Audit not available."
+                  : language === "fr"
+                    ? "Historique des modifications de votre profil"
+                    : "History of changes to your profile"
+            }
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

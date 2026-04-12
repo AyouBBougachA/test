@@ -1,0 +1,723 @@
+"use client"
+
+import { useEffect, useMemo, useState, type FormEvent } from "react"
+import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
+import { Users, Plus, Edit, Trash2, Search, Download, Filter } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useI18n } from "@/lib/i18n"
+import { useAuth, getRoleLabel } from "@/lib/auth-context"
+import { usersApi } from "@/lib/api/users"
+import { rolesApi } from "@/lib/api/roles"
+import { departmentsApi } from "@/lib/api/departments"
+import { auditLogsApi } from "@/lib/api/audit-logs"
+import type { AuditLog, CreateUserRequest, DepartmentResponse, RoleResponse, UpdateUserRequest, UserResponse } from "@/lib/api/types"
+import { downloadCsv } from "@/lib/export"
+import { ApiError } from "@/lib/api/client"
+import { useToast } from "@/components/ui/use-toast"
+
+const NONE_SELECT_VALUE = "__none__"
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.4 },
+}
+
+export default function UsersPage() {
+  const { t, language } = useI18n()
+  const router = useRouter()
+  const { user, isLoading } = useAuth()
+  const { toast } = useToast()
+
+  const [query, setQuery] = useState("")
+  const [items, setItems] = useState<UserResponse[]>([])
+  const [roles, setRoles] = useState<RoleResponse[]>([])
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([])
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [isFetching, setIsFetching] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [roleFilterId, setRoleFilterId] = useState<string>("all")
+  const [departmentFilterId, setDepartmentFilterId] = useState<string>("all")
+
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<"create" | "edit">("create")
+  const [editingUserId, setEditingUserId] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deletingUser, setDeletingUser] = useState<UserResponse | null>(null)
+
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+    roleId: "",
+    departmentId: NONE_SELECT_VALUE,
+    isActive: true,
+  })
+
+  const getApiErrorMessage = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      const payload = err.payload as unknown
+      if (payload && typeof payload === "object") {
+        const maybeError = (payload as Record<string, unknown>).error
+        const maybeMessage = (payload as Record<string, unknown>).message
+        if (typeof maybeError === "string" && maybeError.trim()) return maybeError
+        if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage
+      }
+      return `Request failed (${err.status})`
+    }
+    if (err instanceof Error && err.message) return err.message
+    return "Request failed"
+  }
+
+  const loadUsers = async () => {
+    const roleId = roleFilterId !== "all" ? Number(roleFilterId) : undefined
+    const departmentId = departmentFilterId !== "all" ? Number(departmentFilterId) : undefined
+    const q = query.trim()
+
+    if (q || roleId || departmentId) {
+      return usersApi.search({
+        q: q || undefined,
+        roleId,
+        departmentId,
+      })
+    }
+    return usersApi.getAll()
+  }
+
+  const refreshUsers = async () => {
+    const [usersRes, logsRes] = await Promise.all([
+      loadUsers(),
+      auditLogsApi.getRecent(30),
+    ])
+    setItems(usersRes)
+    setAuditLogs(logsRes)
+  }
+
+  useEffect(() => {
+    if (isLoading) return
+    if (user && (user.roleName ?? "").toUpperCase() !== "ADMIN") {
+      router.replace("/dashboard")
+    }
+  }, [isLoading, router, user])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadRef = async () => {
+      try {
+        const [rolesRes, depsRes] = await Promise.all([
+          rolesApi.getAll(),
+          departmentsApi.getAll(),
+        ])
+        if (cancelled) return
+        setRoles(rolesRes)
+        setDepartments(depsRes)
+      } catch {
+        if (cancelled) return
+        setRoles([])
+        setDepartments([])
+      }
+    }
+
+    loadRef()
+    return () => {
+      cancelled = true
+    }
+  }, [language])
+
+  useEffect(() => {
+    let cancelled = false
+    setIsFetching(true)
+    setError(null)
+
+    const handle = window.setTimeout(async () => {
+      try {
+        const [usersRes, logsRes] = await Promise.all([loadUsers(), auditLogsApi.getRecent(30)])
+        if (cancelled) return
+        setItems(usersRes)
+        setAuditLogs(logsRes)
+      } catch {
+        if (cancelled) return
+        setItems([])
+        setAuditLogs([])
+        setError(language === "fr" ? "Impossible de charger les utilisateurs" : "Failed to load users")
+      } finally {
+        if (!cancelled) setIsFetching(false)
+      }
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [departmentFilterId, language, query, roleFilterId])
+
+  const openCreate = () => {
+    setEditorMode("create")
+    setEditingUserId(null)
+    setForm({
+      fullName: "",
+      email: "",
+      phoneNumber: "",
+      password: "",
+      roleId: roles.length > 0 ? String(roles[0].roleId) : "",
+      departmentId: NONE_SELECT_VALUE,
+      isActive: true,
+    })
+    setEditorOpen(true)
+  }
+
+  const openEdit = (u: UserResponse) => {
+    setEditorMode("edit")
+    setEditingUserId(u.userId)
+    setForm({
+      fullName: u.fullName ?? "",
+      email: u.email ?? "",
+      phoneNumber: u.phoneNumber ?? "",
+      password: "",
+      roleId: u.roleId != null ? String(u.roleId) : (roles.length > 0 ? String(roles[0].roleId) : ""),
+      departmentId: u.departmentId != null ? String(u.departmentId) : NONE_SELECT_VALUE,
+      isActive: u.isActive,
+    })
+    setEditorOpen(true)
+  }
+
+  const onSaveUser = async (e: FormEvent) => {
+    e.preventDefault()
+    if (isSaving) return
+
+    const fullName = form.fullName.trim()
+    const email = form.email.trim()
+    const password = form.password
+
+    const roleId = Number(form.roleId)
+    if (!fullName || !email || !Number.isFinite(roleId) || roleId <= 0) {
+      toast({
+        title: language === "fr" ? "Champs obligatoires manquants" : "Missing required fields",
+        description:
+          language === "fr"
+            ? "Nom complet, email et rôle sont requis."
+            : "Full name, email, and role are required.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const departmentId =
+      form.departmentId !== NONE_SELECT_VALUE ? Number(form.departmentId) : null
+
+    setIsSaving(true)
+    try {
+      if (editorMode === "create") {
+        if (!password || password.length < 8) {
+          toast({
+            title: language === "fr" ? "Mot de passe invalide" : "Invalid password",
+            description:
+              language === "fr"
+                ? "Le mot de passe doit contenir au moins 8 caractères."
+                : "Password must be at least 8 characters.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const payload: CreateUserRequest = {
+          fullName,
+          email,
+          phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
+          password,
+          roleId,
+          departmentId,
+          isActive: form.isActive,
+        }
+
+        await usersApi.create(payload)
+        toast({ title: language === "fr" ? "Utilisateur créé" : "User created" })
+      } else {
+        if (!editingUserId) throw new Error("Missing user id")
+
+        const payload: UpdateUserRequest = {
+          fullName: fullName || undefined,
+          email: email || undefined,
+          phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
+          roleId,
+          departmentId,
+        }
+        if (password && password.trim().length > 0) {
+          payload.password = password
+        }
+
+        await usersApi.update(editingUserId, payload)
+        toast({ title: language === "fr" ? "Utilisateur mis à jour" : "User updated" })
+      }
+
+      setEditorOpen(false)
+      await refreshUsers()
+    } catch (err) {
+      toast({
+        title: language === "fr" ? "Échec de l’enregistrement" : "Save failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const onToggleActive = async (u: UserResponse, nextActive: boolean) => {
+    if (user && u.userId === user.id) {
+      toast({
+        title: language === "fr" ? "Action non autorisée" : "Action not allowed",
+        description: language === "fr" ? "Vous ne pouvez pas désactiver votre compte." : "You can't deactivate your own account.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await usersApi.updateStatus(u.userId, nextActive)
+      toast({ title: nextActive ? (language === "fr" ? "Utilisateur activé" : "User activated") : (language === "fr" ? "Utilisateur désactivé" : "User deactivated") })
+      await refreshUsers()
+    } catch (err) {
+      toast({
+        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    }
+  }
+
+  const askDelete = (u: UserResponse) => {
+    if (user && u.userId === user.id) {
+      toast({
+        title: language === "fr" ? "Action non autorisée" : "Action not allowed",
+        description: language === "fr" ? "Vous ne pouvez pas supprimer votre compte." : "You can't delete your own account.",
+        variant: "destructive",
+      })
+      return
+    }
+    setDeletingUser(u)
+    setConfirmDeleteOpen(true)
+  }
+
+  const onConfirmDelete = async () => {
+    if (!deletingUser) return
+    try {
+      await usersApi.delete(deletingUser.userId)
+      toast({ title: language === "fr" ? "Utilisateur supprimé" : "User deleted" })
+      setConfirmDeleteOpen(false)
+      setDeletingUser(null)
+      await refreshUsers()
+    } catch (err) {
+      toast({
+        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    }
+  }
+
+  const recentUserLogs = useMemo(() => {
+    const filtered = auditLogs.filter((l) => {
+      const entity = (l.entityName ?? "").toLowerCase()
+      const action = (l.actionType ?? "").toLowerCase()
+      return entity.includes("user") || action.includes("user")
+    })
+    return filtered.slice(0, 3)
+  }, [auditLogs])
+
+  const timeAgo = (iso: string) => {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return "—"
+    const diffMs = Date.now() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return language === "fr" ? "à l’instant" : "just now"
+    if (diffMin < 60) return language === "fr" ? `il y a ${diffMin} min` : `${diffMin} min ago`
+    const diffHr = Math.floor(diffMin / 60)
+    if (diffHr < 24) return language === "fr" ? `il y a ${diffHr} h` : `${diffHr}h ago`
+    const diffDay = Math.floor(diffHr / 24)
+    return language === "fr" ? `il y a ${diffDay} j` : `${diffDay}d ago`
+  }
+
+  const onExport = () => {
+    downloadCsv(
+      "users.csv",
+      ["id", "name", "email", "role", "department", "active"],
+      items.map((u) => [
+        u.userId,
+        u.fullName,
+        u.email,
+        u.roleName,
+        u.departmentName,
+        u.isActive,
+      ])
+    )
+  }
+
+  return (
+    <motion.div
+      initial="initial"
+      animate="animate"
+      className="flex-1 space-y-6 overflow-auto"
+    >
+      {/* Header */}
+      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+          <p className="text-muted-foreground">Manage system users and their permissions</p>
+        </div>
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add User
+        </Button>
+      </motion.div>
+
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editorMode === "create"
+                ? (language === "fr" ? "Ajouter un utilisateur" : "Add user")
+                : (language === "fr" ? "Modifier l’utilisateur" : "Edit user")}
+            </DialogTitle>
+            <DialogDescription>
+              {language === "fr" ? "Sauvegarde via l’API /users." : "Saves via the /users API."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={onSaveUser} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="u-fullName">{language === "fr" ? "Nom complet" : "Full name"}</Label>
+                <Input id="u-fullName" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="u-email">{language === "fr" ? "Email" : "Email"}</Label>
+                <Input id="u-email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="u-phone">{language === "fr" ? "Téléphone" : "Phone"}</Label>
+                <Input id="u-phone" value={form.phoneNumber} onChange={(e) => setForm((p) => ({ ...p, phoneNumber: e.target.value }))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="u-password">{language === "fr" ? "Mot de passe" : "Password"}</Label>
+                <Input id="u-password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder={editorMode === "edit" ? (language === "fr" ? "Laisser vide pour ne pas changer" : "Leave empty to keep") : ""} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === "fr" ? "Rôle" : "Role"}</Label>
+                <Select value={form.roleId} onValueChange={(v) => setForm((p) => ({ ...p, roleId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.roleId} value={String(r.roleId)}>
+                        {r.roleName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === "fr" ? "Département" : "Department"}</Label>
+                <Select value={form.departmentId} onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === "fr" ? "Aucun" : "None"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucun" : "None"}</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d.departmentId} value={String(d.departmentId)}>
+                        {d.departmentName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editorMode === "create" && (
+                <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{language === "fr" ? "Actif" : "Active"}</div>
+                    <div className="text-xs text-muted-foreground">{language === "fr" ? "Compte activé à la création" : "Account enabled on creation"}</div>
+                  </div>
+                  <Switch checked={form.isActive} onCheckedChange={(checked) => setForm((p) => ({ ...p, isActive: checked }))} />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditorOpen(false)} disabled={isSaving}>
+                {t("cancel")}
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {t("save")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{language === "fr" ? "Filtres" : "Filters"}</DialogTitle>
+            <DialogDescription>{language === "fr" ? "Recherche via /users/search." : "Search via /users/search."}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{language === "fr" ? "Rôle" : "Role"}</Label>
+              <Select value={roleFilterId} onValueChange={setRoleFilterId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "fr" ? "Tous" : "All"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r.roleId} value={String(r.roleId)}>
+                      {r.roleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{language === "fr" ? "Département" : "Department"}</Label>
+              <Select value={departmentFilterId} onValueChange={setDepartmentFilterId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "fr" ? "Tous" : "All"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.departmentId} value={String(d.departmentId)}>
+                      {d.departmentName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRoleFilterId("all")
+                setDepartmentFilterId("all")
+              }}
+            >
+              {language === "fr" ? "Réinitialiser" : "Reset"}
+            </Button>
+            <Button type="button" onClick={() => setFiltersOpen(false)}>
+              {language === "fr" ? "Appliquer" : "Apply"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{language === "fr" ? "Supprimer l’utilisateur" : "Delete user"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === "fr"
+                ? `Cette action va supprimer l’utilisateur (suppression logique). ${deletingUser?.fullName ?? ""}`
+                : `This will delete the user (soft delete). ${deletingUser?.fullName ?? ""}`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={onConfirmDelete}>{t("delete")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Filters & Search */}
+      <motion.div variants={fadeInUp} className="flex gap-2">
+        <div className="flex-1">
+          <Input
+            placeholder="Search users..."
+            className="h-10"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <Button variant="outline" onClick={() => setFiltersOpen(true)}>
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+        </Button>
+        <Button variant="outline" onClick={onExport} disabled={items.length === 0}>
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
+      </motion.div>
+
+      {/* Users Table */}
+      <motion.div variants={fadeInUp}>
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Name</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Email</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Role</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Department</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Last Login</th>
+                    <th className="text-right py-4 px-6 font-semibold text-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isFetching ? (
+                    <tr>
+                      <td className="py-6 px-6 text-muted-foreground" colSpan={7}>
+                        {language === "fr" ? "Chargement..." : "Loading..."}
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td className="py-6 px-6 text-destructive" colSpan={7}>
+                        {error}
+                      </td>
+                    </tr>
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td className="py-6 px-6 text-muted-foreground" colSpan={7}>
+                        {language === "fr" ? "Aucun utilisateur" : "No users"}
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((u) => (
+                      <tr key={u.userId} className="border-b border-border hover:bg-muted/30 transition-colors">
+                        <td className="py-4 px-6 text-foreground font-medium">{u.fullName}</td>
+                        <td className="py-4 px-6 text-muted-foreground">{u.email}</td>
+                        <td className="py-4 px-6 text-muted-foreground">{getRoleLabel(u.roleName, language)}</td>
+                        <td className="py-4 px-6 text-muted-foreground">{u.departmentName || "—"}</td>
+                        <td className="py-4 px-6">
+                          <Badge
+                            variant="outline"
+                            className={
+                              u.isActive
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-muted text-muted-foreground border-border"
+                            }
+                          >
+                            {u.isActive ? (language === "fr" ? "Actif" : "Active") : (language === "fr" ? "Inactif" : "Inactive")}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-6 text-muted-foreground text-xs">—</td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <div className="flex items-center gap-2 pr-2">
+                              <Switch
+                                checked={u.isActive}
+                                disabled={!!user && u.userId === user.id}
+                                onCheckedChange={(checked) => void onToggleActive(u, checked)}
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => openEdit(u)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              disabled={!!user && u.userId === user.id}
+                              onClick={() => askDelete(u)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Audit Trail */}
+      <motion.div variants={fadeInUp}>
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Recent User Activities</CardTitle>
+            <CardDescription>User management audit trail</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentUserLogs.length === 0 ? (
+                <div className="py-2 px-3 text-sm text-muted-foreground">
+                  {language === "fr" ? "Aucune activité" : "No recent activity"}
+                </div>
+              ) : (
+                recentUserLogs.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{log.actionType || "—"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "fr" ? "par" : "by"} {log.userId ? `User #${log.userId}` : "System"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{timeAgo(log.createdAt)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  )
+}

@@ -1,0 +1,26 @@
+package com.cmms.identity.controller;
+
+import com.cmms.identity.entity.AuditLog;
+import com.cmms.identity.service.AuditLogService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/audit-logs")
+@RequiredArgsConstructor
+public class AuditLogController {
+
+    private final AuditLogService auditLogService;
+
+    @GetMapping
+    public List<AuditLog> getRecentLogs(@RequestParam(defaultValue = "10") int limit) {
+        return auditLogService.getRecentLogs(limit);
+    }
+
+    @GetMapping("/security")
+    public List<AuditLog> getSecurityLogs(@RequestParam(defaultValue = "10") int limit) {
+        return auditLogService.getSecurityLogs(limit);
+    }
+}
