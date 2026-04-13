@@ -12,11 +12,22 @@ import {
   AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useI18n } from "@/lib/i18n"
+import { useAuth } from "@/lib/auth-context"
 import { planningApi } from "@/lib/api/planning"
-import type { MaintenancePlanResponse } from "@/lib/api/types"
+import { equipmentApi } from "@/lib/api/equipment"
+import type { MaintenancePlanResponse, EquipmentResponse } from "@/lib/api/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { 
   format, 
   addMonths, 
@@ -38,16 +49,32 @@ const fadeInUp = {
 }
 
 export default function PlanningCalendarPage() {
-  const { language } = useI18n()
+  const { user, isAuthenticated, isLoading: isAuthLoading, language } = useAuth()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [plans, setPlans] = useState<MaintenancePlanResponse[]>([])
+  const [equipmentList, setEquipmentList] = useState<EquipmentResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  const [newPlan, setNewPlan] = useState({
+    title: "",
+    description: "",
+    equipmentId: "",
+    frequencyType: "MONTHS",
+    frequencyValue: 1,
+    nextDueDate: format(new Date(), 'yyyy-MM-dd')
+  })
 
   const loadData = async () => {
+    if (!isAuthenticated) return
     setIsLoading(true)
     try {
-      const data = await planningApi.getAll()
-      setPlans(data)
+      const [planData, eqData] = await Promise.all([
+        planningApi.getAll(),
+        equipmentApi.getAll()
+      ])
+      setPlans(planData)
+      setEquipmentList(eqData)
     } catch (error) {
       console.error("Failed to load planning data", error)
     } finally {
@@ -56,8 +83,25 @@ export default function PlanningCalendarPage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!isAuthLoading && isAuthenticated) {
+      loadData()
+    }
+  }, [isAuthenticated, isAuthLoading])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await planningApi.create({
+        ...newPlan,
+        equipmentId: parseInt(newPlan.equipmentId),
+        frequencyValue: parseInt(String(newPlan.frequencyValue))
+      })
+      setIsDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error("Failed to create maintenance plan", error)
+    }
+  }
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
@@ -84,6 +128,16 @@ export default function PlanningCalendarPage() {
     return map
   }, [plans])
 
+  if (isAuthLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) return null
+
   return (
     <motion.div 
       initial="initial" 
@@ -108,10 +162,84 @@ export default function PlanningCalendarPage() {
           <Button variant="outline" size="icon" onClick={nextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button className="ml-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Plan
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="ml-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Plan
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl text-foreground">
+              <DialogHeader>
+                <DialogTitle>Schedule Preventive Maintenance</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Define the frequency and start date for recurring equipment checkups.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Activity Title</label>
+                  <Input 
+                    required 
+                    placeholder="e.g., Monthly Filter Replacement" 
+                    value={newPlan.title}
+                    onChange={(e) => setNewPlan({...newPlan, title: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Equipment</label>
+                  <select 
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    value={newPlan.equipmentId}
+                    onChange={(e) => setNewPlan({...newPlan, equipmentId: e.target.value})}
+                  >
+                    <option value="">Select Equipment...</option>
+                    {equipmentList.map(eq => (
+                      <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Frequency Type</label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      value={newPlan.frequencyType}
+                      onChange={(e) => setNewPlan({...newPlan, frequencyType: e.target.value})}
+                    >
+                      <option value="DAYS">Days</option>
+                      <option value="WEEKS">Weeks</option>
+                      <option value="MONTHS">Months</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Every (Value)</label>
+                    <Input 
+                      type="number"
+                      required
+                      min="1"
+                      value={newPlan.frequencyValue}
+                      onChange={(e) => setNewPlan({...newPlan, frequencyValue: parseInt(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Initial Due Date</label>
+                  <Input 
+                    type="date"
+                    required
+                    value={newPlan.nextDueDate}
+                    onChange={(e) => setNewPlan({...newPlan, nextDueDate: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-primary text-primary-foreground">Create Plan</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 

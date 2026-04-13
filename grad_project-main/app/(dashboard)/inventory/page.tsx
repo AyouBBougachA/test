@@ -25,7 +25,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { useI18n } from "@/lib/i18n"
+import { useAuth } from "@/lib/auth-context"
 import { inventoryApi } from "@/lib/api/inventory"
 import type { SparePartResponse } from "@/lib/api/types"
 
@@ -36,13 +45,26 @@ const fadeInUp = {
 }
 
 export default function InventoryPage() {
-  const { language } = useI18n()
+  const { user, isAuthenticated, isLoading: isAuthLoading, language } = useAuth()
   const [parts, setParts] = useState<SparePartResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
 
+  const [newPart, setNewPart] = useState({
+    name: "",
+    sku: "",
+    category: "",
+    quantityInStock: 0,
+    minStockLevel: 5,
+    unitCost: 0,
+    location: "",
+    supplier: ""
+  })
+
   const loadData = async () => {
+    if (!isAuthenticated) return
     setIsLoading(true)
     try {
       const data = await inventoryApi.list()
@@ -55,8 +77,31 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!isAuthLoading && isAuthenticated) {
+      loadData()
+    }
+  }, [isAuthenticated, isAuthLoading])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await inventoryApi.create(newPart)
+      setIsDialogOpen(false)
+      setNewPart({
+        name: "",
+        sku: "",
+        category: "",
+        quantityInStock: 0,
+        minStockLevel: 5,
+        unitCost: 0,
+        location: "",
+        supplier: ""
+      })
+      loadData()
+    } catch (error) {
+      console.error("Failed to add spare part", error)
+    }
+  }
 
   const filteredParts = useMemo(() => {
     return parts.filter(part => {
@@ -102,10 +147,95 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-            <Plus className="h-4 w-4 mr-2" />
-            {language === 'fr' ? 'Ajouter une Pièce' : 'Add Spare Part'}
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+                <Plus className="h-4 w-4 mr-2" />
+                {language === 'fr' ? 'Ajouter une Pièce' : 'Add Spare Part'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl text-foreground">
+              <DialogHeader>
+                <DialogTitle>Register Spare Part</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Enroll a new item in the clinical inventory system.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Part Name</label>
+                    <Input 
+                      required 
+                      placeholder="e.g. MRI Cooling Fan" 
+                      value={newPart.name}
+                      onChange={(e) => setNewPart({...newPart, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">SKU / Reference</label>
+                    <Input 
+                      required 
+                      placeholder="REF-123456" 
+                      value={newPart.sku}
+                      onChange={(e) => setNewPart({...newPart, sku: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Input 
+                      placeholder="e.g. Mechanical" 
+                      value={newPart.category}
+                      onChange={(e) => setNewPart({...newPart, category: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Unit Cost ($)</label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={newPart.unitCost}
+                      onChange={(e) => setNewPart({...newPart, unitCost: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Initial Stock</label>
+                    <Input 
+                      type="number"
+                      required
+                      value={newPart.quantityInStock}
+                      onChange={(e) => setNewPart({...newPart, quantityInStock: parseInt(e.target.value)})}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Alert Level (Min)</label>
+                    <Input 
+                      type="number"
+                      required
+                      value={newPart.minStockLevel}
+                      onChange={(e) => setNewPart({...newPart, minStockLevel: parseInt(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Storage Location</label>
+                  <Input 
+                    placeholder="Shelf B-12" 
+                    value={newPart.location}
+                    onChange={(e) => setNewPart({...newPart, location: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-primary text-primary-foreground">Save Part</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 

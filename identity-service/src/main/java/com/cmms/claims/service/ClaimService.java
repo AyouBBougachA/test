@@ -338,8 +338,8 @@ public class ClaimService {
 
         Claim claim = getClaimEntity(claimId);
 
-        if (claim.getStatus() != ClaimStatus.QUALIFIED && claim.getStatus() != ClaimStatus.ASSIGNED) {
-            throw new IllegalStateException("Only QUALIFIED or ASSIGNED claims can be converted to Work Orders");
+        if (claim.getStatus() != ClaimStatus.OPEN && claim.getStatus() != ClaimStatus.QUALIFIED && claim.getStatus() != ClaimStatus.ASSIGNED) {
+            throw new IllegalStateException("Only OPEN, QUALIFIED or ASSIGNED claims can be converted to Work Orders");
         }
 
         // Check if already has a WO

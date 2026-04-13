@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { AlertTriangle, ArrowLeft, Pencil } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Pencil, Wrench } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -70,6 +70,7 @@ export default function ClaimDetailsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPhotosLoading, setIsPhotosLoading] = useState(false)
   const [isDeleting, setIsDeleting] = useState<number | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
 
   useEffect(() => {
     if (!Number.isFinite(claimId)) {
@@ -195,6 +196,21 @@ export default function ClaimDetailsPage() {
     }
   }
 
+  const handleConvert = async () => {
+    if (!claim) return
+    setIsConverting(true)
+    try {
+      await claimsApi.convertToWorkOrder(claim.claimId)
+      // Refresh claim to show new status (IN_PROGRESS)
+      const claimRes = await claimsApi.getById(claimId)
+      setClaim(claimRes)
+    } catch (err) {
+      setError(language === "fr" ? "Échec de la conversion" : "Conversion failed")
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -214,12 +230,25 @@ export default function ClaimDetailsPage() {
           </div>
         </div>
         {claim && (
-          <Link href={`/claims/${claim.claimId}/edit`}>
-            <Button className="gap-2" type="button">
-              <Pencil className="h-4 w-4" />
-              {language === "fr" ? "Modifier" : "Edit"}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {['OPEN', 'QUALIFIED', 'ASSIGNED'].includes(claim.status ?? "") && (user?.roleName === 'ADMIN' || user?.roleName === 'MAINTENANCE_MANAGER') && (
+              <Button 
+                variant="outline" 
+                className="gap-2 border-primary/50 text-primary hover:bg-primary/10" 
+                onClick={handleConvert}
+                disabled={isConverting}
+              >
+                <Wrench className={`h-4 w-4 ${isConverting ? 'animate-spin' : ''}`} />
+                {language === "fr" ? "Convertir en BM" : "Convert to WO"}
+              </Button>
+            )}
+            <Link href={`/claims/${claim.claimId}/edit`}>
+              <Button className="gap-2" type="button">
+                <Pencil className="h-4 w-4" />
+                {language === "fr" ? "Modifier" : "Edit"}
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 

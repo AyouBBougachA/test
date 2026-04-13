@@ -63,4 +63,9 @@ export const claimsApi = {
 
   getPhotoBlob: (claimId: number, photoId: number) =>
     requestBlob(`/claims/${claimId}/photos/${photoId}/file`),
+
+  convertToWorkOrder: (claimId: number) =>
+    requestJson<any>(`/claims/${claimId}/convert-to-wo`, {
+      method: 'POST',
+    }),
 }

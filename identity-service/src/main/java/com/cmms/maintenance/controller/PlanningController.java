@@ -1,5 +1,6 @@
 package com.cmms.maintenance.controller;
 
+import com.cmms.maintenance.dto.CreateMaintenancePlanRequest;
 import com.cmms.maintenance.entity.MaintenancePlan;
 import com.cmms.maintenance.service.MaintenancePlanService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,8 +28,8 @@ public class PlanningController {
 
     @PostMapping
     @Operation(summary = "Create a new maintenance plan")
-    public MaintenancePlan create(@RequestBody MaintenancePlan plan) {
-        return planningService.create(plan);
+    public MaintenancePlan create(@RequestBody CreateMaintenancePlanRequest request) {
+        return planningService.create(request);
     }
 
     @PostMapping("/generate-now")

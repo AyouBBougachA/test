@@ -19,6 +19,14 @@ public class TaskService {
     private final TaskRepository taskRepository;
 
     @Transactional(readOnly = true)
+    public List<TaskResponse> getAll() {
+        return taskRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<TaskResponse> getTasksForWorkOrder(Integer woId) {
         return taskRepository.findByWoIdOrderByOrderIndexAsc(woId)
                 .stream()

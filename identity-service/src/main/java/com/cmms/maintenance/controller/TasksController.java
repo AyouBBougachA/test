@@ -19,6 +19,12 @@ import java.util.List;
 public class TasksController {
 
     private final TaskService taskService;
+    
+    @GetMapping
+    @Operation(summary = "List all tasks")
+    public List<TaskResponse> getAll() {
+        return taskService.getAll();
+    }
 
     @GetMapping("/work-order/{woId}")
     @Operation(summary = "Get tasks for a work order")

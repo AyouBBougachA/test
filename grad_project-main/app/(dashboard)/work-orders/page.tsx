@@ -34,6 +34,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useI18n } from "@/lib/i18n"
+import { useAuth } from "@/lib/auth-context"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import { equipmentApi } from "@/lib/api/equipment"
 import type { WorkOrderResponse, EquipmentResponse } from "@/lib/api/types"
@@ -48,16 +49,33 @@ const fadeInUp = {
 
 export default function WorkOrdersPage() {
   const { t, language } = useI18n()
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
+  const [equipmentList, setEquipmentList] = useState<EquipmentResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
 
+  const [newWO, setNewWO] = useState({
+    title: "",
+    description: "",
+    equipmentId: "",
+    woType: "CORRECTIVE",
+    priority: "MEDIUM",
+    dueDate: ""
+  })
+
   const loadData = async () => {
+    if (!isAuthenticated) return
     setIsLoading(true)
     try {
-      const data = await workOrdersApi.list()
-      setWorkOrders(data)
+      const [woData, eqData] = await Promise.all([
+        workOrdersApi.list(),
+        equipmentApi.getAll()
+      ])
+      setWorkOrders(woData)
+      setEquipmentList(eqData)
     } catch (error) {
       console.error("Failed to load work orders", error)
     } finally {
@@ -66,8 +84,32 @@ export default function WorkOrdersPage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!isAuthLoading && isAuthenticated) {
+      loadData()
+    }
+  }, [isAuthenticated, isAuthLoading])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await workOrdersApi.create({
+        ...newWO,
+        equipmentId: parseInt(newWO.equipmentId)
+      })
+      setIsDialogOpen(false)
+      setNewWO({
+        title: "",
+        description: "",
+        equipmentId: "",
+        woType: "CORRECTIVE",
+        priority: "MEDIUM",
+        dueDate: ""
+      })
+      loadData()
+    } catch (error) {
+      console.error("Failed to create work order", error)
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     return workOrders.filter(wo => {
@@ -125,10 +167,88 @@ export default function WorkOrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-            <Plus className="h-4 w-4 mr-2" />
-            {language === 'fr' ? 'Nouvel Ordre' : 'New Work Order'}
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+                <Plus className="h-4 w-4 mr-2" />
+                {language === 'fr' ? 'Nouvel Ordre' : 'New Work Order'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl">
+              <DialogHeader>
+                <DialogTitle>Create Maintenance Intervention</DialogTitle>
+                <DialogDescription>
+                  Fill in the details to generate a new work order.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Title</label>
+                  <Input 
+                    required 
+                    placeholder="e.g., Annual MRI Inspection" 
+                    value={newWO.title}
+                    onChange={(e) => setNewWO({...newWO, title: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Equipment</label>
+                  <select 
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newWO.equipmentId}
+                    onChange={(e) => setNewWO({...newWO, equipmentId: e.target.value})}
+                  >
+                    <option value="">Select Equipment...</option>
+                    {equipmentList.map(eq => (
+                      <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Type</label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      value={newWO.woType}
+                      onChange={(e) => setNewWO({...newWO, woType: e.target.value})}
+                    >
+                      <option value="CORRECTIVE">Corrective</option>
+                      <option value="PREVENTIVE">Preventive</option>
+                      <option value="PREDICTIVE">Predictive</option>
+                      <option value="REGULATORY">Regulatory</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Priority</label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      value={newWO.priority}
+                      onChange={(e) => setNewWO({...newWO, priority: e.target.value})}
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="CRITICAL">Critical</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <textarea 
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter technical details..."
+                    value={newWO.description}
+                    onChange={(e) => setNewWO({...newWO, description: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-primary text-primary-foreground">Create Work Order</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 

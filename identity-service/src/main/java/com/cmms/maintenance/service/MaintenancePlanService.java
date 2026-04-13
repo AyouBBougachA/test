@@ -1,5 +1,6 @@
 package com.cmms.maintenance.service;
 
+import com.cmms.maintenance.dto.CreateMaintenancePlanRequest;
 import com.cmms.maintenance.entity.MaintenancePlan;
 import com.cmms.maintenance.entity.WorkOrder;
 import com.cmms.maintenance.repository.MaintenancePlanRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -68,6 +70,41 @@ public class MaintenancePlanService {
     @Transactional(readOnly = true)
     public List<MaintenancePlan> getAll() {
         return planRepository.findAll();
+    }
+
+    @Transactional
+    public MaintenancePlan create(CreateMaintenancePlanRequest request) {
+        LocalDateTime nextDue = null;
+        if (request.getNextDueDate() != null && !request.getNextDueDate().isBlank()) {
+            try {
+                // Handle different date formats or just ISO
+                nextDue = LocalDateTime.parse(request.getNextDueDate());
+            } catch (Exception e) {
+                // If it fails, try just date part
+                try {
+                    nextDue = java.time.LocalDate.parse(request.getNextDueDate()).atStartOfDay();
+                } catch (Exception e2) {
+                    nextDue = LocalDateTime.now();
+                }
+            }
+        }
+
+        MaintenancePlan.FrequencyType type = MaintenancePlan.FrequencyType.valueOf(request.getFrequencyType());
+        if (nextDue == null) {
+            nextDue = calculateNextDueDate(LocalDateTime.now(), type, request.getFrequencyValue());
+        }
+
+        MaintenancePlan plan = MaintenancePlan.builder()
+                .equipmentId(request.getEquipmentId())
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .frequencyType(type)
+                .frequencyValue(request.getFrequencyValue())
+                .nextDueDate(nextDue)
+                .isActive(true)
+                .build();
+
+        return planRepository.save(plan);
     }
 
     @Transactional
