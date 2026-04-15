@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,12 +28,14 @@ public class PlanningController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     @Operation(summary = "Create a new maintenance plan")
     public MaintenancePlan create(@RequestBody CreateMaintenancePlanRequest request) {
         return planningService.create(request);
     }
 
     @PostMapping("/generate-now")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     @Operation(summary = "Manually trigger work order generation for due plans")
     public void triggerGeneration() {
         planningService.generateScheduledWorkOrders();

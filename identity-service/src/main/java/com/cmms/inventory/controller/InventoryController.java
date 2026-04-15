@@ -2,6 +2,8 @@ package com.cmms.inventory.controller;
 
 import com.cmms.inventory.dto.CreateSparePartRequest;
 import com.cmms.inventory.dto.SparePartResponse;
+import com.cmms.inventory.dto.PartUsageResponse;
+import com.cmms.inventory.dto.UsePartRequest;
 import com.cmms.inventory.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -43,5 +45,18 @@ public class InventoryController {
     @Operation(summary = "Update stock level for a part")
     public SparePartResponse updateStock(@PathVariable Integer id, @RequestParam Integer quantity) {
         return inventoryService.updateStock(id, quantity);
+    }
+
+    @PostMapping("/usage")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Record part usage for a work order/task")
+    public PartUsageResponse usePart(@Valid @RequestBody UsePartRequest request) {
+        return inventoryService.usePart(request);
+    }
+
+    @GetMapping("/usage/work-order/{woId}")
+    @Operation(summary = "Get part usages for a work order")
+    public List<PartUsageResponse> getUsages(@PathVariable Integer woId) {
+        return inventoryService.getUsagesForWorkOrder(woId);
     }
 }

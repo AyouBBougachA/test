@@ -49,10 +49,15 @@ public class Claim {
     @Column(name = "department_id")
     private Integer departmentId;
 
-
-
     @Column(name = "qualification_notes")
     private String qualificationNotes;
+
+    @Column(name = "rejection_notes")
+    private String rejectionNotes;
+
+    /** ID of the Work Order created from this claim (set on conversion). */
+    @Column(name = "linked_wo_id")
+    private Integer linkedWoId;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -64,4 +69,10 @@ public class Claim {
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
 }

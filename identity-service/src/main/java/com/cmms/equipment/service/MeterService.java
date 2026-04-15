@@ -22,6 +22,7 @@ public class MeterService {
     private final MeterRepository meterRepository;
     private final MeterLogRepository logRepository;
     private final MeterThresholdRepository thresholdRepository;
+    private final com.cmms.maintenance.service.MeterTriggerService meterTriggerService;
 
     @Transactional(readOnly = true)
     public List<Meter> getAllMeters() {
@@ -67,7 +68,12 @@ public class MeterService {
         meter.setLastReadingAt(java.time.LocalDateTime.now());
         meterRepository.save(meter);
 
-        return logRepository.save(log);
+        logRepository.save(log);
+        
+        // Trigger automated maintenance checks
+        meterTriggerService.evaluateMeterReadings(meter);
+
+        return log;
     }
 
     @Transactional(readOnly = true)

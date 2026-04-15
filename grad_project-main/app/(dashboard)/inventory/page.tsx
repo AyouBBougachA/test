@@ -13,7 +13,14 @@ import {
   Filter,
   Layers,
   MapPin,
-  Truck
+  Truck,
+  History,
+  CheckCircle,
+  XCircle,
+  TrendingDown,
+  DollarSign,
+  CalendarDays,
+  FileText
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -37,6 +44,7 @@ import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { inventoryApi } from "@/lib/api/inventory"
 import type { SparePartResponse } from "@/lib/api/types"
+import { cn } from "@/lib/utils"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -45,12 +53,18 @@ const fadeInUp = {
 }
 
 export default function InventoryPage() {
-  const { user, isAuthenticated, isLoading: isAuthLoading, language } = useAuth()
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
+  const { language } = useI18n()
   const [parts, setParts] = useState<SparePartResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [valuation, setValuation] = useState(0)
+  const [pendingRestocks, setPendingRestocks] = useState<any[]>([])
+  const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false)
+  const [selectedPartForRestock, setSelectedPartForRestock] = useState<number | null>(null)
+  const [restockQty, setRestockQty] = useState(10)
 
   const [newPart, setNewPart] = useState({
     name: "",
@@ -67,12 +81,39 @@ export default function InventoryPage() {
     if (!isAuthenticated) return
     setIsLoading(true)
     try {
-      const data = await inventoryApi.list()
-      setParts(data)
+      const [partsData, valuationData, pendingData] = await Promise.all([
+        inventoryApi.list(),
+        inventoryApi.getValuation(),
+        inventoryApi.getPendingRestocks()
+      ])
+      setParts(partsData)
+      setValuation(valuationData)
+      setPendingRestocks(pendingData)
     } catch (error) {
-      console.error("Failed to load inventory", error)
+      console.error("Failed to load inventory data", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleCreateRestock = async () => {
+    if (!selectedPartForRestock || !user?.id) return
+    try {
+      await inventoryApi.requestRestock(selectedPartForRestock, restockQty, user.id)
+      setIsRestockDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const handleApproveRestock = async (id: number) => {
+    if (!user?.id) return
+    try {
+      await inventoryApi.approveRestock(id, user.id)
+      loadData()
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -105,8 +146,8 @@ export default function InventoryPage() {
 
   const filteredParts = useMemo(() => {
     return parts.filter(part => {
-      const matchesSearch = part.name.toLowerCase().includes(search.toLowerCase()) || 
-                           part.sku.toLowerCase().includes(search.toLowerCase())
+      const matchesSearch = (part.name?.toLowerCase() || "").includes(search.toLowerCase()) || 
+                           (part.sku?.toLowerCase() || "").includes(search.toLowerCase())
       const matchesCategory = categoryFilter === "all" || part.category === categoryFilter
       return matchesSearch && matchesCategory
     })
@@ -240,14 +281,15 @@ export default function InventoryPage() {
       </motion.div>
 
       {/* Stats */}
-      <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-3">
+      <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-4">
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Valuation</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{parts.length}</div>
+            <div className="text-2xl font-bold">${valuation.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">Asset value in stock</p>
           </CardContent>
         </Card>
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
@@ -263,14 +305,57 @@ export default function InventoryPage() {
         </Card>
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Unique Categories</CardTitle>
-            <Layers className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Restocks</CardTitle>
+            <Truck className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{categories.length}</div>
+            <div className="text-2xl font-bold">{pendingRestocks.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Stock Integrity</CardTitle>
+            <CheckCircle className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">100%</div>
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Manager Review Section */}
+      {(user?.roleName === 'ADMIN' || user?.roleName === 'MAINTENANCE_MANAGER') && pendingRestocks.length > 0 && (
+        <motion.div variants={fadeInUp}>
+          <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider opacity-80">Pending Manager Review</CardTitle>
+              <CardDescription>Verify and approve stock replenishment requests from technicians.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingRestocks.map(req => {
+                  const part = parts.find(p => p.partId === req.partId)
+                  return (
+                    <div key={req.requestId} className="flex items-center justify-between p-3 rounded-lg border border-amber-500/10 bg-background/50">
+                      <div className="flex items-center gap-3">
+                        <Truck className="h-5 w-5 text-amber-500" />
+                        <div>
+                          <p className="font-medium text-sm">{part?.name || 'Unknown Part'} (x{req.quantity})</p>
+                          <p className="text-xs text-muted-foreground">Requested {new Date(req.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="h-8 shadow-sm">Details</Button>
+                        <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20" onClick={() => handleApproveRestock(req.requestId)}>Approve Arrival</Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -307,6 +392,7 @@ export default function InventoryPage() {
           <CardContent className="p-0">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <p className="animate-pulse">Loading core database...</p>
               </div>
             ) : (
@@ -326,7 +412,7 @@ export default function InventoryPage() {
                     {filteredParts.map((part) => (
                       <tr key={part.partId} className="border-b border-border hover:bg-muted/30 transition-colors">
                         <td className="py-4 px-6">
-                          <div className="font-medium">{part.name}</div>
+                          <div className="font-medium text-base">{part.name}</div>
                           <div className="text-xs text-muted-foreground">{part.category}</div>
                         </td>
                         <td className="py-4 px-6 font-mono text-xs">{part.sku}</td>
@@ -340,18 +426,30 @@ export default function InventoryPage() {
                           </div>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                             <MapPin className="h-3.5 w-3.5" />
                             <span>{part.location || 'N/A'}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6 font-medium">
+                        <td className="py-4 px-6 font-bold text-primary">
                           ${part.unitCost?.toFixed(2) || '0.00'}
                         </td>
                         <td className="py-4 px-6 text-right">
                           <div className="flex justify-end gap-2">
+                             <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 gap-1 px-2 border border-transparent hover:border-amber-500/20 hover:text-amber-500 transition-all"
+                              onClick={() => {
+                                setSelectedPartForRestock(part.partId)
+                                setIsRestockDialogOpen(true)
+                              }}
+                             >
+                              <History className="h-4 w-4" />
+                              Restock
+                             </Button>
                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Edit2 className="h-4 w-4" />
+                               <Edit2 className="h-4 w-4" />
                              </Button>
                           </div>
                         </td>
@@ -364,6 +462,32 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Restock Request Dialog */}
+      <Dialog open={isRestockDialogOpen} onOpenChange={setIsRestockDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Request Stock Replenishment</DialogTitle>
+            <DialogDescription>
+              Create a formal request for new inventory. High priority items will notify the manager.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Quantity to Order</label>
+              <Input 
+                type="number" 
+                value={restockQty}
+                onChange={(e) => setRestockQty(parseInt(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+             <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)}>Cancel</Button>
+             <Button onClick={handleCreateRestock} className="bg-primary text-primary-foreground shadow-lg shadow-primary/20">Submit Request</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

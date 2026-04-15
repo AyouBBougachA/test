@@ -11,4 +11,5 @@ import java.util.List;
 public interface MaintenancePlanRepository extends JpaRepository<MaintenancePlan, Integer> {
     List<MaintenancePlan> findByIsActiveTrueAndNextDueDateBefore(LocalDateTime now);
     List<MaintenancePlan> findByEquipmentId(Integer equipmentId);
+    List<MaintenancePlan> findByMeterIdAndIsActiveTrue(Integer meterId);
 }

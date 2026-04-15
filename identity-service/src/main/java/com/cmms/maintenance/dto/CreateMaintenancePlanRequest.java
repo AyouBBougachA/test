@@ -18,4 +18,6 @@ public class CreateMaintenancePlanRequest {
     private String frequencyType;
     private Integer frequencyValue;
     private String nextDueDate;
+    private Integer meterId;
+    private java.math.BigDecimal nextMeterReading;
 }

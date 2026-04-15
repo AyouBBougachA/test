@@ -23,6 +23,7 @@ public class MaintenancePlanService {
 
     private final MaintenancePlanRepository planRepository;
     private final WorkOrderRepository workOrderRepository;
+    private final com.cmms.equipment.repository.MeterRepository meterRepository;
 
     @Scheduled(cron = "0 0 1 * * ?") // Run every day at 1 AM
     @Transactional
@@ -43,7 +44,7 @@ public class MaintenancePlanService {
                 .equipmentId(plan.getEquipmentId())
                 .woType(WorkOrder.WorkOrderType.PREVENTIVE)
                 .priority(WorkOrder.WorkOrderPriority.MEDIUM)
-                .status(WorkOrder.WorkOrderStatus.OPEN)
+                .status(WorkOrder.WorkOrderStatus.CREATED)
                 .title("Scheduled: " + plan.getTitle())
                 .description(plan.getDescription())
                 .dueDate(plan.getNextDueDate())
@@ -101,8 +102,18 @@ public class MaintenancePlanService {
                 .frequencyType(type)
                 .frequencyValue(request.getFrequencyValue())
                 .nextDueDate(nextDue)
+                .meterId(request.getMeterId())
+                .nextMeterReading(request.getNextMeterReading())
                 .isActive(true)
                 .build();
+        
+        // If it's a meter plan and next reading isn't set, initialize it from current meter value
+        if (type == MaintenancePlan.FrequencyType.METER && plan.getMeterId() != null && plan.getNextMeterReading() == null) {
+            meterRepository.findById(plan.getMeterId()).ifPresent(meter -> {
+                java.math.BigDecimal current = meter.getValue() != null ? meter.getValue() : java.math.BigDecimal.ZERO;
+                plan.setNextMeterReading(current.add(java.math.BigDecimal.valueOf(plan.getFrequencyValue())));
+            });
+        }
 
         return planRepository.save(plan);
     }

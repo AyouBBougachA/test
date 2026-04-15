@@ -1474,14 +1474,11 @@ export default function EquipmentPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault()
-                                void openView(eq.id)
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              {t("view")}
+                            <DropdownMenuItem asChild>
+                              <Link href={`/equipment/${eq.id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                {t("view")}
+                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={(e) => {

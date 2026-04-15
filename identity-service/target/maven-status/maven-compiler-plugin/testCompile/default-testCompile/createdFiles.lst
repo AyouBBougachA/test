@@ -15,3 +15,4 @@ com\cmms\equipment\controller\EquipmentExceptionHandlerTest$TestApplication.clas
 com\cmms\claims\controller\ClaimsControllerTest$TestApplication.class
 com\cmms\equipment\controller\EquipmentExceptionHandlerTest.class
 com\cmms\security\SecurityAccessTest.class
+com\cmms\security\SystemHardeningTest.class

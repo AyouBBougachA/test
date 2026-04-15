@@ -6,6 +6,9 @@ import type {
   ClaimStatsResponse,
   CreateClaimRequest,
   UpdateClaimRequest,
+  ClaimQualificationRequest,
+  ClaimAssignRequest,
+  ClaimStatusUpdateRequest,
 } from './types'
 
 export const claimsApi = {
@@ -44,6 +47,30 @@ export const claimsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+
+  qualify: (id: number, data: ClaimQualificationRequest) =>
+    requestJson<ClaimResponse>(`/claims/${id}/qualify`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  assign: (id: number, data: ClaimAssignRequest) =>
+    requestJson<ClaimResponse>(`/claims/${id}/assign`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  updateStatus: (id: number, data: ClaimStatusUpdateRequest) =>
+    requestJson<ClaimResponse>(`/claims/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  getHistory: (id: number) =>
+    requestJson<any[]>(`/claims/${id}/history`),
 
   uploadPhoto: async (claimId: number, file: File) => {
     const formData = new FormData()

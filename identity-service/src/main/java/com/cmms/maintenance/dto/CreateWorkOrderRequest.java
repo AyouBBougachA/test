@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CreateWorkOrderRequest {
     private Integer claimId;
+    private Integer parentWoId;
+
     
     @NotNull(message = "Equipment ID is required")
     private Integer equipmentId;
@@ -28,6 +30,7 @@ public class CreateWorkOrderRequest {
     
     private String description;
     private Integer assignedToUserId;
+    private java.util.List<Integer> secondaryAssigneeIds;
     private BigDecimal estimatedTimeHours;
     private BigDecimal estimatedCost;
     private LocalDateTime dueDate;

@@ -10,4 +10,5 @@ import java.util.List;
 public interface PartUsageRepository extends JpaRepository<PartUsage, Integer> {
     List<PartUsage> findByWoId(Integer woId);
     List<PartUsage> findByPartId(Integer partId);
+    List<PartUsage> findByTaskId(Integer taskId);
 }

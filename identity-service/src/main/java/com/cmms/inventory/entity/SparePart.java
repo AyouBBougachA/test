@@ -46,6 +46,20 @@ public class SparePart {
 
     private String supplier;
 
+    @Column(name = "batch_number")
+    private String batchNumber;
+
+    @Column(name = "expiry_date")
+    private java.time.LocalDate expiryDate;
+
+    @ManyToMany
+    @JoinTable(
+        name = "model_spare_parts",
+        joinColumns = @JoinColumn(name = "part_id"),
+        inverseJoinColumns = @JoinColumn(name = "model_id")
+    )
+    private java.util.Set<com.cmms.equipment.entity.EquipmentModel> compatibleModels;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

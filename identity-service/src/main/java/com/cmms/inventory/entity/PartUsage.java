@@ -26,6 +26,9 @@ public class PartUsage {
     @Column(name = "wo_id", nullable = false)
     private Integer woId;
 
+    @Column(name = "task_id")
+    private Integer taskId;
+
     @Column(name = "part_id", nullable = false)
     private Integer partId;
 

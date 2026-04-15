@@ -1,33 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
-import { motion } from "framer-motion"
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus,
-  Clock,
-  Wrench,
-  AlertCircle
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { useI18n } from "@/lib/i18n"
-import { useAuth } from "@/lib/auth-context"
-import { planningApi } from "@/lib/api/planning"
-import { equipmentApi } from "@/lib/api/equipment"
-import type { MaintenancePlanResponse, EquipmentResponse } from "@/lib/api/types"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { useState, useEffect } from "react"
 import { 
   format, 
   addMonths, 
@@ -39,315 +12,139 @@ import {
   isSameMonth, 
   isSameDay, 
   addDays, 
-  eachDayOfInterval 
+  eachDayOfInterval,
+  isToday
 } from "date-fns"
+import { ChevronLeft, ChevronRight, Info, AlertCircle } from "lucide-react"
+import Link from "next/link"
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4 }
-}
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { workOrdersApi } from "@/lib/api/work-orders"
+import type { WorkOrderResponse } from "@/lib/api/types"
+import { cn } from "@/lib/utils"
 
-export default function PlanningCalendarPage() {
-  const { user, isAuthenticated, isLoading: isAuthLoading, language } = useAuth()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [plans, setPlans] = useState<MaintenancePlanResponse[]>([])
-  const [equipmentList, setEquipmentList] = useState<EquipmentResponse[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-
-  const [newPlan, setNewPlan] = useState({
-    title: "",
-    description: "",
-    equipmentId: "",
-    frequencyType: "MONTHS",
-    frequencyValue: 1,
-    nextDueDate: format(new Date(), 'yyyy-MM-dd')
-  })
-
-  const loadData = async () => {
-    if (!isAuthenticated) return
-    setIsLoading(true)
-    try {
-      const [planData, eqData] = await Promise.all([
-        planningApi.getAll(),
-        equipmentApi.getAll()
-      ])
-      setPlans(planData)
-      setEquipmentList(eqData)
-    } catch (error) {
-      console.error("Failed to load planning data", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+export default function CalendarPage() {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!isAuthLoading && isAuthenticated) {
-      loadData()
+    const load = async () => {
+      try {
+        const data = await workOrdersApi.list()
+        setWorkOrders(data)
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [isAuthenticated, isAuthLoading])
+    load()
+  }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      await planningApi.create({
-        ...newPlan,
-        equipmentId: parseInt(newPlan.equipmentId),
-        frequencyValue: parseInt(String(newPlan.frequencyValue))
-      })
-      setIsDialogOpen(false)
-      loadData()
-    } catch (error) {
-      console.error("Failed to create maintenance plan", error)
-    }
-  }
-
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
-
-  const monthStart = startOfMonth(currentMonth)
+  const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(monthStart)
   const startDate = startOfWeek(monthStart)
   const endDate = endOfWeek(monthEnd)
 
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate
-  })
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
 
-  // Group plans by date
-  const plansByDate = useMemo(() => {
-    const map = new Map<string, MaintenancePlanResponse[]>()
-    plans.forEach(plan => {
-      if (!plan.nextDueDate) return
-      const dateStr = format(new Date(plan.nextDueDate), 'yyyy-MM-dd')
-      if (!map.has(dateStr)) map.set(dateStr, [])
-      map.get(dateStr)?.push(plan)
+  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
+  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1))
+
+  const getDayWos = (day: Date) => {
+    return workOrders.filter(wo => {
+      if (!wo.plannedStart && !wo.dueDate) return false
+      const date = wo.plannedStart ? new Date(wo.plannedStart) : new Date(wo.dueDate!)
+      return isSameDay(date, day)
     })
-    return map
-  }, [plans])
-
-  if (isAuthLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    )
   }
 
-  if (!isAuthenticated) return null
+  if (loading) {
+     return <div className="flex h-96 items-center justify-center text-muted-foreground animate-pulse">Initializing calendar...</div>
+  }
 
   return (
-    <motion.div 
-      initial="initial" 
-      animate="animate" 
-      className="flex-1 space-y-6 overflow-auto pb-10"
-    >
-      {/* Header */}
-      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Maintenance Calendar</h1>
-          <p className="text-muted-foreground">
-            Visualize and manage your scheduled maintenance interventions.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="font-semibold text-lg min-w-[150px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
+    <Card className="shadow-xl border-border/40 overflow-hidden rounded-3xl">
+      <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b border-border/60 py-4">
+        <div className="flex flex-col">
+          <CardTitle className="text-xl font-bold bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">
+            {format(currentDate, "MMMM yyyy")}
+          </CardTitle>
+          <div className="flex gap-4 mt-1">
+             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <div className="h-2 w-2 rounded-full bg-indigo-500" /> Planned
+             </div>
+             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <div className="h-2 w-2 rounded-full bg-amber-500" /> Due Date
+             </div>
           </div>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="ml-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Plan
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl text-foreground">
-              <DialogHeader>
-                <DialogTitle>Schedule Preventive Maintenance</DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Define the frequency and start date for recurring equipment checkups.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Activity Title</label>
-                  <Input 
-                    required 
-                    placeholder="e.g., Monthly Filter Replacement" 
-                    value={newPlan.title}
-                    onChange={(e) => setNewPlan({...newPlan, title: e.target.value})}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Equipment</label>
-                  <select 
-                    required
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={newPlan.equipmentId}
-                    onChange={(e) => setNewPlan({...newPlan, equipmentId: e.target.value})}
-                  >
-                    <option value="">Select Equipment...</option>
-                    {equipmentList.map(eq => (
-                      <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Frequency Type</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      value={newPlan.frequencyType}
-                      onChange={(e) => setNewPlan({...newPlan, frequencyType: e.target.value})}
-                    >
-                      <option value="DAYS">Days</option>
-                      <option value="WEEKS">Weeks</option>
-                      <option value="MONTHS">Months</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Every (Value)</label>
-                    <Input 
-                      type="number"
-                      required
-                      min="1"
-                      value={newPlan.frequencyValue}
-                      onChange={(e) => setNewPlan({...newPlan, frequencyValue: parseInt(e.target.value)})}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Initial Due Date</label>
-                  <Input 
-                    type="date"
-                    required
-                    value={newPlan.nextDueDate}
-                    onChange={(e) => setNewPlan({...newPlan, nextDueDate: e.target.value})}
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit" className="bg-primary text-primary-foreground">Create Plan</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
-      </motion.div>
-
-      {/* Calendar Grid */}
-      <motion.div variants={fadeInUp}>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border overflow-hidden">
-          <CardContent className="p-0">
-            <div className="grid grid-cols-7 border-b border-border bg-muted/30">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {day}
-                </div>
-              ))}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 rounded-lg">Today</Button>
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5 border">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 hover:bg-white"><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 hover:bg-white"><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </div>
+    </CardHeader>
+      <CardContent className="p-0">
+        <div className="grid grid-cols-7 border-b border-border/60 bg-muted/5">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div key={day} className="p-3 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              {day}
             </div>
-            <div className="grid grid-cols-7 gap-px bg-border">
-              {isLoading ? (
-                <div className="col-span-7 bg-card py-40 flex items-center justify-center">
-                   <div className="animate-pulse text-muted-foreground italic">Synchronizing with scheduler...</div>
-                </div>
-              ) : calendarDays.map((day, i) => {
-                const dateStr = format(day, 'yyyy-MM-dd')
-                const dayPlans = plansByDate.get(dateStr) || []
-                const isCurrentMonth = isSameMonth(day, monthStart)
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`min-h-[140px] bg-card p-2 transition-colors hover:bg-muted/10 ${
-                      !isCurrentMonth ? 'bg-muted/5' : ''
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                       <span className={`text-sm font-medium p-1 w-7 h-7 flex items-center justify-center rounded-full ${
-                         isSameDay(day, new Date()) ? 'bg-primary text-primary-foreground' : 
-                         !isCurrentMonth ? 'text-muted-foreground/50' : 'text-foreground'
-                       }`}>
-                         {format(day, 'd')}
-                       </span>
-                    </div>
-                    <div className="space-y-1">
-                      {dayPlans.map((plan, idx) => (
-                        <div 
-                          key={idx}
-                          className="text-[10px] p-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-medium truncate flex items-center gap-1.5"
-                          title={plan.title}
-                        >
-                          <Wrench className="h-2.5 w-2.5 shrink-0" />
-                          <span className="truncate">{plan.title}</span>
-                        </div>
-                      ))}
-                      {dayPlans.length > 3 && (
-                        <div className="text-[10px] text-center text-muted-foreground py-0.5">
-                          + {dayPlans.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 auto-rows-[140px]">
+          {calendarDays.map((day, idx) => {
+            const dayWos = getDayWos(day)
+            const isCurrentMonth = isSameMonth(day, monthStart)
+            const isTodayDay = isToday(day)
 
-      {/* Legend & Summary */}
-      <motion.div variants={fadeInUp} className="grid gap-6 md:grid-cols-2">
-         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Legend</CardTitle>
-            </CardHeader>
-            <CardContent>
-               <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                     <div className="w-3 h-3 rounded-full bg-blue-500" />
-                     <span className="text-xs">Preventive</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                     <div className="w-3 h-3 rounded-full bg-rose-500" />
-                     <span className="text-xs">Missed / Late</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                     <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                     <span className="text-xs">Completed</span>
-                  </div>
-               </div>
-            </CardContent>
-         </Card>
-         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">This Month</CardTitle>
-            </CardHeader>
-            <CardContent>
-               <div className="flex gap-6">
-                  <div>
-                    <div className="text-2xl font-bold">{plans.length}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase">Total Planned</div>
-                  </div>
-                  <div className="w-px bg-border h-10 self-center" />
-                  <div>
-                    <div className="text-2xl font-bold text-amber-500">
-                      {plans.filter(p => p.isActive).length}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground uppercase">Active Plans</div>
-                  </div>
-               </div>
-            </CardContent>
-         </Card>
-      </motion.div>
-    </motion.div>
+            return (
+              <div 
+                key={idx} 
+                className={cn(
+                  "border-r border-b border-border/40 p-1 flex flex-col gap-1 transition-colors hover:bg-muted/5",
+                  !isCurrentMonth && "bg-muted/10 opacity-40"
+                )}
+              >
+                <div className="flex justify-start p-1.5">
+                  <span className={cn(
+                    "text-xs font-semibold h-7 w-7 flex items-center justify-center rounded-full",
+                    isTodayDay && "bg-primary text-white shadow-md shadow-primary/30",
+                    !isTodayDay && isCurrentMonth && "text-foreground",
+                    !isTodayDay && !isCurrentMonth && "text-muted-foreground"
+                  )}>
+                    {format(day, "d")}
+                  </span>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-1">
+                  {dayWos.map(wo => (
+                    <Link key={wo.woId} href={`/work-orders/${wo.woId}`}>
+                      <div className={cn(
+                         "text-[10px] p-1.5 rounded-lg border flex flex-col gap-0.5 shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]",
+                         wo.status === 'COMPLETED' ? "bg-emerald-50 border-emerald-100 text-emerald-800" :
+                         wo.status === 'IN_PROGRESS' ? "bg-amber-50 border-amber-100 text-amber-800" :
+                         wo.plannedStart ? "bg-indigo-50 border-indigo-100 text-indigo-800" : "bg-zinc-50 border-zinc-200 text-zinc-800"
+                      )}>
+                        <div className="flex items-center justify-between">
+                           <span className="font-bold tracking-tight">{wo.woCode}</span>
+                           {wo.priority === 'CRITICAL' && <AlertCircle className="h-2 w-2 text-rose-500" />}
+                        </div>
+                        <span className="truncate opacity-90 leading-tight">{wo.title}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

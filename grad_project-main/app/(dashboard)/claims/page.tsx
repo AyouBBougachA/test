@@ -187,13 +187,22 @@ export default function ClaimsPage() {
   const getStatusColor = (status: string) => {
     switch (normalizeStatusLabel(status)) {
       case "open":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      case "new":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+      case "qualified":
+        return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
       case "assigned":
         return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
       case "in progress":
         return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400"
-      case "closed":
+      case "converted to work order":
+        return "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
+      case "resolved":
         return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+      case "closed":
+        return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400"
+      case "rejected":
+        return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
       default:
         return "bg-muted text-muted-foreground"
     }
@@ -251,11 +260,11 @@ export default function ClaimsPage() {
       bgColor: "bg-orange-50 dark:bg-orange-900/20",
     },
     {
-      label: language === "fr" ? "En attente" : "Pending",
+      label: language === "fr" ? "Nouveaux" : "New",
       value: kpi.pending,
       icon: Clock,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
       label: language === "fr" ? "En cours" : "In Progress",
@@ -358,10 +367,14 @@ export default function ClaimsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
-                      <SelectItem value="Open">{t("open")}</SelectItem>
-                      <SelectItem value="Assigned">{t("assigned")}</SelectItem>
-                      <SelectItem value="In Progress">{t("inProgress")}</SelectItem>
-                      <SelectItem value="Closed">{t("closed")}</SelectItem>
+                      <SelectItem value="New">New</SelectItem>
+                      <SelectItem value="Qualified">Qualified</SelectItem>
+                      <SelectItem value="Assigned">Assigned</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Converted To Work Order">In WO</SelectItem>
+                      <SelectItem value="Resolved">Resolved</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                      <SelectItem value="Rejected">Rejected</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>

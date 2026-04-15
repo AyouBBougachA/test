@@ -4,49 +4,77 @@ import com.cmms.claims.entity.Claim;
 import com.cmms.claims.repository.ClaimRepository;
 import com.cmms.equipment.entity.Equipment;
 import com.cmms.equipment.repository.EquipmentRepository;
-import com.cmms.maintenance.dto.CreateWorkOrderRequest;
-import com.cmms.maintenance.dto.WorkOrderResponse;
+import com.cmms.maintenance.dto.*;
+import com.cmms.maintenance.entity.Task;
 import com.cmms.maintenance.entity.WorkOrder;
+import com.cmms.maintenance.entity.WorkOrderStatusHistory;
+import com.cmms.maintenance.repository.TaskRepository;
 import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.maintenance.repository.WorkOrderStatusHistoryRepository;
+import com.cmms.maintenance.repository.WorkOrderAssignmentRepository;
+import com.cmms.maintenance.repository.WorkOrderFollowerRepository;
+import com.cmms.maintenance.entity.WorkOrderAssignment;
+import com.cmms.maintenance.entity.WorkOrderFollower;
 import com.cmms.identity.entity.User;
 import com.cmms.identity.repository.UserRepository;
 import com.cmms.claims.exception.ResourceNotFoundException;
+import com.cmms.identity.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class WorkOrderService {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_MAINTENANCE_MANAGER = "MAINTENANCE_MANAGER";
+    private static final String ROLE_TECHNICIAN = "TECHNICIAN";
+
     private final WorkOrderRepository workOrderRepository;
     private final ClaimRepository claimRepository;
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
+    private final WorkOrderStatusHistoryRepository historyRepository;
+    private final TaskRepository taskRepository;
+    private final WorkOrderAssignmentRepository assignmentRepository;
+    private final WorkOrderFollowerRepository followerRepository;
+    private final com.cmms.notifications.service.NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<WorkOrderResponse> list(String status, String type, Integer equipmentId, Integer assignedToUserId) {
-        Specification<WorkOrder> spec = Specification.where(null);
+        Actor actor = getCurrentActorRequired();
         
-        if (status != null) spec = spec.and((root, cq, cb) -> cb.equal(root.get("status"), WorkOrder.WorkOrderStatus.valueOf(status.toUpperCase())));
+        Specification<WorkOrder> spec = Specification.where(accessScopeSpec(actor));
+        
+        if (status != null) spec = spec.and((root, cq, cb) -> cb.equal(root.get("status"), parseStatusRequired(status)));
         if (type != null) spec = spec.and((root, cq, cb) -> cb.equal(root.get("woType"), WorkOrder.WorkOrderType.valueOf(type.toUpperCase())));
         if (equipmentId != null) spec = spec.and((root, cq, cb) -> cb.equal(root.get("equipmentId"), equipmentId));
         if (assignedToUserId != null) spec = spec.and((root, cq, cb) -> cb.equal(root.get("assignedToUserId"), assignedToUserId));
 
-        return workOrderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<WorkOrder> wos = workOrderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return batchMapToResponse(wos);
     }
 
     @Transactional
     public WorkOrderResponse create(CreateWorkOrderRequest request) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+
         Equipment equipment = equipmentRepository.findById(request.getEquipmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found"));
 
@@ -55,54 +83,590 @@ public class WorkOrderService {
                 .equipmentId(equipment.getEquipmentId())
                 .woType(WorkOrder.WorkOrderType.valueOf(request.getWoType().toUpperCase()))
                 .priority(WorkOrder.WorkOrderPriority.valueOf(request.getPriority().toUpperCase()))
-                .status(WorkOrder.WorkOrderStatus.OPEN)
+                .status(WorkOrder.WorkOrderStatus.CREATED)
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .assignedToUserId(request.getAssignedToUserId())
+                .parentWoId(request.getParentWoId())
                 .estimatedTimeHours(request.getEstimatedTimeHours())
                 .estimatedCost(request.getEstimatedCost())
                 .dueDate(request.getDueDate())
                 .isArchived(false)
                 .build();
 
-        return toResponse(workOrderRepository.save(wo));
+        if (wo.getAssignedToUserId() != null || (request.getSecondaryAssigneeIds() != null && !request.getSecondaryAssigneeIds().isEmpty())) {
+            wo.setStatus(WorkOrder.WorkOrderStatus.ASSIGNED);
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+
+        if (request.getSecondaryAssigneeIds() != null) {
+            for (Integer secondaryId : request.getSecondaryAssigneeIds()) {
+                assignmentRepository.save(WorkOrderAssignment.builder()
+                        .woId(saved.getWoId())
+                        .userId(secondaryId)
+                        .build());
+            }
+        }
+
+        saveStatusHistory(saved.getWoId(), null, saved.getStatus(), actor.displayName, "Work Order generated");
+
+        // Auto-follow for the claimant (technician)
+        if (saved.getClaimId() != null) {
+            claimRepository.findById(saved.getClaimId()).ifPresent(claim -> {
+                followerRepository.save(WorkOrderFollower.builder()
+                        .woId(saved.getWoId())
+                        .userId(claim.getRequesterId())
+                        .build());
+            });
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
     public WorkOrderResponse getById(Integer id) {
-        WorkOrder wo = workOrderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Work Order not found"));
+        Actor actor = getCurrentActorRequired();
+        WorkOrder wo = getWoEntity(id);
+        assertCanView(wo, actor);
         return toResponse(wo);
     }
 
-    private WorkOrderResponse toResponse(WorkOrder wo) {
-        Equipment equipment = equipmentRepository.findById(wo.getEquipmentId()).orElse(null);
-        User assignee = wo.getAssignedToUserId() == null ? null : userRepository.findById(wo.getAssignedToUserId()).orElse(null);
-        Claim claim = wo.getClaimId() == null ? null : claimRepository.findById(wo.getClaimId()).orElse(null);
+    @Transactional
+    public WorkOrderResponse update(Integer id, UpdateWorkOrderRequest request) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        WorkOrder wo = getWoEntity(id);
 
-        return WorkOrderResponse.builder()
-                .woId(wo.getWoId())
-                .woCode(String.format("WO-%03d", wo.getWoId()))
-                .claimId(wo.getClaimId())
-                .claimCode(claim == null ? null : String.format("CLM-%03d", claim.getClaimId()))
-                .equipmentId(wo.getEquipmentId())
-                .equipmentName(equipment == null ? null : equipment.getName())
-                .woType(wo.getWoType().name())
-                .priority(wo.getPriority().name())
-                .status(wo.getStatus().name())
-                .title(wo.getTitle())
-                .description(wo.getDescription())
-                .assignedToUserId(wo.getAssignedToUserId())
-                .assignedToName(assignee == null ? null : assignee.getFullName())
-                .estimatedTimeHours(wo.getEstimatedTimeHours())
-                .actualTimeHours(wo.getActualTimeHours())
-                .estimatedCost(wo.getEstimatedCost())
-                .actualCost(wo.getActualCost())
-                .createdAt(wo.getCreatedAt())
-                .updatedAt(wo.getUpdatedAt())
-                .dueDate(wo.getDueDate())
-                .completedAt(wo.getCompletedAt())
-                .completionNotes(wo.getCompletionNotes())
+        if (wo.getStatus() == WorkOrder.WorkOrderStatus.CLOSED || wo.getStatus() == WorkOrder.WorkOrderStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot update a closed or cancelled work order");
+        }
+
+        wo.setTitle(request.getTitle());
+        wo.setDescription(request.getDescription());
+        wo.setPriority(WorkOrder.WorkOrderPriority.valueOf(request.getPriority().toUpperCase()));
+        wo.setEstimatedTimeHours(request.getEstimatedTimeHours());
+        wo.setEstimatedDuration(request.getEstimatedDuration());
+        wo.setEstimatedCost(request.getEstimatedCost());
+        wo.setDueDate(request.getDueDate());
+        wo.setPlannedStart(request.getPlannedStart());
+        wo.setPlannedEnd(request.getPlannedEnd());
+
+        return toResponse(workOrderRepository.save(wo));
+    }
+
+    @Transactional
+    public WorkOrderResponse assign(Integer id, AssignWorkOrderRequest request) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        WorkOrder wo = getWoEntity(id);
+
+        if (wo.getStatus() == WorkOrder.WorkOrderStatus.CLOSED || wo.getStatus() == WorkOrder.WorkOrderStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot assign a closed or cancelled work order");
+        }
+
+        User assignee = userRepository.findById(request.getAssignedToUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
+
+        wo.setAssignedToUserId(assignee.getUserId());
+        
+        assignmentRepository.deleteByWoId(wo.getWoId());
+        if (request.getSecondaryAssigneeIds() != null) {
+            for (Integer sec : request.getSecondaryAssigneeIds()) {
+                assignmentRepository.save(WorkOrderAssignment.builder()
+                        .woId(wo.getWoId())
+                        .userId(sec)
+                        .build());
+            }
+        }
+        
+        if (wo.getStatus() == WorkOrder.WorkOrderStatus.CREATED) {
+            WorkOrder.WorkOrderStatus old = wo.getStatus();
+            wo.setStatus(WorkOrder.WorkOrderStatus.ASSIGNED);
+            saveStatusHistory(wo.getWoId(), old, wo.getStatus(), actor.displayName, "Assigned to " + assignee.getFullName());
+        } else {
+            saveStatusHistory(wo.getWoId(), wo.getStatus(), wo.getStatus(), actor.displayName, "Reassigned to " + assignee.getFullName());
+        }
+
+        notificationService.sendDirect(
+                assignee.getUserId(),
+                "INFO",
+                "You have been assigned to Work Order #" + wo.getWoId() + ": " + wo.getTitle(),
+                wo.getWoId()
+        );
+
+        return toResponse(workOrderRepository.save(wo));
+    }
+
+    @Transactional
+    public WorkOrderResponse updateStatus(Integer id, WorkOrderStatusUpdateRequest request) {
+        Actor actor = getCurrentActorRequired();
+        WorkOrder wo = getWoEntity(id);
+        
+        assertCanUpdateStatus(wo, actor);
+
+        WorkOrder.WorkOrderStatus newStatus = parseStatusRequired(request.getStatus());
+        WorkOrder.WorkOrderStatus oldStatus = wo.getStatus();
+
+        enforceWoTransition(oldStatus, newStatus);
+
+        if (newStatus == WorkOrder.WorkOrderStatus.COMPLETED && !Boolean.TRUE.equals(request.getForceClose())) {
+            List<Task> tasks = taskRepository.findByWoIdOrderByOrderIndexAsc(wo.getWoId());
+            boolean hasIncompleteTasks = tasks.stream().anyMatch(t -> t.getStatus() != Task.TaskStatus.DONE && t.getStatus() != Task.TaskStatus.SKIPPED);
+            if (hasIncompleteTasks && !actor.isAdminOrManager()) {
+                throw new IllegalStateException("Cannot complete work order with incomplete tasks. Complete all tasks first.");
+            }
+        }
+
+        wo.setStatus(newStatus);
+        
+        if (newStatus == WorkOrder.WorkOrderStatus.IN_PROGRESS && wo.getActualStart() == null) {
+            wo.setActualStart(LocalDateTime.now());
+        }
+        
+        if (newStatus == WorkOrder.WorkOrderStatus.COMPLETED) {
+            wo.setCompletedAt(LocalDateTime.now());
+            wo.setActualEnd(LocalDateTime.now());
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        saveStatusHistory(saved.getWoId(), oldStatus, newStatus, actor.displayName, request.getNote());
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderResponse validate(Integer id, ValidateWorkOrderRequest request) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        WorkOrder wo = getWoEntity(id);
+
+        if (wo.getStatus() != WorkOrder.WorkOrderStatus.COMPLETED) {
+            throw new IllegalStateException("Only COMPLETED work orders can be validated.");
+        }
+
+        WorkOrder.WorkOrderStatus oldStatus = wo.getStatus();
+        wo.setStatus(WorkOrder.WorkOrderStatus.VALIDATED);
+        wo.setValidationNotes(request.getValidationNotes());
+        wo.setValidatedAt(LocalDateTime.now());
+        wo.setValidatedBy(actor.displayName);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager validated");
+        
+        checkAndResolveClaim(saved);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderResponse close(Integer id) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        WorkOrder wo = getWoEntity(id);
+
+        if (wo.getStatus() != WorkOrder.WorkOrderStatus.VALIDATED) {
+            throw new IllegalStateException("Only VALIDATED work orders can be closed.");
+        }
+
+        WorkOrder.WorkOrderStatus oldStatus = wo.getStatus();
+        wo.setStatus(WorkOrder.WorkOrderStatus.CLOSED);
+        wo.setClosedAt(LocalDateTime.now());
+        wo.setClosedBy(actor.displayName);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager closed");
+        
+        checkAndResolveClaim(saved);
+        
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderResponse reschedule(Integer id, ScheduleWorkOrderRequest request) {
+        Actor actor = getCurrentActorRequired();
+        WorkOrder wo = getWoEntity(id);
+        
+        assertCanUpdateStatus(wo, actor);
+        
+        wo.setPlannedStart(request.getPlannedStart());
+        wo.setPlannedEnd(request.getPlannedEnd());
+        wo.setDueDate(request.getDueDate());
+        if (request.getEstimatedDuration() != null) {
+            wo.setEstimatedDuration(request.getEstimatedDuration());
+        }
+        
+        if (wo.getStatus() == WorkOrder.WorkOrderStatus.ASSIGNED || wo.getStatus() == WorkOrder.WorkOrderStatus.CREATED) {
+            saveStatusHistory(wo.getWoId(), wo.getStatus(), WorkOrder.WorkOrderStatus.SCHEDULED, actor.displayName, "Scheduled");
+            wo.setStatus(WorkOrder.WorkOrderStatus.SCHEDULED);
+        } else {
+            saveStatusHistory(wo.getWoId(), wo.getStatus(), wo.getStatus(), actor.displayName, "Rescheduled");
+        }
+
+        return toResponse(workOrderRepository.save(wo));
+    }
+
+    @Transactional
+    public void toggleFollower(Integer id) {
+        Actor actor = getCurrentActorRequired();
+        if (actor.userId == null) return;
+        
+        Optional<WorkOrderFollower> existing = followerRepository.findByWoIdAndUserId(id, actor.userId);
+        if (existing.isPresent()) {
+            followerRepository.delete(existing.get());
+        } else {
+            followerRepository.save(WorkOrderFollower.builder()
+                .woId(id)
+                .userId(actor.userId)
+                .build());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkOrderStatusHistoryResponse> getStatusHistory(Integer id) {
+        Actor actor = getCurrentActorRequired();
+        WorkOrder wo = getWoEntity(id);
+        assertCanView(wo, actor);
+
+        return historyRepository.findByWoIdOrderByChangedAtDesc(id).stream()
+                .map(h -> WorkOrderStatusHistoryResponse.builder()
+                        .id(h.getId())
+                        .woId(h.getWoId())
+                        .oldStatus(h.getOldStatus())
+                        .newStatus(h.getNewStatus())
+                        .changedAt(h.getChangedAt())
+                        .changedBy(h.getChangedBy())
+                        .note(h.getNote())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkOrderResponse> getDelayed() {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+
+        LocalDateTime now = LocalDateTime.now();
+        List<WorkOrder> delayed = workOrderRepository.findAll().stream()
+                .filter(wo -> wo.getDueDate() != null && wo.getDueDate().isBefore(now))
+                .filter(wo -> {
+                    var s = wo.getStatus();
+                    return s != WorkOrder.WorkOrderStatus.COMPLETED && 
+                           s != WorkOrder.WorkOrderStatus.VALIDATED && 
+                           s != WorkOrder.WorkOrderStatus.CLOSED && 
+                           s != WorkOrder.WorkOrderStatus.CANCELLED;
+                })
+                .collect(Collectors.toList());
+                
+        return batchMapToResponse(delayed);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkOrderResponse> getCalendar() {
+        Actor actor = getCurrentActorRequired();
+        Specification<WorkOrder> spec = Specification.where(accessScopeSpec(actor))
+            .and((root, cq, cb) -> cb.notEqual(root.get("status"), WorkOrder.WorkOrderStatus.CANCELLED));
+        return batchMapToResponse(workOrderRepository.findAll(spec));
+    }
+    
+    @Transactional(readOnly = true)
+    public List<WorkloadResponse> getWorkload() {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        
+        List<WorkOrder> allActive = workOrderRepository.findAll().stream()
+                .filter(wo -> wo.getAssignedToUserId() != null)
+                .filter(wo -> wo.getStatus() != WorkOrder.WorkOrderStatus.CLOSED && wo.getStatus() != WorkOrder.WorkOrderStatus.CANCELLED)
+                .collect(Collectors.toList());
+                
+        Map<Integer, List<WorkOrder>> byUser = allActive.stream().collect(Collectors.groupingBy(WorkOrder::getAssignedToUserId));
+        
+        List<User> users = userRepository.findAllById(byUser.keySet());
+        Map<Integer, String> userNames = users.stream().collect(Collectors.toMap(User::getUserId, User::getFullName));
+        
+        List<WorkloadResponse> workload = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        
+        for (Map.Entry<Integer, List<WorkOrder>> entry : byUser.entrySet()) {
+            Integer userId = entry.getKey();
+            List<WorkOrder> wos = entry.getValue();
+            
+            long overdue = wos.stream().filter(w -> w.getDueDate() != null && w.getDueDate().isBefore(now) && w.getStatus() != WorkOrder.WorkOrderStatus.COMPLETED && w.getStatus() != WorkOrder.WorkOrderStatus.VALIDATED).count();
+            
+            WorkloadResponse wr = WorkloadResponse.builder()
+                .userId(userId)
+                .userName(userNames.getOrDefault(userId, "Unknown"))
+                .totalAssigned((long) wos.size())
+                .created(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.CREATED).count())
+                .assigned(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.ASSIGNED).count())
+                .scheduled(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.SCHEDULED).count())
+                .inProgress(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.IN_PROGRESS).count())
+                .onHold(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.ON_HOLD).count())
+                .completed(wos.stream().filter(w -> w.getStatus() == WorkOrder.WorkOrderStatus.COMPLETED || w.getStatus() == WorkOrder.WorkOrderStatus.VALIDATED).count())
+                .overdue(overdue)
                 .build();
+            workload.add(wr);
+        }
+        
+        workload.sort(Comparator.comparing(WorkloadResponse::getTotalAssigned).reversed());
+        return workload;
+    }
+
+    private void checkAndResolveClaim(WorkOrder wo) {
+        if (wo.getClaimId() != null && (wo.getStatus() == WorkOrder.WorkOrderStatus.VALIDATED || wo.getStatus() == WorkOrder.WorkOrderStatus.CLOSED)) {
+            claimRepository.findById(wo.getClaimId()).ifPresent(claim -> {
+                if (claim.getStatus() != com.cmms.claims.entity.ClaimStatus.CLOSED && claim.getStatus() != com.cmms.claims.entity.ClaimStatus.RESOLVED) {
+                    claim.setStatus(com.cmms.claims.entity.ClaimStatus.RESOLVED);
+                    claim.setResolvedAt(LocalDateTime.now());
+                    claimRepository.save(claim);
+                }
+            });
+        }
+    }
+
+    private WorkOrder getWoEntity(Integer id) {
+        return workOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Work Order not found"));
+    }
+
+    private void saveStatusHistory(Integer woId, WorkOrder.WorkOrderStatus oldStatus, WorkOrder.WorkOrderStatus newStatus, String changedBy, String note) {
+        historyRepository.save(WorkOrderStatusHistory.builder()
+                .woId(woId)
+                .oldStatus(oldStatus == null ? null : oldStatus.name())
+                .newStatus(newStatus.name())
+                .changedBy(changedBy)
+                .note(note)
+                .build());
+
+        // Broadcast notification to primary technician and followers
+        if (oldStatus != newStatus && newStatus != null) {
+            String message = String.format("Work Order #%d status updated to %s by %s", woId, newStatus, changedBy);
+            
+            // Notify primary technician
+            workOrderRepository.findById(woId).ifPresent(wo -> {
+                if (wo.getAssignedToUserId() != null) {
+                    notificationService.sendDirect(wo.getAssignedToUserId(), "INFO", message, woId);
+                }
+            });
+
+            // Notify followers
+            List<WorkOrderFollower> followers = followerRepository.findByWoId(woId);
+            for (WorkOrderFollower follower : followers) {
+                notificationService.sendDirect(follower.getUserId(), "INFO", message, woId);
+            }
+        }
+    }
+
+    @Transactional
+    public void toggleFollower(Integer woId, Integer userId) {
+        followerRepository.findByWoIdAndUserId(woId, userId).ifPresentOrElse(
+            followerRepository::delete,
+            () -> followerRepository.save(WorkOrderFollower.builder().woId(woId).userId(userId).build())
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isFollowing(Integer woId, Integer userId) {
+        return followerRepository.findByWoIdAndUserId(woId, userId).isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> getFollowers(Integer woId) {
+        List<Integer> userIds = followerRepository.findByWoId(woId).stream()
+                .map(WorkOrderFollower::getUserId)
+                .collect(Collectors.toList());
+        return userRepository.findAllById(userIds);
+    }
+
+    private void enforceWoTransition(WorkOrder.WorkOrderStatus oldStatus, WorkOrder.WorkOrderStatus newStatus) {
+        if (oldStatus == newStatus) return;
+        boolean allowed = switch (oldStatus) {
+            case CREATED -> newStatus == WorkOrder.WorkOrderStatus.ASSIGNED || newStatus == WorkOrder.WorkOrderStatus.SCHEDULED || newStatus == WorkOrder.WorkOrderStatus.CANCELLED;
+            case ASSIGNED -> newStatus == WorkOrder.WorkOrderStatus.SCHEDULED || newStatus == WorkOrder.WorkOrderStatus.IN_PROGRESS || newStatus == WorkOrder.WorkOrderStatus.CANCELLED;
+            case SCHEDULED -> newStatus == WorkOrder.WorkOrderStatus.IN_PROGRESS || newStatus == WorkOrder.WorkOrderStatus.ON_HOLD || newStatus == WorkOrder.WorkOrderStatus.CANCELLED;
+            case IN_PROGRESS -> newStatus == WorkOrder.WorkOrderStatus.ON_HOLD || newStatus == WorkOrder.WorkOrderStatus.COMPLETED;
+            case ON_HOLD -> newStatus == WorkOrder.WorkOrderStatus.IN_PROGRESS || newStatus == WorkOrder.WorkOrderStatus.COMPLETED || newStatus == WorkOrder.WorkOrderStatus.CANCELLED;
+            case COMPLETED -> newStatus == WorkOrder.WorkOrderStatus.VALIDATED || newStatus == WorkOrder.WorkOrderStatus.IN_PROGRESS; // can revert
+            case VALIDATED -> newStatus == WorkOrder.WorkOrderStatus.CLOSED;
+            case CLOSED, CANCELLED -> false;
+        };
+        if (!allowed) {
+            throw new IllegalStateException("Invalid work order status transition from " + oldStatus + " to " + newStatus);
+        }
+    }
+
+    private List<WorkOrderResponse> batchMapToResponse(List<WorkOrder> wos) {
+        Map<Integer, Equipment> equipmentById = equipmentRepository.findAllById(wos.stream().map(WorkOrder::getEquipmentId).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Equipment::getEquipmentId, e -> e));
+        Map<Integer, User> userById = userRepository.findAllById(wos.stream().map(WorkOrder::getAssignedToUserId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(User::getUserId, u -> u));
+        Map<Integer, Claim> claimById = claimRepository.findAllById(wos.stream().map(WorkOrder::getClaimId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Claim::getClaimId, c -> c));
+
+        LocalDateTime now = LocalDateTime.now();
+        List<Integer> woIds = wos.stream().map(WorkOrder::getWoId).collect(Collectors.toList());
+        List<Task> allTasks = taskRepository.findAll(); // Simple approximation, could be optimized
+        Map<Integer, List<Task>> tasksByWo = allTasks.stream().collect(Collectors.groupingBy(Task::getWoId));
+        
+        List<WorkOrderAssignment> allAssignments = woIds.isEmpty() ? List.of() : assignmentRepository.findAll().stream()
+            .filter(a -> woIds.contains(a.getWoId()))
+            .collect(Collectors.toList());
+        
+        Map<Integer, List<WorkOrderAssignment>> assignmentsByWo = allAssignments.stream()
+            .collect(Collectors.groupingBy(WorkOrderAssignment::getWoId));
+            
+        List<Integer> allSecondaryUserIds = allAssignments.stream().map(WorkOrderAssignment::getUserId).collect(Collectors.toList());
+        Map<Integer, User> secondaryUsersById = userRepository.findAllById(allSecondaryUserIds).stream()
+            .collect(Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
+        List<WorkOrderFollower> allFollowers = woIds.isEmpty() ? List.of() : followerRepository.findAll().stream()
+            .filter(f -> woIds.contains(f.getWoId()))
+            .collect(Collectors.toList());
+        
+        Map<Integer, List<WorkOrderFollower>> followersByWo = allFollowers.stream()
+            .collect(Collectors.groupingBy(WorkOrderFollower::getWoId));
+
+        List<Integer> allFollowerUserIds = allFollowers.stream().map(WorkOrderFollower::getUserId).collect(Collectors.toList());
+        Map<Integer, User> followerUsersById = userRepository.findAllById(allFollowerUserIds).stream()
+            .collect(Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
+        return wos.stream().map(wo -> {
+            Equipment eq = equipmentById.get(wo.getEquipmentId());
+            User assignee = wo.getAssignedToUserId() == null ? null : userById.get(wo.getAssignedToUserId());
+            Claim claim = wo.getClaimId() == null ? null : claimById.get(wo.getClaimId());
+            List<Task> tasks = tasksByWo.getOrDefault(wo.getWoId(), List.of());
+            long completedTasks = tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.DONE || t.getStatus() == Task.TaskStatus.SKIPPED).count();
+            boolean hasPendingAdHoc = tasks.stream().anyMatch(t -> Boolean.TRUE.equals(t.getIsAdHoc()) && t.getApprovalStatus() == Task.TaskApprovalStatus.PENDING);
+
+            boolean overdue = wo.getDueDate() != null && wo.getDueDate().isBefore(now) && 
+                wo.getStatus() != WorkOrder.WorkOrderStatus.COMPLETED && 
+                wo.getStatus() != WorkOrder.WorkOrderStatus.VALIDATED && 
+                wo.getStatus() != WorkOrder.WorkOrderStatus.CLOSED && 
+                wo.getStatus() != WorkOrder.WorkOrderStatus.CANCELLED;
+
+            return WorkOrderResponse.builder()
+                    .woId(wo.getWoId())
+                    .woCode(String.format("WO-%03d", wo.getWoId()))
+                    .parentWoId(wo.getParentWoId())
+                    .parentWoCode(wo.getParentWoId() == null ? null : String.format("WO-%03d", wo.getParentWoId()))
+                    .claimId(wo.getClaimId())
+                    .claimCode(claim == null ? null : String.format("CLM-%03d", claim.getClaimId()))
+                    .equipmentId(wo.getEquipmentId())
+                    .equipmentName(eq == null ? null : eq.getName())
+                    .woType(wo.getWoType().name())
+                    .priority(wo.getPriority().name())
+                    .status(wo.getStatus().name())
+                    .title(wo.getTitle())
+                    .description(wo.getDescription())
+                    .assignedToUserId(wo.getAssignedToUserId())
+                    .assignedToName(assignee == null ? null : assignee.getFullName())
+                    .secondaryAssignees(assignmentsByWo.getOrDefault(wo.getWoId(), List.of()).stream()
+                        .map(a -> {
+                            User u = secondaryUsersById.get(a.getUserId());
+                            return WorkOrderResponse.UserReference.builder()
+                                .userId(a.getUserId())
+                                .name(u != null ? u.getFullName() : String.valueOf(a.getUserId()))
+                                .build();
+                        }).collect(Collectors.toList()))
+                    .followers(followersByWo.getOrDefault(wo.getWoId(), List.of()).stream()
+                        .map(f -> {
+                            User u = followerUsersById.get(f.getUserId());
+                            return WorkOrderResponse.UserReference.builder()
+                                .userId(f.getUserId())
+                                .name(u != null ? u.getFullName() : String.valueOf(f.getUserId()))
+                                .build();
+                        }).collect(Collectors.toList()))
+                    .estimatedTimeHours(wo.getEstimatedTimeHours())
+                    .actualTimeHours(wo.getActualTimeHours())
+                    .estimatedDuration(wo.getEstimatedDuration())
+                    .actualDuration(wo.getActualDuration())
+                    .estimatedCost(wo.getEstimatedCost())
+                    .actualCost(wo.getActualCost())
+                    .plannedStart(wo.getPlannedStart())
+                    .plannedEnd(wo.getPlannedEnd())
+                    .actualStart(wo.getActualStart())
+                    .actualEnd(wo.getActualEnd())
+                    .dueDate(wo.getDueDate())
+                    .overdue(overdue)
+                    .totalTasks((long) tasks.size())
+                    .completedTasks(completedTasks)
+                    .hasPendingAdHocTasks(hasPendingAdHoc)
+                    .hasCriticalFailure(wo.getHasCriticalFailure())
+                    .completedAt(wo.getCompletedAt())
+                    .completionNotes(wo.getCompletionNotes())
+                    .validationNotes(wo.getValidationNotes())
+                    .validatedAt(wo.getValidatedAt())
+                    .validatedBy(wo.getValidatedBy())
+                    .closedAt(wo.getClosedAt())
+                    .closedBy(wo.getClosedBy())
+                    .cancellationNotes(wo.getCancellationNotes())
+                    .createdAt(wo.getCreatedAt())
+                    .updatedAt(wo.getUpdatedAt())
+                    .totalTasks((long) tasks.size())
+                    .completedTasks(completedTasks)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    private WorkOrderResponse toResponse(WorkOrder wo) {
+        return batchMapToResponse(List.of(wo)).get(0);
+    }
+
+    private WorkOrder.WorkOrderStatus parseStatusRequired(String status) {
+        try {
+            return WorkOrder.WorkOrderStatus.valueOf(status.toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid status: " + status);
+        }
+    }
+
+    private void assertCanView(WorkOrder wo, Actor actor) {
+        if (actor.isAdminOrManager()) return;
+        if (actor.userId != null && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        throw new AccessDeniedException("Not allowed to view this work order");
+    }
+
+    private void assertCanUpdateStatus(WorkOrder wo, Actor actor) {
+        if (actor.isAdminOrManager()) return;
+        if (ROLE_TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        throw new AccessDeniedException("Not allowed to update this work order");
+    }
+
+    private void assertAdminOrManager(Actor actor) {
+        if (!actor.isAdminOrManager()) {
+            throw new AccessDeniedException("Requires ADMIN or MAINTENANCE_MANAGER role");
+        }
+    }
+
+    private Specification<WorkOrder> accessScopeSpec(Actor actor) {
+        if (actor.isAdminOrManager() || "FINANCE_MANAGER".equals(actor.role)) {
+            return (root, cq, cb) -> cb.conjunction();
+        }
+        if (ROLE_TECHNICIAN.equals(actor.role) && actor.userId != null) {
+            return (root, cq, cb) -> cb.equal(root.get("assignedToUserId"), actor.userId);
+        }
+        return (root, cq, cb) -> cb.disjunction();
+    }
+
+    private Actor getCurrentActorRequired() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            return new Actor(
+                    user == null ? null : user.getUserId(),
+                    user == null || user.getFullName() == null ? authentication.getName() : user.getFullName(),
+                    user == null || user.getRole() == null ? null : user.getRole().getRoleName().toUpperCase()
+            );
+        }
+        return new Actor(null, authentication.getName(), null);
+    }
+
+    private record Actor(Integer userId, String displayName, String role) {
+        boolean isAdminOrManager() {
+            return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
+        }
     }
 }

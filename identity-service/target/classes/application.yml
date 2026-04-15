@@ -22,7 +22,10 @@ spring:
   jpa:
     hibernate:
       # validate = check schema matches entities; use 'none' if migrations manage schema
-      ddl-auto: ${HIBERNATE_DDL_AUTO:validate}
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+      
+  flyway:
+    baseline-on-migrate: true
     show-sql: false
     properties:
       hibernate:

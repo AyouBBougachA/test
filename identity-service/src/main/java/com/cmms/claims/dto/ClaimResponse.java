@@ -1,8 +1,6 @@
 package com.cmms.claims.dto;
 
-import lombok.Builder;
-import lombok.Data;
-
+import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -10,13 +8,13 @@ import java.util.List;
 @Builder
 public class ClaimResponse {
     private Integer claimId;
-    private String claimCode;
+    private String  claimCode;
 
     private String title;
     private String description;
 
     private Integer equipmentId;
-    private String equipmentName;
+    private String  equipmentName;
 
     private String priority;
     private String priorityLabel;
@@ -25,21 +23,27 @@ public class ClaimResponse {
     private String statusLabel;
 
     private Integer requesterId;
-    private String requesterName;
+    private String  requesterName;
 
     private Integer assignedToUserId;
-    private String assignedToName;
+    private String  assignedToName;
 
     private Integer departmentId;
-    private String departmentName;
-
+    private String  departmentName;
 
     private String qualificationNotes;
+    private String rejectionNotes;
+
+    /** Work Order created from this claim (set after conversion) */
+    private Integer linkedWoId;
+    private String  linkedWoCode;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime closedAt;
+    private LocalDateTime resolvedAt;
+    private LocalDateTime rejectedAt;
 
-    private Long photoCount;
+    private Long                  photoCount;
     private List<ClaimPhotoResponse> photos;
 }

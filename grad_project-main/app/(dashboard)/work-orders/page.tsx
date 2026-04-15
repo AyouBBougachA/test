@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { 
   ClipboardList, 
@@ -38,8 +39,9 @@ import { useAuth } from "@/lib/auth-context"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import { equipmentApi } from "@/lib/api/equipment"
 import type { WorkOrderResponse, EquipmentResponse } from "@/lib/api/types"
-import { format } from "date-fns"
-import { fr } from "date-fns/locale"
+import { format, formatDistanceToNow } from "date-fns"
+import { fr, enUS } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -56,6 +58,9 @@ export default function WorkOrdersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
+  const [showArchived, setShowArchived] = useState(false)
+
+  const dateLocale = language === 'fr' ? fr : enUS
 
   const [newWO, setNewWO] = useState({
     title: "",
@@ -65,6 +70,9 @@ export default function WorkOrdersPage() {
     priority: "MEDIUM",
     dueDate: ""
   })
+
+  // ... (keeping loadData and handleSubmit logic)
+
 
   const loadData = async () => {
     if (!isAuthenticated) return
@@ -124,14 +132,23 @@ export default function WorkOrdersPage() {
     switch (status.toUpperCase()) {
       case "COMPLETED":
         return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">Completed</Badge>
+      case "VALIDATED":
+        return <Badge className="bg-teal-500/10 text-teal-500 border-teal-500/20 hover:bg-teal-500/20">Validated</Badge>
+      case "CLOSED":
+        return <Badge className="bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20">Closed</Badge>
       case "IN_PROGRESS":
-        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">In Progress</Badge>
+        return <Badge className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20 hover:bg-cyan-500/20">In Progress</Badge>
       case "ON_HOLD":
         return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20">On Hold</Badge>
       case "CANCELLED":
-        return <Badge className="bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20">Cancelled</Badge>
+        return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20">Cancelled</Badge>
+      case "ASSIGNED":
+        return <Badge className="bg-violet-500/10 text-violet-500 border-violet-500/20 hover:bg-violet-500/20">Assigned</Badge>
+      case "SCHEDULED":
+        return <Badge className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20 hover:bg-indigo-500/20">Scheduled</Badge>
+      case "CREATED":
       default:
-        return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500/20">Open</Badge>
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">Created</Badge>
     }
   }
 
@@ -167,13 +184,14 @@ export default function WorkOrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-                <Plus className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Nouvel Ordre' : 'New Work Order'}
-              </Button>
-            </DialogTrigger>
+          {user?.roleName !== 'TECHNICIAN' && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {language === 'fr' ? 'Nouvel Ordre' : 'New Work Order'}
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl">
               <DialogHeader>
                 <DialogTitle>Create Maintenance Intervention</DialogTitle>
@@ -249,6 +267,7 @@ export default function WorkOrdersPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </motion.div>
 
@@ -263,11 +282,11 @@ export default function WorkOrdersPage() {
             bg: "bg-blue-500/10"
           },
           { 
-            title: language === 'fr' ? 'Ouverts' : 'Open', 
-            count: workOrders.filter(wo => wo.status === 'OPEN').length, 
+            title: language === 'fr' ? 'Ouverts' : 'Created', 
+            count: workOrders.filter(wo => wo.status === 'CREATED').length, 
             icon: AlertCircle, 
-            color: "text-purple-500",
-            bg: "bg-purple-500/10"
+            color: "text-blue-500",
+            bg: "bg-blue-500/10"
           },
           { 
             title: language === 'fr' ? 'Terminés' : 'Completed', 
@@ -310,6 +329,16 @@ export default function WorkOrdersPage() {
           />
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowArchived(!showArchived)}
+            className={cn(
+              "bg-card/50 border-border transition-colors",
+              showArchived && "bg-primary/10 border-primary text-primary"
+            )}
+          >
+            {showArchived ? (language === 'fr' ? 'Masquer Archivés' : 'Hide Archived') : (language === 'fr' ? 'Afficher Archivés' : 'Show Archived')}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="bg-card/50 border-border">
@@ -319,9 +348,13 @@ export default function WorkOrdersPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => setFilter("all")}>All</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("open")}>Open</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("created")}>Created</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("assigned")}>Assigned</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("scheduled")}>Scheduled</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("in_progress")}>In Progress</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("completed")}>Completed</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("validated")}>Validated</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("closed")}>Closed</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("cancelled")}>Cancelled</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -333,7 +366,9 @@ export default function WorkOrdersPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border overflow-hidden">
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-xl">Active Interventions</CardTitle>
+              <CardTitle className="text-xl">
+                {showArchived ? (language === 'fr' ? 'Toutes les interventions' : 'All Interventions') : (language === 'fr' ? 'Interventions Actives' : 'Active Interventions')}
+              </CardTitle>
               <Badge variant="outline" className="font-normal text-muted-foreground">
                 {filteredOrders.length} {language === 'fr' ? 'résultats' : 'results'}
               </Badge>
@@ -360,10 +395,10 @@ export default function WorkOrdersPage() {
                     <tr className="border-b border-border bg-muted/50">
                       <th className="text-left py-4 px-6 font-semibold text-foreground">Code</th>
                       <th className="text-left py-4 px-6 font-semibold text-foreground">Title</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Equipment</th>
+                      <th className="text-left py-4 px-6 font-semibold text-foreground">Assignee</th>
+                      <th className="text-left py-4 px-6 font-semibold text-foreground">Duration</th>
                       <th className="text-left py-4 px-6 font-semibold text-foreground">Status</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Priority</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Due Date</th>
+                      <th className="text-left py-4 px-6 font-semibold text-foreground whitespace-nowrap">Updated</th>
                       <th className="text-right py-4 px-6 font-semibold text-foreground">Actions</th>
                     </tr>
                   </thead>
@@ -379,30 +414,49 @@ export default function WorkOrdersPage() {
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2">
-                            <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
+                             <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                {wo.assignedToName?.split(' ').map(n => n[0]).join('') || '?'}
+                             </div>
+                            <span className="font-medium">{wo.assignedToName || 'Unassigned'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground truncate">
+                            <Wrench className="h-3 w-3" />
                             <span>{wo.equipmentName}</span>
                           </div>
                         </td>
                         <td className="py-4 px-6">
-                          {getStatusBadge(wo.status)}
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{wo.estimatedDuration || '—'}h</span>
+                          </div>
                         </td>
                         <td className="py-4 px-6">
-                          {getPriorityBadge(wo.priority)}
+                          <div className="flex flex-col gap-1.5">
+                            {getStatusBadge(wo.status)}
+                            {wo.hasPendingAdHocTasks && (
+                              <Badge variant="outline" className="w-fit text-[9px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50/50 flex items-center gap-1">
+                                <AlertCircle className="h-2.5 w-2.5" />
+                                Review Req.
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-2 text-muted-foreground font-medium text-xs">
+                            <Calendar className="h-3.5 w-3.5 opacity-50" />
                             <span>
-                              {wo.dueDate 
-                                ? format(new Date(wo.dueDate), 'MMM d, yyyy') 
-                                : 'No date'}
+                              {wo.updatedAt 
+                                ? formatDistanceToNow(new Date(wo.updatedAt), { addSuffix: true, locale: dateLocale }) 
+                                : formatDistanceToNow(new Date(wo.createdAt), { addSuffix: true, locale: dateLocale })}
                             </span>
                           </div>
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
+                          <Link href={`/work-orders/${wo.woId}`}>
+                            <Button variant="ghost" size="sm" className="h-8 p-2 text-primary hover:bg-primary/10 rounded-lg">
+                              {language === 'fr' ? 'Gérer' : 'Manage'}
+                            </Button>
+                          </Link>
                         </td>
                       </tr>
                     ))}

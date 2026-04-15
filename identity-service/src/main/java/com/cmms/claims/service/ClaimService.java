@@ -52,6 +52,7 @@ public class ClaimService {
     private final DepartmentRepository departmentRepository;
 
     private final WorkOrderRepository workOrderRepository;
+    private final com.cmms.notifications.service.NotificationService notificationService;
 
     private final AuditLogService auditLogService;
     private final AuditLogRepository auditLogRepository;
@@ -111,9 +112,9 @@ public class ClaimService {
         Specification<Claim> baseSpec = Specification.where(accessScopeSpec(actor));
 
         long total = claimRepository.count(baseSpec);
-        long pending = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.OPEN)));
-        long inProgress = claimRepository.count(baseSpec.and(statusInSpec(List.of(ClaimStatus.ASSIGNED, ClaimStatus.IN_PROGRESS))));
-        long closed = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.CLOSED)));
+        long pending = claimRepository.count(baseSpec.and(optionalEquals("status", ClaimStatus.NEW)));
+        long inProgress = claimRepository.count(baseSpec.and(statusInSpec(List.of(ClaimStatus.ASSIGNED, ClaimStatus.CONVERTED_TO_WORK_ORDER, ClaimStatus.IN_PROGRESS))));
+        long closed = claimRepository.count(baseSpec.and(statusInSpec(List.of(ClaimStatus.CLOSED, ClaimStatus.RESOLVED))));
 
         return ClaimStatsResponse.builder()
                 .total(total)
@@ -153,7 +154,7 @@ public class ClaimService {
                 .title(request.getTitle().trim())
                 .description(request.getDescription().trim())
                 .priority(parsedPriority)
-                .status(ClaimStatus.OPEN)
+                .status(ClaimStatus.NEW)
                 .assignedToUserId(null)
                 .departmentId(finalDepartmentId)
                 .qualificationNotes(null)
@@ -165,7 +166,7 @@ public class ClaimService {
         statusHistoryRepository.save(ClaimStatusHistory.builder()
                 .claimId(saved.getClaimId())
                 .oldStatus(null)
-                .newStatus(ClaimStatus.OPEN)
+                .newStatus(ClaimStatus.NEW)
                 .changedAt(LocalDateTime.now())
                 .changedBy(actor.displayName)
                 .note(null)
@@ -178,6 +179,12 @@ public class ClaimService {
                 ENTITY_NAME,
                 saved.getClaimId(),
                 "Created claim " + formatClaimCode(saved.getClaimId()) + " for equipment " + equipment.getName()
+        );
+
+        notificationService.notifyAdminAndManagers(
+                "INFO",
+                "New Claim reported for " + equipment.getName() + ": " + saved.getTitle(),
+                saved.getClaimId()
         );
 
         return toClaimResponse(saved);
@@ -221,8 +228,8 @@ public class ClaimService {
 
         Claim claim = getClaimEntity(claimId);
 
-        if (claim.getStatus() != ClaimStatus.OPEN) {
-            throw new IllegalStateException("Only OPEN claims can be qualified");
+        if (claim.getStatus() != ClaimStatus.NEW) {
+            throw new IllegalStateException("Only NEW claims can be qualified");
         }
 
         if (request.getPriority() != null && !request.getPriority().isBlank()) {
@@ -304,8 +311,8 @@ public class ClaimService {
         ClaimStatus newStatus = parseStatusRequired(request.getStatus());
         ClaimStatus oldStatus = claim.getStatus();
 
-        if (oldStatus == ClaimStatus.CLOSED) {
-            throw new IllegalStateException("Closed claims cannot change status");
+        if (oldStatus == ClaimStatus.CLOSED || oldStatus == ClaimStatus.REJECTED) {
+            throw new IllegalStateException("Closed/Rejected claims cannot change status");
         }
 
         enforceTransition(oldStatus, newStatus);
@@ -313,6 +320,10 @@ public class ClaimService {
         claim.setStatus(newStatus);
         if (newStatus == ClaimStatus.CLOSED) {
             claim.setClosedAt(LocalDateTime.now());
+        } else if (newStatus == ClaimStatus.RESOLVED) {
+            claim.setResolvedAt(LocalDateTime.now());
+        } else if (newStatus == ClaimStatus.REJECTED) {
+            claim.setRejectedAt(LocalDateTime.now());
         }
 
         Claim saved = claimRepository.save(claim);
@@ -338,11 +349,10 @@ public class ClaimService {
 
         Claim claim = getClaimEntity(claimId);
 
-        if (claim.getStatus() != ClaimStatus.OPEN && claim.getStatus() != ClaimStatus.QUALIFIED && claim.getStatus() != ClaimStatus.ASSIGNED) {
-            throw new IllegalStateException("Only OPEN, QUALIFIED or ASSIGNED claims can be converted to Work Orders");
+        if (claim.getStatus() != ClaimStatus.NEW && claim.getStatus() != ClaimStatus.QUALIFIED && claim.getStatus() != ClaimStatus.ASSIGNED) {
+            throw new IllegalStateException("Only NEW, QUALIFIED or ASSIGNED claims can be converted to Work Orders");
         }
 
-        // Check if already has a WO
         if (workOrderRepository.existsByClaimId(claimId)) {
             throw new IllegalStateException("This claim has already been converted to a Work Order");
         }
@@ -352,21 +362,25 @@ public class ClaimService {
                 .equipmentId(claim.getEquipmentId())
                 .woType(WorkOrder.WorkOrderType.CORRECTIVE)
                 .priority(mapPriority(claim.getPriority()))
-                .status(WorkOrder.WorkOrderStatus.OPEN)
+                .status(WorkOrder.WorkOrderStatus.CREATED)
                 .title("WO: " + claim.getTitle())
                 .description(claim.getDescription())
                 .assignedToUserId(claim.getAssignedToUserId())
                 .isArchived(false)
                 .build();
+                
+        if (wo.getAssignedToUserId() != null) {
+            wo.setStatus(WorkOrder.WorkOrderStatus.ASSIGNED);
+        }
 
         WorkOrder savedWo = workOrderRepository.save(wo);
 
-        // Update claim status
         ClaimStatus oldStatus = claim.getStatus();
-        claim.setStatus(ClaimStatus.IN_PROGRESS);
+        claim.setStatus(ClaimStatus.CONVERTED_TO_WORK_ORDER);
+        claim.setLinkedWoId(savedWo.getWoId());
         claimRepository.save(claim);
 
-        saveStatusHistory(claim.getClaimId(), oldStatus, ClaimStatus.IN_PROGRESS, actor.displayName, "Converted to Work Order " + formatWoCode(savedWo.getWoId()));
+        saveStatusHistory(claim.getClaimId(), oldStatus, ClaimStatus.CONVERTED_TO_WORK_ORDER, actor.displayName, "Converted to Work Order " + formatWoCode(savedWo.getWoId()));
 
         auditLogService.log(
                 actor.userId,
@@ -529,9 +543,14 @@ public class ClaimService {
                 .departmentId(claim.getDepartmentId())
                 .departmentName(dept == null ? null : dept.getDepartmentName())
                 .qualificationNotes(claim.getQualificationNotes())
+                .rejectionNotes(claim.getRejectionNotes())
+                .linkedWoId(claim.getLinkedWoId())
+                .linkedWoCode(claim.getLinkedWoId() == null ? null : formatWoCode(claim.getLinkedWoId()))
                 .createdAt(claim.getCreatedAt())
                 .updatedAt(claim.getUpdatedAt())
                 .closedAt(claim.getClosedAt())
+                .resolvedAt(claim.getResolvedAt())
+                .rejectedAt(claim.getRejectedAt())
                 .photoCount(photoCount)
                 .photos(photos)
                 .build();
@@ -561,7 +580,7 @@ public class ClaimService {
                 .build());
     }
 
-    private static void enforceTransition(ClaimStatus oldStatus, ClaimStatus newStatus) {
+    private void enforceTransition(ClaimStatus oldStatus, ClaimStatus newStatus) {
         if (newStatus == oldStatus) {
             return;
         }
@@ -571,11 +590,13 @@ public class ClaimService {
         }
 
         boolean allowed = switch (oldStatus) {
-            case OPEN -> (newStatus == ClaimStatus.QUALIFIED || newStatus == ClaimStatus.ASSIGNED);
-            case QUALIFIED -> (newStatus == ClaimStatus.ASSIGNED);
-            case ASSIGNED -> (newStatus == ClaimStatus.IN_PROGRESS);
-            case IN_PROGRESS -> (newStatus == ClaimStatus.CLOSED);
-            case CLOSED -> false;
+            case NEW -> (newStatus == ClaimStatus.QUALIFIED || newStatus == ClaimStatus.ASSIGNED || newStatus == ClaimStatus.REJECTED);
+            case QUALIFIED -> (newStatus == ClaimStatus.ASSIGNED || newStatus == ClaimStatus.CONVERTED_TO_WORK_ORDER || newStatus == ClaimStatus.REJECTED);
+            case ASSIGNED -> (newStatus == ClaimStatus.CONVERTED_TO_WORK_ORDER || newStatus == ClaimStatus.IN_PROGRESS || newStatus == ClaimStatus.REJECTED);
+            case CONVERTED_TO_WORK_ORDER -> (newStatus == ClaimStatus.IN_PROGRESS || newStatus == ClaimStatus.CLOSED); 
+            case IN_PROGRESS -> (newStatus == ClaimStatus.RESOLVED || newStatus == ClaimStatus.CLOSED);
+            case RESOLVED -> (newStatus == ClaimStatus.CLOSED || newStatus == ClaimStatus.IN_PROGRESS);
+            case CLOSED, REJECTED -> false;
         };
 
         if (!allowed) {
@@ -661,7 +682,7 @@ public class ClaimService {
     }
 
     private Specification<Claim> accessScopeSpec(Actor actor) {
-        if (actor.isAdminOrManager()) {
+        if (actor.isAdminOrManager() || "FINANCE_MANAGER".equals(actor.role)) {
             return (root, cq, cb) -> cb.conjunction();
         }
         if (ROLE_TECHNICIAN.equals(actor.role) && actor.userId != null) {
@@ -726,11 +747,14 @@ public class ClaimService {
     private static String statusLabel(ClaimStatus status) {
         if (status == null) return null;
         return switch (status) {
-            case OPEN -> "Open";
+            case NEW -> "New";
             case QUALIFIED -> "Qualified";
             case ASSIGNED -> "Assigned";
+            case CONVERTED_TO_WORK_ORDER -> "WO Created";
             case IN_PROGRESS -> "In Progress";
+            case RESOLVED -> "Resolved";
             case CLOSED -> "Closed";
+            case REJECTED -> "Rejected";
         };
     }
 

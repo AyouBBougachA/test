@@ -62,6 +62,8 @@ public class SecurityConfig {
                             "/swagger-ui/**",
                             "/swagger-ui.html"
                     ).permitAll()
+                    // Spring Boot internal error dispatcher — must be public or a 401 loop occurs
+                    .requestMatchers("/error", "/error/**").permitAll()
                     // User management — admin only
                     .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PUT, "/api/users/**").hasRole("ADMIN")

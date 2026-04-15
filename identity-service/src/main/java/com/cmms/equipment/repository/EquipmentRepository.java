@@ -8,7 +8,8 @@ import java.util.List;
 
 @Repository
 public interface EquipmentRepository extends JpaRepository<Equipment, Integer>, JpaSpecificationExecutor<Equipment> {
-    List<Equipment> findByStatus(String status);
+    List<Equipment> findByStatus(com.cmms.equipment.entity.EquipmentStatus status);
+    long countByStatus(com.cmms.equipment.entity.EquipmentStatus status);
     boolean existsByCategoryId(Integer categoryId);
     boolean existsByModelId(Integer modelId);
 }

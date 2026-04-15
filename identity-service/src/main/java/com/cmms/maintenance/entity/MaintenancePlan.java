@@ -47,6 +47,12 @@ public class MaintenancePlan {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "meter_id")
+    private Integer meterId;
+
+    @Column(name = "next_meter_reading")
+    private java.math.BigDecimal nextMeterReading;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -202,11 +202,14 @@ export interface EquipmentDocument {
 export type ClaimPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
 
 export type ClaimStatus =
-  | 'OPEN'
+  | 'NEW'
   | 'QUALIFIED'
   | 'ASSIGNED'
+  | 'CONVERTED_TO_WORK_ORDER'
   | 'IN_PROGRESS'
+  | 'RESOLVED'
   | 'CLOSED'
+  | 'REJECTED'
 
 export interface ClaimListItemResponse {
   claimId: number
@@ -253,7 +256,31 @@ export interface ClaimPhotoResponse {
 
 export interface ClaimResponse extends ClaimListItemResponse {
   qualificationNotes?: string | null
+  rejectionNotes?: string | null
+  linkedWoId?: number | null
+  linkedWoCode?: string | null
+  resolvedAt?: string | null
+  rejectedAt?: string | null
   photos?: ClaimPhotoResponse[]
+}
+
+export interface ClaimQualificationRequest {
+  priority?: string | null
+  qualificationNotes?: string | null
+  assignedToUserId?: number | null
+}
+
+export interface ClaimAssignRequest {
+  assignedToUserId: number
+}
+
+export interface ClaimStatusUpdateRequest {
+  status: string
+  note?: string | null
+}
+
+export interface RejectClaimRequest {
+  rejectionNotes: string
 }
 
 export interface ClaimStatsResponse {
@@ -280,13 +307,15 @@ export interface UpdateClaimRequest {
 
 export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'PREDICTIVE' | 'REGULATORY'
 export type WorkOrderPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type WorkOrderStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED'
+export type WorkOrderStatus = 'CREATED' | 'ASSIGNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'VALIDATED' | 'CLOSED' | 'CANCELLED'
 
 export interface WorkOrderResponse {
   woId: number
   woCode: string
   claimId?: number | null
   claimCode?: string | null
+  parentWoId?: number | null
+  parentWoCode?: string | null
   equipmentId: number
   equipmentName?: string | null
   woType: WorkOrderType | string
@@ -296,15 +325,97 @@ export interface WorkOrderResponse {
   description?: string | null
   assignedToUserId?: number | null
   assignedToName?: string | null
+  secondaryAssignees?: { userId: number; name: string }[]
+  followers?: { userId: number; name: string }[]
   estimatedTimeHours?: number | null
   actualTimeHours?: number | null
+  estimatedDuration?: number | null
+  actualDuration?: number | null
   estimatedCost?: number | null
   actualCost?: number | null
+  plannedStart?: string | null
+  plannedEnd?: string | null
+  actualStart?: string | null
+  actualEnd?: string | null
   createdAt: string
   updatedAt?: string | null
   dueDate?: string | null
+  overdue?: boolean
   completedAt?: string | null
   completionNotes?: string | null
+  validationNotes?: string | null
+  validatedAt?: string | null
+  validatedBy?: string | null
+  closedAt?: string | null
+  closedBy?: string | null
+  cancellationNotes?: string | null
+  totalTasks?: number
+  completedTasks?: number
+  hasPendingAdHocTasks?: boolean
+  hasCriticalFailure?: boolean
+}
+
+export interface WorkOrderStatusHistoryResponse {
+  id: number
+  woId: number
+  oldStatus?: string | null
+  newStatus: string
+  changedAt: string
+  changedBy?: string | null
+  note?: string | null
+}
+
+export interface WorkloadResponse {
+  userId: number
+  userName: string
+  totalAssigned: number
+  created: number
+  assigned: number
+  scheduled: number
+  inProgress: number
+  onHold: number
+  completed: number
+  overdue: number
+}
+
+export interface UpdateWorkOrderRequest {
+  title: string
+  description?: string | null
+  priority: string
+  estimatedTimeHours?: number | null
+  estimatedDuration?: number | null
+  estimatedCost?: number | null
+  dueDate?: string | null
+  plannedStart?: string | null
+  plannedEnd?: string | null
+  parentWoId?: number | null
+  secondaryAssigneeIds?: number[]
+}
+
+export interface AssignWorkOrderRequest {
+  assignedToUserId: number
+  secondaryAssigneeIds?: number[]
+  note?: string | null
+}
+
+export interface WorkOrderStatusUpdateRequest {
+  status: string
+  note?: string | null
+  forceClose?: boolean
+}
+
+export interface ValidateWorkOrderRequest {
+  validationNotes: string
+}
+
+export interface ScheduleWorkOrderRequest {
+  plannedStart?: string | null
+  plannedEnd?: string | null
+  dueDate?: string | null
+}
+
+export interface CancelWorkOrderRequest {
+  cancellationNotes: string
 }
 
 export interface CreateWorkOrderRequest {
@@ -315,19 +426,67 @@ export interface CreateWorkOrderRequest {
   title: string
   description?: string | null
   assignedToUserId?: number | null
+  secondaryAssigneeIds?: number[]
   estimatedTimeHours?: number | null
   estimatedCost?: number | null
   dueDate?: string | null
+  parentWoId?: number | null
+}
+
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED' | 'SKIPPED'
+export type TaskApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export interface SubTaskResponse {
+  id: number
+  taskId: number
+  description: string
+  isCompleted: boolean
+  orderIndex?: number | null
 }
 
 export interface TaskResponse {
   taskId: number
   woId: number
-  description: string
-  status: 'PENDING' | 'COMPLETED' | string
+  title?: string | null
+  description?: string | null
+  notes?: string | null
+  status: TaskStatus | string
+  assignedToUserId?: number | null
+  assignedToName?: string | null
+  estimatedDuration?: number | null
+  orderIndex: number
+  startedAt?: string | null
   completedAt?: string | null
   completedBy?: string | null
-  orderIndex: number
+  skippedAt?: string | null
+  skippedBy?: string | null
+  blockedReason?: string | null
+  isAdHoc?: boolean | null
+  createdByUserId?: number | null
+  approvalStatus?: TaskApprovalStatus | string | null
+  approvedByUserId?: number | null
+  approvedAt?: string | null
+  failureReason?: string | null
+  subTasks?: SubTaskResponse[] | null
+}
+
+export interface CreateTaskRequest {
+  woId: number
+  title?: string | null
+  description?: string | null
+  assignedToUserId?: number | null
+  estimatedDuration?: number | null
+  orderIndex?: number | null
+}
+
+export interface UpdateTaskRequest {
+  title?: string | null
+  description?: string | null
+  notes?: string | null
+  assignedToUserId?: number | null
+  estimatedDuration?: number | null
+  orderIndex?: number | null
+  blockedReason?: string | null
 }
 
 export interface SparePartResponse {
@@ -354,6 +513,23 @@ export interface CreateSparePartRequest {
   location?: string | null
   supplier?: string | null
 }
+export interface PartUsageResponse {
+  usageId: number
+  woId: number
+  taskId?: number | null
+  partId: number
+  partName?: string | null
+  quantityUsed: number
+  unitCostAtUsage?: number | null
+  usedAt: string
+}
+
+export interface UsePartRequest {
+  woId: number
+  taskId?: number | null
+  partId: number
+  quantity: number
+}
 
 export interface MaintenancePlanResponse {
   planId: number
@@ -364,9 +540,22 @@ export interface MaintenancePlanResponse {
   frequencyValue: number
   lastGenerationDate?: string | null
   nextDueDate?: string | null
+  meterId?: number | null
+  nextMeterReading?: number | null
   isActive: boolean
   createdAt: string
   updatedAt?: string | null
+}
+
+export interface NotificationResponse {
+  id: number
+  userId: number
+  type: 'RECOMMENDATION' | 'WARNING' | 'INFO' | string
+  message: string
+  isRead: boolean
+  referenceId?: number | null
+  createdAt: string
+  readAt?: string | null
 }
 
 export interface KpiResponse {
@@ -377,9 +566,26 @@ export interface KpiResponse {
   totalMaintenanceCost: number
   mtbf: number
   mttr: number
+  costTrend?: number
+  mtbfTrend?: number
+  mttrTrend?: number
   woByStatus: Record<string, number>
   woByType: Record<string, number>
   costByDepartment: Record<string, number>
+  costByCategory: Record<string, number>
+  availabilityRate: number
+  correctivePreventiveRatio: number
+  maintenanceCostPerEquipment: Record<string, number>
+  maintenanceCostPerDepartment: Record<string, number>
+  paretoData: Record<string, number>
+  annualProjection: Record<string, number>
+  monthlyCostTrends: Record<string, number>
+  monthlyWorkOrderTrends: Record<string, Record<string, number>>
+  complianceRate: number
+  equipmentRoi: number
+  ytdBudget: number
+  costAvoidance: number
+  expectedLifeSpanScore: number
 }
 
 export interface PredictionResponse {

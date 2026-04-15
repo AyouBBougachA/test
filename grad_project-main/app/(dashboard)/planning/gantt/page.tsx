@@ -12,26 +12,25 @@ import {
   addMonths,
   startOfMonth,
   endOfMonth,
-  differenceInDays
+  differenceInDays,
+  differenceInMinutes,
+  addMinutes
 } from "date-fns"
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
   Wrench,
-  Clock,
-  Filter,
-  LayoutGrid,
-  Trello
+  AlertTriangle
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth-context"
-import { planningApi } from "@/lib/api/planning"
-import type { MaintenancePlanResponse } from "@/lib/api/types"
+import { useI18n } from "@/lib/i18n"
+import { workOrdersApi } from "@/lib/api/work-orders"
+import type { WorkOrderResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
 const fadeInUp = {
@@ -41,18 +40,25 @@ const fadeInUp = {
 }
 
 export default function PlanningGanttPage() {
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth()
-  const [plans, setPlans] = useState<MaintenancePlanResponse[]>([])
+  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth()
+  const { language } = useI18n()
+  const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<"weekly" | "monthly">("monthly")
+  const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly")
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const loadData = async () => {
     if (!isAuthenticated) return
     setIsLoading(true)
     try {
-      const data = await planningApi.getAll()
-      setPlans(data)
+      // Use calendar endpoint or fallback to get all
+      const wos = await workOrdersApi.getCalendar().catch(async () => {
+        return await workOrdersApi.list()
+      })
+      
+      // Filter out WOs without scheduled dates
+      const scheduledWos = wos.filter((wo: WorkOrderResponse) => wo.plannedStart)
+      setWorkOrders(scheduledWos)
     } catch (error) {
       console.error("Failed to load plans", error)
     } finally {
@@ -90,15 +96,56 @@ export default function PlanningGanttPage() {
     setCurrentDate(viewMode === "weekly" ? addDays(currentDate, -7) : addMonths(currentDate, -1))
   }
 
-  // Calculate bar position
-  const getPosition = (dateStr: string | null | undefined) => {
-    if (!dateStr) return null
-    const date = new Date(dateStr)
-    if (date < timelineRange.start || date > timelineRange.end) return null
-    
-    const diff = differenceInDays(date, timelineRange.start)
+  // Calculate bar position and width
+  const getBarLayout = (startStr: string, endStr: string | null | undefined, estimatedDuration: number | null | undefined) => {
+    const start = new Date(startStr)
     const totalDays = days.length
-    return (diff / totalDays) * 100
+
+    // fallback logic: if end is missing, compute from estimatedDuration (in mins), else assume 1 day
+    let end = endStr ? new Date(endStr) : undefined
+    if (!end && estimatedDuration) {
+      end = addMinutes(start, estimatedDuration || 60)
+    }
+    if (!end) {
+      end = addDays(start, 1)
+    }
+    
+    if (end < timelineRange.start || start > timelineRange.end) return null
+    if (start > end) return null
+
+    // Clamp values
+    const effectiveStart = start < timelineRange.start ? timelineRange.start : start
+    const effectiveEnd = end > timelineRange.end ? addDays(timelineRange.end, 1) : end
+
+    const diffStartStr = differenceInDays(effectiveStart, timelineRange.start)
+    const diffStartMins = differenceInMinutes(effectiveStart, timelineRange.start)
+    
+    const diffEndMins = differenceInMinutes(effectiveEnd, effectiveStart)
+
+    const totalPeriodMins = totalDays * 24 * 60
+
+    const left = (diffStartMins / totalPeriodMins) * 100
+    let width = (diffEndMins / totalPeriodMins) * 100
+    
+    // Ensure minimal viable width logic (1% or at least visible)
+    if (width < 3) width = 3
+
+    return { left, width }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED':
+      case 'VALIDATED':
+        return "from-emerald-500 to-emerald-600 shadow-emerald-500/20";
+      case 'IN_PROGRESS':
+        return "from-cyan-500 to-cyan-600 shadow-cyan-500/20";
+      case 'ON_HOLD':
+      case 'DELAYED':
+        return "from-amber-500 to-amber-600 shadow-amber-500/20";
+      default: // scheduled, assigned
+        return "from-blue-500 to-indigo-600 shadow-blue-500/20";
+    }
   }
 
   if (isAuthLoading || (isLoading && isAuthenticated)) {
@@ -118,8 +165,8 @@ export default function PlanningGanttPage() {
     <motion.div initial="initial" animate="animate" className="space-y-6">
       <motion.div variants={fadeInUp} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Maintenance Timeline</h1>
-          <p className="text-muted-foreground mt-1">Gantt visualization of preventive maintenance schedules.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Gantt View</h1>
+          <p className="text-muted-foreground mt-1">Visualize timeline and duration of work orders.</p>
         </div>
         
         <div className="flex items-center gap-3 bg-card/50 backdrop-blur-md p-1.5 rounded-xl border border-border shadow-sm">
@@ -165,18 +212,26 @@ export default function PlanningGanttPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border overflow-hidden">
           <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                   <span>Preventive</span>
+                   <span>Scheduled</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                   <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                   <span>In Progress</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                   <span>Complete</span>
+                   <span>Completed</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                   <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                   <span>Delayed</span>
                 </div>
               </div>
               <Badge variant="outline" className="font-mono text-[10px] hidden sm:block">
-                {plans.length} ACTIVE PLANS
+                {workOrders.length} SCHEDULED WOs
               </Badge>
             </div>
           </CardHeader>
@@ -185,7 +240,7 @@ export default function PlanningGanttPage() {
               {/* Timeline Header */}
               <div className="flex border-b border-border sticky top-0 bg-card/80 backdrop-blur-md z-10">
                 <div className="w-64 border-r border-border p-4 bg-muted/10 shrink-0 font-bold text-xs uppercase tracking-wider">
-                  Maintenance Item
+                  Work Order details
                 </div>
                 <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
                   {days.map((day, i) => (
@@ -205,30 +260,30 @@ export default function PlanningGanttPage() {
 
               {/* Plans Rows */}
               <div className="divide-y divide-border">
-                {plans.length === 0 ? (
+                {workOrders.length === 0 ? (
                   <div className="py-20 text-center text-muted-foreground italic">
-                    No maintenance activities scheduled for this period.
+                    No work orders scheduled for this period.
                   </div>
-                ) : plans.map((plan) => {
-                  const left = getPosition(plan.nextDueDate)
+                ) : workOrders.map((wo) => {
+                  const layout = getBarLayout(wo.plannedStart!, wo.plannedEnd, wo.estimatedDuration)
                   
                   return (
-                    <div key={plan.planId} className="flex group hover:bg-muted/5 transition-colors relative">
-                      <div className="w-64 border-r border-border p-4 shrink-0 flex flex-col gap-1">
-                        <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                          {plan.title}
+                    <div key={wo.woId} className="flex group hover:bg-muted/5 transition-colors relative">
+                      <div className="w-64 border-r border-border p-4 shrink-0 flex flex-col justify-center gap-1">
+                        <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors cursor-pointer" onClick={() => window.location.href = `/work-orders/${wo.woId}`}>
+                          {wo.title}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between mt-1">
                            <Badge variant="secondary" className="text-[9px] uppercase px-1.5 py-0">
-                             {plan.frequencyType}
+                             {wo.status}
                            </Badge>
                            <span className="text-[10px] text-muted-foreground italic">
-                             ID: {plan.planId}
+                             ID: {wo.woCode}
                            </span>
                         </div>
                       </div>
                       
-                      <div className="flex-1 relative h-16">
+                      <div className="flex-1 relative h-20">
                         {/* Day vertical grid lines */}
                         <div className="absolute inset-0 grid h-full" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
                           {days.map((_, i) => (
@@ -240,31 +295,36 @@ export default function PlanningGanttPage() {
                         {days.some(d => isSameDay(d, new Date())) && (
                           <div 
                             className="absolute top-0 bottom-0 w-px bg-primary z-10 shadow-[0_0_8px_rgba(var(--primary),0.8)]"
-                            style={{ left: `${getPosition(new Date().toISOString())}%` }}
+                            style={{ left: `${(differenceInMinutes(new Date(), timelineRange.start) / (days.length * 24 * 60)) * 100}%` }}
                           />
                         )}
 
                         {/* Task Bar */}
                         <AnimatePresence mode="wait">
-                          {left !== null && (
+                          {layout !== null && (
                             <motion.div
-                              key={`${plan.planId}-${viewMode}`}
+                              key={`${wo.woId}-${viewMode}`}
                               initial={{ scaleX: 0, opacity: 0 }}
                               animate={{ scaleX: 1, opacity: 1 }}
                               className="absolute top-1/2 -translate-y-1/2 h-8 z-20"
                               style={{ 
-                                left: `${left}%`, 
-                                width: `calc(${100/days.length}% - 8px)`
+                                left: `${layout.left}%`, 
+                                width: `calc(${layout.width}%)`
                               }}
                             >
-                              <div className="h-full w-full rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/20 flex items-center justify-center group/bar cursor-pointer relative">
-                                 <Wrench className="h-3.5 w-3.5 text-white" />
+                              <div className={`h-full w-full rounded-md bg-gradient-to-r shadow-lg flex items-center justify-center group/bar cursor-pointer relative ${getStatusColor(wo.status)}`}
+                                   onClick={() => window.location.href = `/work-orders/${wo.woId}`}
+                              >
+                                 <Wrench className="h-3.5 w-3.5 text-white opacity-80" />
                                  
                                  {/* Tooltip */}
                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/bar:opacity-100 transition-all pointer-events-none z-30">
                                     <div className="bg-popover border border-border rounded-lg p-2 shadow-xl whitespace-nowrap">
-                                      <p className="text-xs font-bold text-popover-foreground">{plan.title}</p>
-                                      <p className="text-[10px] text-muted-foreground">Due: {format(new Date(plan.nextDueDate!), 'PPP')}</p>
+                                      <p className="text-xs font-bold text-popover-foreground">{wo.title}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                         Start: {format(new Date(wo.plannedStart!), 'PPp')}
+                                      </p>
+                                      {wo.estimatedDuration && <p className="text-[10px] text-muted-foreground text-center">Duration: {wo.estimatedDuration} min</p>}
                                     </div>
                                     <div className="w-2 h-2 bg-popover border-b border-r border-border rotate-45 mx-auto -mt-1" />
                                  </div>
