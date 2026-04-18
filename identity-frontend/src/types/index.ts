@@ -45,17 +45,22 @@ export interface AuditLog {
 
 export interface Equipment {
   equipmentId: number;
+  assetCode?: string | null;
   name: string;
   serialNumber: string;
-  status: string;
+  status: 'OPERATIONAL' | 'OUT_OF_SERVICE' | 'REFORMED' | 'UNDER_REPAIR' | 'ARCHIVED';
   location: string;
   departmentId: number;
+  departmentName?: string | null;
   categoryId?: number | null;
   modelId?: number | null;
-  criticality?: 'LOW' | 'MEDIUM' | 'CRITICAL' | null;
+  classification?: 'BIOMEDICAL' | 'TECHNICAL' | 'IT' | null;
+  criticality?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
   meterUnit?: string | null;
   startMeterValue?: number | null;
   thresholds?: number[];
+  manufacturer?: string | null;
+  modelReference?: string | null;
   createdAt: string;
 }
 

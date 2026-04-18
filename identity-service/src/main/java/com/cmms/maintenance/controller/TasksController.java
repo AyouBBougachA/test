@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -35,6 +41,12 @@ public class TasksController {
     @Operation(summary = "Get tasks for a work order")
     public List<TaskResponse> getByWorkOrder(@PathVariable Integer woId) {
         return taskService.getTasksForWorkOrder(woId);
+    }
+
+    @GetMapping("/{taskId}")
+    @Operation(summary = "Get a single task by ID")
+    public TaskResponse getById(@PathVariable Integer taskId) {
+        return taskService.getById(taskId);
     }
 
     @PostMapping
@@ -83,4 +95,27 @@ public class TasksController {
     public TaskResponse updateApprovalStatus(@PathVariable Integer taskId, @RequestParam String status) {
         return taskService.updateApprovalStatus(taskId, status);
     }
+
+    @PostMapping("/{taskId}/photos")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN')")
+    @Operation(summary = "Upload photo for a task")
+    public TaskResponse.TaskPhotoResponse uploadPhoto(
+            @PathVariable Integer taskId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("type") String type) throws IOException {
+        return taskService.uploadPhoto(taskId, file, type);
+    }
+
+    @GetMapping("/{taskId}/photos/{photoId}/download")
+    @Operation(summary = "Download/View task photo")
+    public ResponseEntity<Resource> downloadPhoto(@PathVariable Integer taskId, @PathVariable Integer photoId) throws IOException {
+        TaskService.PhotoFile photoFile = taskService.getPhotoFile(taskId, photoId);
+        Resource resource = new UrlResource(photoFile.path().toUri());
+        
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(photoFile.contentType()))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + photoFile.fileName() + "\"")
+                .body(resource);
+    }
 }
+

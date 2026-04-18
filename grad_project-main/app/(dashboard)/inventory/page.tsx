@@ -40,6 +40,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { inventoryApi } from "@/lib/api/inventory"
@@ -60,6 +68,13 @@ export default function InventoryPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, categoryFilter])
+
   const [valuation, setValuation] = useState(0)
   const [pendingRestocks, setPendingRestocks] = useState<any[]>([])
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false)
@@ -152,6 +167,14 @@ export default function InventoryPage() {
       return matchesSearch && matchesCategory
     })
   }, [parts, search, categoryFilter])
+
+  const paginatedParts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredParts.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredParts, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredParts.length / itemsPerPage)
+
 
   const categories = useMemo(() => {
     const cats = new Set(parts.map(p => p.category).filter(Boolean))
@@ -282,7 +305,7 @@ export default function InventoryPage() {
 
       {/* Stats */}
       <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-4">
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Valuation</CardTitle>
             <DollarSign className="h-4 w-4 text-emerald-500" />
@@ -292,7 +315,7 @@ export default function InventoryPage() {
             <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">Asset value in stock</p>
           </CardContent>
         </Card>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2 text-rose-500">
             <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
             <AlertTriangle className="h-4 w-4" />
@@ -303,7 +326,7 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Pending Restocks</CardTitle>
             <Truck className="h-4 w-4 text-amber-500" />
@@ -312,7 +335,7 @@ export default function InventoryPage() {
             <div className="text-2xl font-bold">{pendingRestocks.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Stock Integrity</CardTitle>
             <CheckCircle className="h-4 w-4 text-blue-500" />
@@ -363,7 +386,7 @@ export default function InventoryPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder={language === 'fr' ? "Rechercher par nom ou SKU..." : "Search by name or SKU..."} 
-            className="pl-9 bg-card/50 backdrop-blur-sm border-border"
+            className="pl-9 bg-card border-border shadow-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -371,7 +394,7 @@ export default function InventoryPage() {
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-card/50 border-border">
+              <Button variant="outline" className="bg-card border-border shadow-sm">
                 <Filter className="h-4 w-4 mr-2" />
                 Category: {categoryFilter}
               </Button>
@@ -388,7 +411,7 @@ export default function InventoryPage() {
 
       {/* Inventory List */}
       <motion.div variants={fadeInUp}>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
+        <Card className="border-border shadow-sm overflow-hidden">
           <CardContent className="p-0">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -397,26 +420,26 @@ export default function InventoryPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="py-4 px-6 font-semibold">Part Info</th>
-                      <th className="py-4 px-6 font-semibold">SKU</th>
-                      <th className="py-4 px-6 font-semibold">Stock Level</th>
-                      <th className="py-4 px-6 font-semibold">Location</th>
-                      <th className="py-4 px-6 font-semibold">Unit Cost</th>
-                      <th className="py-4 px-6 font-semibold text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredParts.map((part) => (
-                      <tr key={part.partId} className="border-b border-border hover:bg-muted/30 transition-colors">
-                        <td className="py-4 px-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Part Info</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Stock Level</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedParts.map((part) => (
+                      <TableRow key={part.partId} className="cursor-pointer hover:bg-muted/30 group">
+                        <TableCell>
                           <div className="font-medium text-base">{part.name}</div>
                           <div className="text-xs text-muted-foreground">{part.category}</div>
-                        </td>
-                        <td className="py-4 px-6 font-mono text-xs">{part.sku}</td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{part.sku}</TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-3">
                             <span className="font-bold text-lg">{part.quantityInStock}</span>
                             {getStockBadge(part)}
@@ -424,17 +447,17 @@ export default function InventoryPage() {
                           <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
                             Min: {part.minStockLevel} units
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                             <MapPin className="h-3.5 w-3.5" />
                             <span>{part.location || 'N/A'}</span>
                           </div>
-                        </td>
-                        <td className="py-4 px-6 font-bold text-primary">
+                        </TableCell>
+                        <TableCell className="font-bold text-primary">
                           ${part.unitCost?.toFixed(2) || '0.00'}
-                        </td>
-                        <td className="py-4 px-6 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                              <Button 
                               variant="ghost" 
@@ -452,14 +475,39 @@ export default function InventoryPage() {
                                <Edit2 className="h-4 w-4" />
                              </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border p-4">
+              <p className="text-sm text-muted-foreground">
+                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredParts.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredParts.length}</span> {language === "fr" ? "résultats" : "results"}
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  {language === "fr" ? "Précédent" : "Previous"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {language === "fr" ? "Suivant" : "Next"}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
 

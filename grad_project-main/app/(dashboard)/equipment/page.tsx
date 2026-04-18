@@ -100,10 +100,29 @@ type EquipmentFormState = {
   modelId: string
   manufacturer: string
   classification: string
+  category: string
+  model: string
   criticality: string
   meterUnit: string
   startMeterValue: string
-  thresholds: string[]
+  thresholds: { value: string; label: string }[]
+}
+
+const CLASSIFICATION_MAPPINGS: Record<string, string[]> = {
+  BIOMEDICAL: [
+    "IMAGING",
+    "LABORATORY",
+    "LIFE_SUPPORT",
+    "MONITORING",
+    "SURGICAL",
+    "NEONATAL",
+    "DENTAL",
+    "OPHTHALMOLOGY",
+    "ENT",
+    "REHABILITATION",
+  ],
+  TECHNICAL: ["LABORATORY", "SURGICAL", "STERILIZATION", "REHABILITATION"],
+  IT: ["INFORMATION_SYSTEM", "LOGISTICS"],
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -143,7 +162,9 @@ function createEmptyEquipmentForm(departmentId: number | null): EquipmentFormSta
     modelId: NONE_SELECT_VALUE,
     manufacturer: "",
     classification: "",
-    criticality: NONE_SELECT_VALUE,
+    category: NONE_SELECT_VALUE,
+    model: "",
+    criticality: "LOW",
     meterUnit: "",
     startMeterValue: "",
     thresholds: [],
@@ -161,13 +182,16 @@ function mapEquipmentToForm(e: EquipmentResponse): EquipmentFormState {
     modelId: e.modelId != null ? String(e.modelId) : NONE_SELECT_VALUE,
     manufacturer: e.manufacturer ?? "",
     classification: e.classification ?? "",
-    criticality: e.criticality ? e.criticality.toUpperCase() : NONE_SELECT_VALUE,
+    category: e.category ?? NONE_SELECT_VALUE,
+    model: e.model ?? "",
+    criticality: e.criticality ? e.criticality.toUpperCase() : "LOW",
     meterUnit: e.meterUnit ?? "",
     startMeterValue:
       e.startMeterValue != null && Number.isFinite(e.startMeterValue) ? String(e.startMeterValue) : "",
-    thresholds: (e.thresholds ?? [])
-      .filter((n) => typeof n === "number" && Number.isFinite(n))
-      .map((n) => String(n)),
+    thresholds: (e.thresholds ?? []).map((t: any) => ({
+      value: String(t.value),
+      label: t.label || "",
+    })),
   }
 }
 
@@ -177,6 +201,13 @@ export default function EquipmentPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [classificationFilter, setClassificationFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, classificationFilter, statusFilter])
 
   const [equipment, setEquipment] = useState<EquipmentResponse[]>([])
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
@@ -325,6 +356,13 @@ export default function EquipmentPage() {
     })
   }, [classificationFilter, searchQuery, statusFilter, uiItems])
 
+  const paginatedEquipment = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredEquipment.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredEquipment, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredEquipment.length / itemsPerPage)
+
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
       case "OPERATIONAL":
@@ -389,13 +427,13 @@ export default function EquipmentPage() {
         bgColor: "bg-violet-50 dark:bg-violet-900/20",
       },
       {
-        label: language === "fr" ? "Actifs" : "Active",
-        value: uiItems.filter((e) => e.status === "OPERATIONAL").length,
+        label: language === "fr" ? "Hors service" : "Out of Service",
+        value: uiItems.filter((e) => e.status === "UNDER_REPAIR" || e.status === "OUT_OF_SERVICE").length,
         icon: Activity,
-        color: "text-emerald-600",
-        bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+        color: "text-amber-600",
+        bgColor: "bg-amber-50 dark:bg-amber-900/20",
       },
-      {
+       {
         label: language === "fr" ? "Critiques" : "Critical",
         value: uiItems.filter((e) => e.criticality === "CRITICAL").length,
         icon: AlertTriangle,
@@ -690,10 +728,10 @@ export default function EquipmentPage() {
     const location = form.location.trim()
     const departmentId = Number(form.departmentId)
     const status = (form.status ?? "").toUpperCase()
-    if (!name || !serialNumber || !location || !Number.isFinite(departmentId) || departmentId <= 0 || !status) {
+    if (!name || !location || !Number.isFinite(departmentId) || departmentId <= 0 || !status) {
       toast({
         title: language === "fr" ? "Champs obligatoires manquants" : "Missing required fields",
-        description: language === "fr" ? "Nom, numéro de série, emplacement, service et statut sont requis." : "Name, serial number, location, department, and status are required.",
+        description: language === "fr" ? "Nom, emplacement, service et statut sont requis." : "Name, location, department, and status are required.",
         variant: "destructive",
       })
       return
@@ -710,18 +748,23 @@ export default function EquipmentPage() {
       modelId:
         form.modelId && form.modelId !== NONE_SELECT_VALUE ? Number(form.modelId) : null,
       manufacturer: form.manufacturer.trim() ? form.manufacturer.trim() : null,
-      classification: form.classification.trim() ? form.classification.trim() : null,
+      classification: form.classification,
+      category: form.category && form.category !== NONE_SELECT_VALUE ? form.category : null,
+      model: form.model.trim() || null,
       criticality:
         form.criticality && form.criticality !== NONE_SELECT_VALUE
           ? form.criticality.toUpperCase()
-          : null,
+          : "LOW",
       meterUnit: form.meterUnit.trim() ? form.meterUnit.trim() : null,
       startMeterValue: form.startMeterValue.trim()
         ? (Number.isFinite(Number(form.startMeterValue)) ? Number(form.startMeterValue) : null)
         : null,
       thresholds: form.thresholds
-        .map((v) => Number(v))
-        .filter((n) => Number.isFinite(n) && n > 0),
+        .map((t) => ({
+          value: Number(t.value),
+          label: t.label.trim() || null,
+        }))
+        .filter((t) => Number.isFinite(t.value) && t.value > 0),
     }
 
     if (formMode === "edit" && editingId) {
@@ -801,7 +844,7 @@ export default function EquipmentPage() {
             <Download className="h-4 w-4" />
             {t("export")}
           </Button>
-          <Button onClick={openCreate} className="gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700">
+          <Button onClick={openCreate} className="gap-2">
             <Plus className="h-4 w-4" />
             {t("addEquipment")}
           </Button>
@@ -809,7 +852,7 @@ export default function EquipmentPage() {
       </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {formMode === "create"
@@ -823,8 +866,8 @@ export default function EquipmentPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={onSubmitForm} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+          <form onSubmit={onSubmitForm} className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="eq-name">{language === "fr" ? "Nom" : "Name"}</Label>
                 <Input
@@ -902,54 +945,58 @@ export default function EquipmentPage() {
 
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Classification" : "Classification"}</Label>
-                <Input
-                  value={form.classification}
-                  onChange={(e) => setForm((p) => ({ ...p, classification: e.target.value }))}
-                />
+                <Select 
+                  value={form.classification} 
+                  onValueChange={(v) => setForm((p) => ({ ...p, classification: v, category: NONE_SELECT_VALUE }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BIOMEDICAL">BIOMEDICAL</SelectItem>
+                    <SelectItem value="TECHNICAL">TECHNICAL</SelectItem>
+                    <SelectItem value="IT">IT</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
+    
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Catégorie" : "Category"}</Label>
-                <Select value={form.categoryId} onValueChange={(v) => setForm((p) => ({ ...p, categoryId: v }))}>
+                <Select 
+                  value={form.category} 
+                  onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}
+                  disabled={!form.classification}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Aucune" : "None"} />
+                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucune" : "None"}</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c.categoryId} value={String(c.categoryId)}>
-                        {c.name}
-                      </SelectItem>
+                    {form.classification && CLASSIFICATION_MAPPINGS[form.classification]?.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
+    
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Modèle" : "Model"}</Label>
-                <Select value={form.modelId} onValueChange={(v) => setForm((p) => ({ ...p, modelId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Aucun" : "None"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucun" : "None"}</SelectItem>
-                    {models.map((m) => (
-                      <SelectItem key={m.modelId} value={String(m.modelId)}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={form.model}
+                  onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+                  placeholder={language === "fr" ? "Ex: Magnetom" : "e.g., Magnetom"}
+                />
               </div>
-
+    
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Fabricant" : "Manufacturer"}</Label>
                 <Input
                   value={form.manufacturer}
                   onChange={(e) => setForm((p) => ({ ...p, manufacturer: e.target.value }))}
+                  placeholder={language === "fr" ? "Ex: Siemens" : "e.g., Siemens"}
                 />
               </div>
-
+    
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Unité compteur" : "Meter unit"}</Label>
                 <Input
@@ -958,59 +1005,68 @@ export default function EquipmentPage() {
                   placeholder={language === "fr" ? "Ex: heures" : "e.g., hours"}
                 />
               </div>
-
+    
               <div className="space-y-2">
                 <Label>{language === "fr" ? "Valeur initiale" : "Start meter value"}</Label>
                 <Input
                   type="number"
                   value={form.startMeterValue}
                   onChange={(e) => setForm((p) => ({ ...p, startMeterValue: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: 0" : "e.g., 0"}
+                  placeholder="0"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-3">
               <div className="flex items-center justify-between">
-                <Label>{language === "fr" ? "Seuils" : "Thresholds"}</Label>
+                <Label>{language === "fr" ? "Seuils de maintenance" : "Maintenance Thresholds"}</Label>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setForm((p) => ({ ...p, thresholds: [...p.thresholds, ""] }))}
+                  onClick={() => setForm((p) => ({ ...p, thresholds: [...p.thresholds, { value: "", label: "" }] }))}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  {language === "fr" ? "Ajouter un seuil" : "Add threshold"}
+                  {language === "fr" ? "Ajouter" : "Add"}
                 </Button>
               </div>
 
               {form.thresholds.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Aucun seuil" : "No thresholds"}
+                <div className="text-sm text-muted-foreground italic">
+                  {language === "fr" ? "Aucun seuil configuré" : "No thresholds configured"}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {form.thresholds.map((v, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <div className="w-24 text-xs text-muted-foreground">
-                        {language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`}
-                      </div>
+                <div className="space-y-3">
+                  {form.thresholds.map((t, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
                       <Input
-                        type="number"
-                        value={v}
+                        className="flex-1"
+                        value={t.label}
                         onChange={(e) =>
                           setForm((p) => ({
                             ...p,
-                            thresholds: p.thresholds.map((x, i) => (i === idx ? e.target.value : x)),
+                            thresholds: p.thresholds.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)),
                           }))
                         }
-                        placeholder={language === "fr" ? "Valeur" : "Value"}
+                        placeholder={language === "fr" ? "Nom (ex: Vidange)" : "Label (e.g. Oil Change)"}
+                      />
+                      <Input
+                        type="number"
+                        className="w-32"
+                        value={t.value}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            thresholds: p.thresholds.map((x, i) => (i === idx ? { ...x, value: e.target.value } : x)),
+                          }))
+                        }
+                        placeholder="0"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-destructive"
+                        className="text-destructive shrink-0"
                         onClick={() =>
                           setForm((p) => ({
                             ...p,
@@ -1412,11 +1468,11 @@ export default function EquipmentPage() {
                 <TableRow>
                   <TableHead>{language === "fr" ? "Équipement" : "Equipment"}</TableHead>
                   <TableHead className="hidden md:table-cell">{t("serialNumber")}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t("location")}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t("department")}</TableHead>
                   <TableHead className="hidden lg:table-cell">{t("classification")}</TableHead>
                   <TableHead>{t("criticality")}</TableHead>
                   <TableHead>{t("status")}</TableHead>
-                  <TableHead className="hidden xl:table-cell">{t("department")}</TableHead>
-                  <TableHead className="hidden xl:table-cell">{t("lastMaintenance")}</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -1433,24 +1489,25 @@ export default function EquipmentPage() {
                       {error}
                     </TableCell>
                   </TableRow>
-                ) : filteredEquipment.length === 0 ? (
+                ) : paginatedEquipment.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-6 text-muted-foreground">
                       {language === "fr" ? "Aucun équipement" : "No equipment"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredEquipment.map((eq) => (
+                  paginatedEquipment.map((eq) => (
                     <TableRow key={eq.id} className="cursor-pointer hover:bg-muted/50">
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{eq.name}</p>
-                          <p className="text-sm text-muted-foreground">{eq.location}</p>
-                        </div>
+                        <p className="font-medium">{eq.name}</p>
                       </TableCell>
                       <TableCell className="hidden md:table-cell font-mono text-sm">
                         {eq.serialNumber}
                       </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                        {eq.location}
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">{eq.departmentName}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <Badge variant="outline">{eq.classification}</Badge>
                       </TableCell>
@@ -1464,8 +1521,6 @@ export default function EquipmentPage() {
                           {getStatusLabel(eq.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden xl:table-cell">{eq.departmentName}</TableCell>
-                      <TableCell className="hidden xl:table-cell">—</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1521,6 +1576,31 @@ export default function EquipmentPage() {
               </TableBody>
             </Table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t p-4">
+              <p className="text-sm text-muted-foreground">
+                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEquipment.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredEquipment.length}</span> {language === "fr" ? "résultats" : "results"}
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  {language === "fr" ? "Précédent" : "Previous"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {language === "fr" ? "Suivant" : "Next"}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
         </TabsContent>

@@ -23,6 +23,9 @@ public class Equipment {
     @Column(name = "equipment_id")
     private Integer equipmentId;
 
+    @Column(name = "asset_code", unique = true)
+    private String assetCode;
+
     @Column(nullable = false)
     private String name;
 
@@ -31,7 +34,8 @@ public class Equipment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private EquipmentStatus status; // e.g., OPERATIONAL, UNDER_REPAIR, ARCHIVED
+    @Builder.Default
+    private EquipmentStatus status = EquipmentStatus.OPERATIONAL;
 
     private String location;
 
@@ -50,6 +54,8 @@ public class Equipment {
     private String modelReference;
 
     private String classification;
+    private String category;
+    private String model;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "criticality")

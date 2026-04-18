@@ -56,4 +56,9 @@ public class AuditLogService {
                 .limit(limit)
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public List<AuditLog> getByEntity(String entityName, Integer entityId) {
+        return auditLogRepository.findByEntity(entityName, entityId);
+    }
 }

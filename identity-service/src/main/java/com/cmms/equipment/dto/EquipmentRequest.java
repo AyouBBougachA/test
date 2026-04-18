@@ -14,9 +14,10 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EquipmentRequest {
+    private String assetCode;
     private String name;
     private String serialNumber;
-    private String status;
+    private String status; // Ignored on create; only used in update
     private String location;
     private Integer departmentId;
     private Integer categoryId;
@@ -24,10 +25,12 @@ public class EquipmentRequest {
     private String manufacturer;
     private String modelReference;
     private String classification;
+    private String category;
+    private String model;
     private String criticality;
     private String meterUnit;
     private BigDecimal startMeterValue;
-    private List<BigDecimal> thresholds;
+    private List<EquipmentThresholdDto> thresholds;
     private LocalDate purchaseDate;
     private LocalDate commissioningDate;
     private String supplierName;

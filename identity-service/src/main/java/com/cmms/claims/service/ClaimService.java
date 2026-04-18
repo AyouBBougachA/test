@@ -140,7 +140,11 @@ public class ClaimService {
         Equipment equipment = equipmentRepository.findById(request.getEquipmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found with ID: " + request.getEquipmentId()));
 
-        Integer finalDepartmentId = request.getDepartmentId();
+        Integer resolvedDepartmentId = request.getDepartmentId();
+        if (resolvedDepartmentId == null) {
+            resolvedDepartmentId = equipment.getDepartmentId();
+        }
+        final Integer finalDepartmentId = resolvedDepartmentId;
         if (finalDepartmentId != null) {
             departmentRepository.findById(finalDepartmentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found with ID: " + finalDepartmentId));

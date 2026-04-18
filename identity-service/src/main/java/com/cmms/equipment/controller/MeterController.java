@@ -3,6 +3,7 @@ package com.cmms.equipment.controller;
 import com.cmms.equipment.dto.MeterLogRequest;
 import com.cmms.equipment.dto.MeterLogResponse;
 import com.cmms.equipment.dto.MeterResponse;
+import com.cmms.equipment.dto.MeterThresholdRequest;
 import com.cmms.equipment.entity.Meter;
 import com.cmms.equipment.entity.MeterLog;
 import com.cmms.equipment.entity.MeterThreshold;
@@ -40,16 +41,16 @@ public class MeterController {
     @ResponseStatus(HttpStatus.CREATED)
     public MeterLogResponse recordLog(@PathVariable Integer id, @RequestBody MeterLogRequest request) {
         MeterLog log = meterService.recordLog(id, request.getOperation(), request.getAmount());
-        
+
         // Threshold Check
         Optional<String> alert = meterService.checkThreshold(id, log.getResultingValue());
-        
+
         return MeterLogResponse.builder()
                 .logId(log.getLogId())
                 .meterId(log.getMeterId())
-            .value(log.getValue())
-            .operation(log.getOperation())
-            .resultingValue(log.getResultingValue())
+                .value(log.getValue())
+                .operation(log.getOperation())
+                .resultingValue(log.getResultingValue())
                 .recordedAt(log.getRecordedAt())
                 .alert(alert.orElse(null))
                 .build();
@@ -62,8 +63,8 @@ public class MeterController {
 
     @PostMapping("/{id}/thresholds")
     @ResponseStatus(HttpStatus.CREATED)
-    public MeterThreshold createThreshold(@PathVariable Integer id, @RequestBody java.math.BigDecimal thresholdValue) {
-        return meterService.createThreshold(id, thresholdValue);
+    public MeterThreshold createThreshold(@PathVariable Integer id, @RequestBody MeterThresholdRequest request) {
+        return meterService.createThreshold(id, request.getThresholdValue(), request.getLabel());
     }
 
     @GetMapping("/{id}/thresholds")

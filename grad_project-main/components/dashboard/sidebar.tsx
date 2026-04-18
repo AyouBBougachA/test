@@ -62,6 +62,9 @@ export function DashboardSidebar() {
   const [expandedItems, setExpandedItems] = useState<string[]>(["planning", "ai", "bi", "admin"])
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [hasMeterAlert, setHasMeterAlert] = useState(false)
+
+  const isMaintenanceStaff = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
 
   useEffect(() => {
     const checkMobile = () => {
@@ -75,6 +78,30 @@ export function DashboardSidebar() {
   useEffect(() => {
     setMobileOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    if (!isAuthenticated || !isMaintenanceStaff) return
+
+    const checkMeters = async () => {
+      try {
+        const { metersApi } = await import("@/lib/api/meters")
+        const meters = await metersApi.getAll()
+        const hasAlert = meters.some(m => {
+          // Logic from adapters/page
+          const val = m.value
+          const threshold = m.thresholds && m.thresholds.length > 0 ? Math.min(...m.thresholds) : null
+          return threshold !== null && val >= threshold
+        })
+        setHasMeterAlert(hasAlert)
+      } catch (e) {
+        console.error("Sidebar meter check failed", e)
+      }
+    }
+
+    checkMeters()
+    const interval = setInterval(checkMeters, 60000) // Check every minute
+    return () => clearInterval(interval)
+  }, [isAuthenticated, isMaintenanceStaff])
 
   // Organized by recommended sidebar groups
   const navItems: NavItem[] = [
@@ -114,7 +141,6 @@ export function DashboardSidebar() {
       children: [
         { label: t("kanban"), href: "/planning/kanban", icon: Kanban },
         { label: t("calendar"), href: "/planning/calendar", icon: Calendar },
-        { label: t("workload"), href: "/planning/workload", icon: BarChart3 },
         { label: t("gantt"), href: "/planning/gantt", icon: GanttChart },
       ],
       roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN"],
@@ -292,14 +318,25 @@ export function DashboardSidebar() {
                 key={item.href}
                 href={item.href!}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive(item.href!)
                     ? "bg-sidebar-primary text-sidebar-primary-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                {!collapsed && <span>{item.label}</span>}
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5" />
+                  {!collapsed && <span>{item.label}</span>}
+                </div>
+                {!collapsed && item.href === '/meters' && hasMeterAlert && (
+                  <motion.div 
+                    initial={{ scale: 0 }} 
+                    animate={{ scale: 1 }}
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                  </motion.div>
+                )}
               </Link>
             )
           })}
@@ -354,7 +391,7 @@ export function DashboardSidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-sidebar transition-all duration-300",
+        "sticky left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-sidebar transition-all duration-300 shrink-0",
         collapsed ? "w-16" : "w-64"
       )}
     >

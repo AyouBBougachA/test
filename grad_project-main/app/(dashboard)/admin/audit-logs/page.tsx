@@ -33,7 +33,7 @@ export default function AuditLogsPage() {
   const [query, setQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [timeRange, setTimeRange] = useState("7days")
-  const [scope, setScope] = useState<"all" | "security">("all")
+  const [scope, setScope] = useState<"all" | "security" | "equipment">("all")
 
   useEffect(() => {
     if (isLoading) return
@@ -48,7 +48,11 @@ export default function AuditLogsPage() {
     setError(null)
     const load = async () => {
       try {
-        const res = scope === "security" ? await auditLogsApi.getSecurity(200) : await auditLogsApi.getRecent(200)
+        const res = 
+          scope === "security" ? await auditLogsApi.getSecurity(200) : 
+          scope === "equipment" ? await auditLogsApi.getRecent(500) : 
+          await auditLogsApi.getRecent(200)
+        
         if (cancelled) return
         setItems(res)
       } catch {
@@ -75,6 +79,8 @@ export default function AuditLogsPage() {
       Infinity
 
     return items.filter((l) => {
+      if (scope === "equipment" && l.entityName !== "EQUIPMENT") return false
+      
       const createdAt = new Date(l.createdAt).getTime()
       if (Number.isNaN(createdAt)) return false
       if (cutoffMs !== Infinity && now - createdAt > cutoffMs) return false
@@ -158,13 +164,14 @@ export default function AuditLogsPage() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Select value={scope} onValueChange={(v) => setScope(v as "all" | "security")}>
+        <Select value={scope} onValueChange={(v) => setScope(v as "all" | "security" | "equipment")}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={language === "fr" ? "Périmètre" : "Scope"} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{language === "fr" ? "Tous" : "All logs"}</SelectItem>
             <SelectItem value="security">{language === "fr" ? "Sécurité" : "Security logs"}</SelectItem>
+            <SelectItem value="equipment">{language === "fr" ? "Équipements" : "Equipment logs"}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={actionFilter} onValueChange={setActionFilter}>

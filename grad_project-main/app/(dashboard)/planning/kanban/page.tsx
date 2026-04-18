@@ -11,38 +11,74 @@ import {
   AlertCircle, 
   Clock, 
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  UserPlus,
+  CalendarCheck,
+  Pause,
+  ArrowRight
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { workOrdersApi } from "@/lib/api/work-orders"
-import type { WorkOrderResponse } from "@/lib/api/types"
+import { usersApi } from "@/lib/api/users"
+import type { WorkOrderResponse, UserResponse } from "@/lib/api/types"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 
 const COLUMNS = [
-  { id: 'CREATED', label: 'Backlog', color: 'bg-zinc-100 text-zinc-700' },
-  { id: 'ASSIGNED', label: 'Assigned', color: 'bg-blue-50 text-blue-700' },
-  { id: 'SCHEDULED', label: 'Scheduled', color: 'bg-indigo-50 text-indigo-700' },
-  { id: 'IN_PROGRESS', label: 'In Progress', color: 'bg-amber-50 text-amber-700' },
-  { id: 'ON_HOLD', label: 'On Hold', color: 'bg-rose-50 text-rose-700' },
-  { id: 'COMPLETED', label: 'Done', color: 'bg-emerald-50 text-emerald-700' },
+  { id: 'CREATED', label: 'Backlog', border: 'border-zinc-200 dark:border-zinc-800', dot: 'bg-zinc-400' },
+  { id: 'ASSIGNED', label: 'Assigned', border: 'border-blue-200 dark:border-blue-800', dot: 'bg-blue-500' },
+  { id: 'SCHEDULED', label: 'Scheduled', border: 'border-indigo-200 dark:border-indigo-800', dot: 'bg-indigo-500' },
+  { id: 'IN_PROGRESS', label: 'In Progress', border: 'border-amber-200 dark:border-amber-800', dot: 'bg-amber-500' },
+  { id: 'ON_HOLD', label: 'On Hold', border: 'border-rose-200 dark:border-rose-800', dot: 'bg-rose-500' },
+  { id: 'COMPLETED', label: 'Done', border: 'border-emerald-200 dark:border-emerald-800', dot: 'bg-emerald-500' },
 ]
 
 export default function KanbanPage() {
   const { user } = useAuth()
   const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
+  const [technicians, setTechnicians] = useState<UserResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  // Dialog states
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ id: number; status: string } | null>(null)
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
+  const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false)
+
+  // Interaction states
+  const [selectedTechId, setSelectedTechId] = useState<string>("")
+  const [plannedStart, setPlannedStart] = useState<string>("")
+  const [plannedEnd, setPlannedEnd] = useState<string>("")
+  const [estDuration, setEstDuration] = useState<string>("")
+  const [holdNote, setHoldNote] = useState<string>("")
 
   const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
 
   const loadData = async () => {
     try {
-      const data = await workOrdersApi.list()
-      setWorkOrders(data)
+      setLoading(true)
+      const [wos, users] = await Promise.all([
+        workOrdersApi.list(),
+        usersApi.getAll()
+      ])
+      setWorkOrders(wos)
+      setTechnicians(users.filter(u => u.roleName === 'TECHNICIAN' || u.roleId === 3))
     } catch (e) {
       console.error(e)
     } finally {
@@ -71,18 +107,85 @@ export default function KanbanPage() {
     const idStr = e.dataTransfer.getData("woId")
     if (!idStr) return
     const id = parseInt(idStr)
-    
     setDraggingId(null)
-    
+
+    const wo = workOrders.find(w => w.woId === id)
+    if (!wo || wo.status === status) return
+
+    // Special handling for certain transitions
+    if (status === 'ASSIGNED') {
+      setPendingStatusChange({ id, status })
+      setSelectedTechId(wo.assignedToUserId?.toString() || "")
+      setIsAssignDialogOpen(true)
+      return
+    }
+
+    if (status === 'SCHEDULED') {
+      setPendingStatusChange({ id, status })
+      setPlannedStart(wo.plannedStart ? wo.plannedStart.slice(0, 16) : "")
+      setPlannedEnd(wo.plannedEnd ? wo.plannedEnd.slice(0, 16) : "")
+      setEstDuration(wo.estimatedDuration?.toString() || "")
+      setIsScheduleDialogOpen(true)
+      return
+    }
+
+    if (status === 'ON_HOLD') {
+      setPendingStatusChange({ id, status })
+      setHoldNote("")
+      setIsOnHoldDialogOpen(true)
+      return
+    }
+
+    await executeStatusUpdate(id, status)
+  }
+
+  const executeStatusUpdate = async (id: number, status: string, additionalData: any = {}) => {
+    setActionLoading(true)
     // Optimistic Update
-    setWorkOrders(prev => prev.map(wo => wo.woId === id ? { ...wo, status } : wo))
+    setWorkOrders(prev => prev.map(wo => wo.woId === id ? { ...wo, status, ...additionalData } : wo))
     
     try {
-      await workOrdersApi.updateStatus(id, { status })
+      if (status === 'ASSIGNED' && additionalData.assignedToUserId) {
+        await workOrdersApi.assign(id, { assignedToUserId: additionalData.assignedToUserId })
+      } else if (status === 'SCHEDULED' && additionalData.plannedStart) {
+        await workOrdersApi.reschedule(id, additionalData)
+      } else {
+        await workOrdersApi.updateStatus(id, { status, note: additionalData.note })
+      }
+      await loadData() // Refresh to get server values
     } catch (e) {
       console.error(e)
       loadData() // Rollback
+    } finally {
+      setActionLoading(false)
+      setPendingStatusChange(null)
     }
+  }
+
+  const confirmAssignment = () => {
+    if (!pendingStatusChange || !selectedTechId) return
+    const tech = technicians.find(t => t.userId === parseInt(selectedTechId))
+    executeStatusUpdate(pendingStatusChange.id, 'ASSIGNED', { 
+      assignedToUserId: parseInt(selectedTechId),
+      assignedToName: tech?.fullName 
+    })
+    setIsAssignDialogOpen(false)
+  }
+
+  const confirmSchedule = () => {
+    if (!pendingStatusChange || !plannedStart) return
+    executeStatusUpdate(pendingStatusChange.id, 'SCHEDULED', {
+      plannedStart: `${plannedStart}:00`,
+      plannedEnd: plannedEnd ? `${plannedEnd}:00` : null,
+      estimatedDuration: estDuration ? parseFloat(estDuration) : null
+    })
+    setIsScheduleDialogOpen(false)
+  }
+
+  const confirmHold = () => {
+    if (!pendingStatusChange || !holdNote) return
+    executeStatusUpdate(pendingStatusChange.id, 'ON_HOLD', { note: holdNote })
+    setIsOnHoldDialogOpen(false)
   }
 
   if (loading) {
@@ -103,20 +206,20 @@ export default function KanbanPage() {
           >
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
-                <div className={cn("h-2 w-2 rounded-full", column.color.split(' ')[0])} />
-                <h3 className="font-bold text-sm text-foreground/80">{column.label}</h3>
-                <Badge variant="outline" className="text-[10px] h-5 bg-muted/30 border-none font-medium">
+                <div className={cn("h-3 w-3 rounded-full shadow-sm ring-2 ring-background", column.dot)} />
+                <h3 className="font-bold text-sm text-foreground/80 tracking-tight">{column.label}</h3>
+                <Badge variant="outline" className="text-[10px] h-5 bg-muted/40 border-none font-bold text-muted-foreground">
                   {columnWos.length}
                 </Badge>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 opacity-50 hover:opacity-100">
-                <Plus className="h-3.5 w-3.5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
 
             <div className={cn(
-              "flex-1 bg-muted/20 rounded-2xl p-2 space-y-3 min-h-[500px] border border-transparent transition-colors",
-              draggingId && "border-primary/20 bg-primary/5"
+              "flex-1 bg-muted/30 dark:bg-muted/10 rounded-3xl p-2.5 space-y-3 min-h-[600px] border-2 border-transparent transition-all duration-300",
+              draggingId && "border-primary/20 bg-primary/5 scale-[1.01]"
             )}>
               <AnimatePresence mode="popLayout">
                 {columnWos.map(wo => (
@@ -130,19 +233,21 @@ export default function KanbanPage() {
                     onDragStart={(e) => handleDragStart(e, wo.woId)}
                     onDragEnd={() => setDraggingId(null)}
                     className={cn(
-                      "bg-white p-4 rounded-xl shadow-sm border border-border/60 group cursor-grab active:cursor-grabbing",
+                      "bg-card text-card-foreground p-4 rounded-2xl shadow-sm border group cursor-grab active:cursor-grabbing hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
+                      column.border,
+                      draggingId === wo.woId && "opacity-40",
                       !isManager && "cursor-default drag-none"
                     )}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-[10px] font-bold text-muted-foreground tracking-widest">{wo.woCode}</p>
+                    <div className="flex justify-between items-start mb-3">
+                      <p className="text-[10px] font-black text-muted-foreground tracking-[0.2em]">{wo.woCode}</p>
                       <Badge 
                         variant="outline" 
                         className={cn(
-                          "text-[9px] h-4 border-none",
-                          wo.priority === 'CRITICAL' ? "bg-rose-100 text-rose-700" :
-                          wo.priority === 'HIGH' ? "bg-amber-100 text-amber-700" :
-                          "bg-zinc-100 text-zinc-700"
+                          "text-[9px] h-4.5 border px-2 font-bold uppercase tracking-tighter",
+                          wo.priority === 'CRITICAL' ? "border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:border-rose-800" :
+                          wo.priority === 'HIGH' ? "border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:border-amber-800" :
+                          "border-zinc-200 bg-zinc-50 text-zinc-700 dark:bg-zinc-900/40 dark:border-zinc-800"
                         )}
                       >
                         {wo.priority}
@@ -190,6 +295,109 @@ export default function KanbanPage() {
           </div>
         )
       })}
+      {/* ── ASSIGNMENT DIALOG ─────────────────────────────────── */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-blue-500" />
+              Assign Technician
+            </DialogTitle>
+            <DialogDescription>
+              Select the primary technician responsible for this work order.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Primary Technician</Label>
+              <select 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedTechId}
+                onChange={(e) => setSelectedTechId(e.target.value)}
+              >
+                <option value="">Select a technician...</option>
+                {technicians.map(t => (
+                  <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsAssignDialogOpen(false)}>Cancel</Button>
+            <Button onClick={confirmAssignment} disabled={!selectedTechId || actionLoading}>
+              {actionLoading ? "Assigning..." : "Confirm Assignment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── SCHEDULE DIALOG ───────────────────────────────────── */}
+      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="h-5 w-5 text-indigo-500" />
+              Schedule Intervention
+            </DialogTitle>
+            <DialogDescription>
+              Set the planned dates and estimated duration for this work.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Planned Start</Label>
+              <Input type="datetime-local" value={plannedStart} onChange={e => setPlannedStart(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Planned End (Optional)</Label>
+              <Input type="datetime-local" value={plannedEnd} onChange={e => setPlannedEnd(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Estimated Duration (Hours)</Label>
+              <Input type="number" step="0.5" placeholder="e.g. 4.5" value={estDuration} onChange={e => setEstDuration(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsScheduleDialogOpen(false)}>Cancel</Button>
+            <Button onClick={confirmSchedule} disabled={!plannedStart || actionLoading}>
+              {actionLoading ? "Scheduling..." : "Save Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── ON HOLD DIALOG ────────────────────────────────────── */}
+      <Dialog open={isOnHoldDialogOpen} onOpenChange={setIsOnHoldDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pause className="h-5 w-5 text-rose-500" />
+              Pause Work (On Hold)
+            </DialogTitle>
+            <DialogDescription>
+              Please provide a reason for putting this work order on hold.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Pause</Label>
+              <Textarea 
+                placeholder="e.g. Waiting for spare parts delivery..." 
+                value={holdNote} 
+                onChange={e => setHoldNote(e.target.value)} 
+                className="resize-none"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsOnHoldDialogOpen(false)}>Cancel</Button>
+            <Button onClick={confirmHold} disabled={!holdNote || actionLoading} className="bg-rose-600 hover:bg-rose-700 text-white">
+              {actionLoading ? "Pausing..." : "Put on Hold"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

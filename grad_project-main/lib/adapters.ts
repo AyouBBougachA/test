@@ -133,6 +133,7 @@ export type UiMeterStatus = 'normal' | 'warning' | 'critical'
 
 export interface UiMeterCard {
   id: number
+  equipmentId: number // Added missing field
   displayId: string
   name: string
   equipmentLabel: string
@@ -161,6 +162,7 @@ export function mapMeterResponseToUiCard(meter: MeterResponse): UiMeterCard {
 
   return {
     id: meter.meterId,
+    equipmentId: meter.equipmentId, // Map the equipment ID
     displayId: formatDisplayId('MTR', meter.meterId),
     name: safeName,
     equipmentLabel: meter.equipmentName ? `${meter.equipmentName}` : `Equipment #${meter.equipmentId}`,

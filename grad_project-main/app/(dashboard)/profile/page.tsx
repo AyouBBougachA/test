@@ -354,7 +354,7 @@ export default function ProfilePage() {
                 />
               </div>
               <Button
-                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                
                 onClick={onSaveProfile}
                 disabled={!user || isSavingProfile}
               >
@@ -424,7 +424,7 @@ export default function ProfilePage() {
                 <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
               <Button
-                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                
                 onClick={onUpdatePassword}
                 disabled={!user || isSavingPassword}
               >

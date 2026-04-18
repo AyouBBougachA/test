@@ -22,6 +22,9 @@ public class MeterThreshold {
     @Column(name = "threshold_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal thresholdValue;
 
+    @Column(name = "label")
+    private String label;
+
     @Column(name = "threshold_type")
     @Builder.Default
     private String thresholdType = "CRITICAL";

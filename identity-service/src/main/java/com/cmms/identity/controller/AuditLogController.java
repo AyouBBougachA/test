@@ -23,4 +23,9 @@ public class AuditLogController {
     public List<AuditLog> getSecurityLogs(@RequestParam(defaultValue = "10") int limit) {
         return auditLogService.getSecurityLogs(limit);
     }
+
+    @GetMapping("/entity/{name}/{id}")
+    public List<AuditLog> getByEntity(@PathVariable String name, @PathVariable Integer id) {
+        return auditLogService.getByEntity(name, id);
+    }
 }

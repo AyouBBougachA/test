@@ -21,6 +21,9 @@ public class Task {
     private Integer woId;
 
     /** Short title of the task step */
+    @Column(name = "parent_task_id")
+    private Integer parentTaskId;
+
     @Column(length = 255)
     private String title;
 
@@ -42,8 +45,22 @@ public class Task {
     private Integer assignedToUserId;
 
     /** Estimated hours to complete this task */
-    @Column(name = "estimated_duration")
+    @Column(name = "estimated_duration", precision = 10, scale = 2)
     private java.math.BigDecimal estimatedDuration;
+
+    /** Actual logged hours */
+    @Column(name = "actual_duration", precision = 10, scale = 2)
+    private java.math.BigDecimal actualDuration;
+
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", length = 20)
+    private TaskPriority priority;
+
+    @Column(name = "department_id")
+    private Integer departmentId;
 
     @Builder.Default
     @Column(name = "order_index")
@@ -87,6 +104,15 @@ public class Task {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    /** Accumulated time spent on task in seconds */
+    @Builder.Default
+    @Column(name = "total_timer_duration")
+    private Long totalTimerDuration = 0L;
+
+    /** Timestamp when the active timer session started */
+    @Column(name = "current_timer_started_at")
+    private LocalDateTime currentTimerStartedAt;
+
     public enum TaskStatus {
         TODO,
         IN_PROGRESS,
@@ -101,5 +127,12 @@ public class Task {
         PENDING,
         APPROVED,
         REJECTED
+    }
+
+    public enum TaskPriority {
+        CRITICAL,
+        HIGH,
+        MEDIUM,
+        LOW
     }
 }

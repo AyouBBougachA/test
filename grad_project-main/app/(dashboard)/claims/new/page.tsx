@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { AlertTriangle, ArrowLeft, Camera, Send, Upload } from "lucide-react"
+
+import { useAuth } from "@/lib/auth-context"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +33,7 @@ import { useToast } from "@/components/ui/use-toast"
 export default function NewClaimPage() {
   const { t, language } = useI18n()
   const router = useRouter()
+  const { user } = useAuth()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -62,6 +65,11 @@ export default function NewClaimPage() {
         if (cancelled) return
         setEquipment(eqRes)
         setDepartments(deptRes)
+        
+        // Initial department for Technicians
+        if (user?.roleName === "TECHNICIAN" && user.departmentId) {
+          setDepartmentId(String(user.departmentId))
+        }
       } catch {
         if (!cancelled) setError(language === "fr" ? "Échec du chargement" : "Failed to load")
       } finally {
@@ -75,8 +83,22 @@ export default function NewClaimPage() {
     }
   }, [language])
 
-  const equipmentOptions = useMemo(() => equipment ?? [], [equipment])
+  const equipmentOptions = useMemo(() => {
+    if (user?.roleName === "TECHNICIAN" && user.departmentId) {
+      return equipment.filter(e => e.departmentId === user.departmentId)
+    }
+    return equipment ?? []
+  }, [equipment, user])
+
   const departmentOptions = useMemo(() => departments ?? [], [departments])
+
+  const onEquipmentChange = (val: string) => {
+    setEquipmentId(val)
+    const eq = equipment.find(e => String(e.equipmentId) === val)
+    if (eq?.departmentId) {
+      setDepartmentId(String(eq.departmentId))
+    }
+  }
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList) return
@@ -190,7 +212,7 @@ export default function NewClaimPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("equipment")} *</label>
-                <Select value={equipmentId} onValueChange={setEquipmentId} required disabled={isLoadingRefs}>
+                <Select value={equipmentId} onValueChange={onEquipmentChange} required disabled={isLoadingRefs}>
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
@@ -212,7 +234,12 @@ export default function NewClaimPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("department")} *</label>
-                <Select value={departmentId} onValueChange={setDepartmentId} required disabled={isLoadingRefs}>
+                <Select 
+                  value={departmentId} 
+                  onValueChange={setDepartmentId} 
+                  required 
+                  disabled={isLoadingRefs || (user?.roleName === "TECHNICIAN") || (!!equipmentId && !!equipment.find(e => String(e.equipmentId) === equipmentId)?.departmentId)}
+                >
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
@@ -332,7 +359,7 @@ export default function NewClaimPage() {
                 <Button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+                  className="flex-1 gap-2 "
                 >
                   <Send className="h-4 w-4" />
                   {isSaving

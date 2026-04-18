@@ -3,8 +3,11 @@
 import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Clock, Wrench, CheckCircle, AlertCircle, CheckSquare, Calendar, Users, XCircle, FileText, Plus, Trash2, ThumbsUp, ThumbsDown, Edit, CalendarDays, Eye, EyeOff, Square, History, Hammer, Package, Activity, DollarSign, TrendingDown, Search, Check, X, FastForward } from "lucide-react"
-
+import { 
+  ArrowLeft, Clock, Wrench, CheckCircle, AlertCircle, CheckSquare, Calendar, Users, XCircle, FileText, Plus, Trash2, ThumbsUp, ThumbsDown, Edit, CalendarDays, Eye, EyeOff, Square, History, Hammer, Package, Activity, DollarSign, TrendingDown, Search, Check, X, FastForward 
+} from "lucide-react"
+import { TaskExecutionHub } from "@/components/tasks/TaskExecutionHub"
+import { WorkOrderLifecycleFlow } from "@/components/work-orders/WorkOrderLifecycleFlow"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
@@ -29,7 +33,10 @@ import { useI18n } from "@/lib/i18n"
 import { format } from "date-fns"
 import { usersApi } from "@/lib/api/users"
 import { inventoryApi } from "@/lib/api/inventory"
+import { metersApi } from "@/lib/api/meters"
+import { equipmentApi } from "@/lib/api/equipment"
 import { motion } from "framer-motion"
+import { cn } from "@/lib/utils"
 import { 
   Tabs, 
   TabsContent, 
@@ -92,6 +99,10 @@ export default function WorkOrderDetailPage() {
   const [newTaskTitle, setNewTaskTitle] = useState("")
   const [newTaskDesc, setNewTaskDesc] = useState("")
   const [newTaskEst, setNewTaskEst] = useState("")
+  const [newTaskParentId, setNewTaskParentId] = useState<number | null>(null)
+  const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM")
+  const [newTaskDueDate, setNewTaskDueDate] = useState("")
+  const [newTaskAssignedTo, setNewTaskAssignedTo] = useState("")
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
 
   // Reschedule state
@@ -224,9 +235,38 @@ export default function WorkOrderDetailPage() {
       } else if (action === 'cancel') {
         await workOrdersApi.updateStatus(woId, { status: 'CANCELLED', forceClose: true })
       } else if (action === 'toggle-watch') {
+        if (!wo || !user) return
+        const isFollowing = wo.followers?.some(f => f.userId === user.id)
+        if (isFollowing) {
+          setWo(prev => prev ? { ...prev, followers: prev.followers?.filter(f => f.userId !== user.id) } : prev)
+        } else {
+          setWo(prev => prev ? { ...prev, followers: [...(prev.followers || []), { userId: user.id, name: user.name || 'Me' }] } : prev)
+        }
         await workOrdersApi.toggleFollower(woId)
       }
-      await loadData()
+      if (action !== 'toggle-watch') await loadData()
+
+      // AUTOMATED METER RESET FOR PREVENTIVE MAINT
+      if ((action === 'validate' || action === 'close') && wo?.woType === 'PREVENTIVE') {
+        try {
+          const meters = await metersApi.getAll()
+          const equipMeters = meters.filter(m => m.equipmentId === wo.equipmentId)
+          
+          for (const m of equipMeters) {
+            if (m.value > 0) {
+              await metersApi.recordLog(m.meterId, {
+                operation: 'SUBTRACT',
+                amount: m.value
+              })
+            }
+          }
+
+          // Return equipment to OPERATIONAL status
+          await equipmentApi.updateStatus(wo.equipmentId, 'OPERATIONAL')
+        } catch (err) {
+          console.error("Failed to reset meters on WO closure", err)
+        }
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -300,10 +340,8 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  const handleSubTaskToggle = async (subTaskId: number, completed: boolean) => {
+  const refreshTasks = async () => {
     try {
-      await tasksApi.toggleSubTask(subTaskId, completed)
-      // Optimistic or simple reload
       const tasksData = await workOrdersApi.getTasks(woId)
       setTasks(tasksData)
     } catch (e) {
@@ -316,14 +354,22 @@ export default function WorkOrderDetailPage() {
     try {
       await tasksApi.create({
         woId,
-        title: newTaskTitle,
+        title: newTaskTitle || newTaskDesc.split(' ').slice(0, 5).join(' '),
         description: newTaskDesc,
-        estimatedDuration: newTaskEst ? parseInt(newTaskEst) : null
+        estimatedDuration: newTaskEst ? parseFloat(newTaskEst) : null,
+        parentTaskId: newTaskParentId,
+        priority: newTaskPriority,
+        dueDate: newTaskDueDate || null,
+        assignedToUserId: newTaskAssignedTo ? parseInt(newTaskAssignedTo) : undefined
       })
       setIsTaskDialogOpen(false)
       setNewTaskTitle("")
       setNewTaskDesc("")
       setNewTaskEst("")
+      setNewTaskParentId(null)
+      setNewTaskPriority("MEDIUM")
+      setNewTaskDueDate("")
+      setNewTaskAssignedTo("")
       const tasksData = await workOrdersApi.getTasks(woId)
       setTasks(tasksData)
     } catch (e) {
@@ -354,15 +400,7 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  const handleDeleteTask = async (taskId: number) => {
-    try {
-      await tasksApi.delete(taskId)
-      const tasksData = await workOrdersApi.getTasks(woId)
-      setTasks(tasksData)
-    } catch (e) {
-      console.error("Task deletion failed", e)
-    }
-  }
+  // Handlers for tasks are now managed by TaskExecutionHub shared component
 
   const handleLogLabor = async () => {
     if (!user) return
@@ -381,15 +419,7 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  const handleApproveTask = async (taskId: number, status: 'APPROVED' | 'REJECTED') => {
-    try {
-      await tasksApi.approve(taskId, status)
-      const tasksData = await workOrdersApi.getTasks(woId)
-      setTasks(tasksData)
-    } catch (e) {
-      console.error("Task approval failed", e)
-    }
-  }
+  // Approval handled by TaskExecutionHub
 
   const handleAddPart = async () => {
     if (!selectedPartId || !partQty) return
@@ -484,19 +514,6 @@ export default function WorkOrderDetailPage() {
             </Link>
           )}
 
-          {/* WATCH BUTTON */}
-          <Button 
-            variant="outline" 
-            onClick={() => handleAction('toggle-watch')} 
-            disabled={actionLoading === 'toggle-watch'}
-            className={wo.followers?.some(f => f.userId === user?.id) ? "border-amber-200 text-amber-600 bg-amber-50" : ""}
-          >
-            {wo.followers?.some(f => f.userId === user?.id) ? (
-              <><EyeOff className="h-4 w-4 mr-2" /> Unwatch</>
-            ) : (
-              <><Eye className="h-4 w-4 mr-2" /> Watch</>
-            )}
-          </Button>
 
           {/* TECHNICIAN / MANAGER ACTIONS */}
           {(wo.status === 'ASSIGNED' || wo.status === 'SCHEDULED') && (isAssignedTech || isManager) && (
@@ -535,7 +552,9 @@ export default function WorkOrderDetailPage() {
                         <Label>Primary Technician (Responsible)</Label>
                         <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={assignUserId} onChange={e => setAssignUserId(e.target.value)}>
                           <option value="">Select Technician...</option>
-                          {technicians.map(t => <option key={t.userId} value={t.userId}>{t.fullName}</option>)}
+                          {technicians
+                            .filter(t => !t.departmentId || t.departmentId === wo.departmentId)
+                            .map(t => <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -544,7 +563,9 @@ export default function WorkOrderDetailPage() {
                           const options = Array.from(e.target.selectedOptions) as HTMLOptionElement[];
                           setSecondaryAssignedUserIds(options.map(o => o.value));
                         }}>
-                          {technicians.filter(t => t.userId.toString() !== assignUserId).map(t => <option key={t.userId} value={t.userId}>{t.fullName}</option>)}
+                          {technicians
+                            .filter(t => t.userId.toString() !== assignUserId && (!t.departmentId || t.departmentId === wo.departmentId))
+                            .map(t => <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>)}
                         </select>
                         <p className="text-xs text-muted-foreground">Hold Ctrl/Cmd to select multiple</p>
                       </div>
@@ -607,6 +628,9 @@ export default function WorkOrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* LIFECYCLE FLOW TRACKER */}
+      <WorkOrderLifecycleFlow status={wo.status} />
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-muted/50 p-1 border border-border inline-flex h-11 items-center justify-center rounded-xl">
@@ -710,7 +734,17 @@ export default function WorkOrderDetailPage() {
                     <span className="text-3xl font-bold text-foreground">{completionRate}%</span>
                     <span className="text-xs text-muted-foreground">{tasks.filter(t => ['DONE', 'PASS'].includes(t.status)).length} / {tasks.length} Steps</span>
                   </div>
-                  <Progress value={completionRate} className="h-2 bg-muted transition-all duration-500" />
+                  <Progress 
+                    value={completionRate} 
+                    className="h-2 bg-muted transition-all duration-500"
+                    indicatorClassName={cn(
+                      "transition-all duration-700",
+                      completionRate < 30 ? "bg-rose-500" :
+                      completionRate < 70 ? "bg-amber-500" :
+                      completionRate < 100 ? "bg-indigo-500" :
+                      "bg-emerald-500"
+                    )}
+                  />
                 </CardContent>
               </Card>
 
@@ -753,122 +787,24 @@ export default function WorkOrderDetailPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="checklist" className="outline-none">
-          <Card className="shadow-sm border-border/60 overflow-hidden">
-            <CardHeader className="bg-muted/30 border-b border-border/60">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <CheckSquare className="h-5 w-5 text-primary" />
-                  Intervention Steps
-                </CardTitle>
-                {(isManager || isAssignedTech) && (
-                  <Button size="sm" variant="outline" className="h-9 gap-2 shadow-sm" onClick={() => setIsTaskDialogOpen(true)}>
-                    <Plus className="h-4 w-4" />
-                    Add Execution Step
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {tasks.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground">
-                   <p className="italic">No checklist defined for this intervention.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/60">
-                  {tasks.map(task => {
-                    const isFailed = task.status === 'FAIL';
-                    const isSuccess = task.status === 'PASS' || task.status === 'DONE';
-                    const canEdit = (isAssignedTech || isManager) && wo.status !== 'CLOSED';
-                    
-                    return (
-                      <div key={task.taskId} className={`p-4 flex items-center justify-between group transition-all ${isFailed ? 'bg-rose-50/10' : ''}`}>
-                         <div className="flex items-center gap-4 flex-1">
-                            <div className={`p-2 rounded-lg ${isFailed ? 'bg-rose-100 text-rose-600' : isSuccess ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-                               {isFailed ? <ThumbsDown className="h-4 w-4" /> : isSuccess ? <Check className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                            </div>
-                             <div className="flex-1">
-                               <p className={`text-sm font-medium ${isSuccess ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                                 {task.description}
-                               </p>
-                               
-                               {/* SUBTASKS / CHECKLIST */}
-                               {task.subTasks && task.subTasks.length > 0 && (
-                                 <div className="mt-3 space-y-2 pl-2 border-l-2 border-primary/20">
-                                   {task.subTasks.map(st => (
-                                     <div key={st.id} className="flex items-center gap-2 group/st">
-                                       <Checkbox 
-                                         id={`subtask-${st.id}`}
-                                         checked={st.isCompleted}
-                                         onCheckedChange={(checked) => handleSubTaskToggle(st.id, checked as boolean)}
-                                         disabled={!canEdit}
-                                         className="h-3.5 w-3.5 rounded-sm border-muted-foreground/40 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                                       />
-                                       <label 
-                                         htmlFor={`subtask-${st.id}`} 
-                                         className={`text-[12px] cursor-pointer ${st.isCompleted ? 'text-muted-foreground line-through italic' : 'text-foreground/70'}`}
-                                       >
-                                         {st.description}
-                                       </label>
-                                     </div>
-                                   ))}
-                                 </div>
-                               )}
+        <TabsContent value="checklist" className="outline-none space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <CheckSquare className="h-5 w-5 text-primary" />
+              Intervention Checklist
+            </h3>
+            {(isManager || isAssignedTech) && (
+              <Button size="sm" variant="outline" className="h-9 gap-2 shadow-sm" onClick={() => setIsTaskDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add Step
+              </Button>
+            )}
+          </div>
 
-                               <div className="flex items-center gap-2 mt-2">
-                                 {task.isAdHoc && <Badge className="text-[9px] h-4 bg-indigo-50 text-indigo-700 border-none uppercase">Ad-Hoc</Badge>}
-                                 {task.status === 'SKIPPED' && <Badge variant="outline" className="text-[9px] h-4 uppercase tracking-tighter">Skipped</Badge>}
-                                 {isFailed && task.failureReason && (
-                                   <p className="text-[10px] text-rose-600 font-medium italic">Reason: {task.failureReason}</p>
-                                 )}
-                               </div>
-                             </div>
-                         </div>
-
-                         <div className="flex items-center gap-2">
-                            {canEdit && !task.isAdHoc && (
-                               <div className="bg-muted/50 p-1 rounded-xl flex items-center gap-1 border border-border/40">
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className={`h-8 px-3 rounded-lg flex items-center gap-1 ${task.status === 'PASS' ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'hover:bg-emerald-100 text-emerald-600'}`}
-                                    onClick={() => handleTaskToggle(task.taskId, 'PASS')}
-                                  >
-                                    <Check className="h-3.5 w-3.5" /> Pass
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className={`h-8 px-3 rounded-lg flex items-center gap-1 ${task.status === 'FAIL' ? 'bg-rose-500 text-white hover:bg-rose-600' : 'hover:bg-rose-100 text-rose-600'}`}
-                                    onClick={() => handleTaskToggle(task.taskId, 'FAIL')}
-                                  >
-                                    <X className="h-3.5 w-3.5" /> Fail
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className={`h-8 px-3 rounded-lg flex items-center gap-1 hover:bg-muted text-muted-foreground`}
-                                    onClick={() => handleTaskToggle(task.taskId, 'SKIPPED')}
-                                  >
-                                    <FastForward className="h-3.5 w-3.5" /> Skip
-                                  </Button>
-                               </div>
-                            )}
-
-                            {isManager && task.isAdHoc && task.approvalStatus === 'PENDING' && (
-                              <div className="flex items-center gap-2 bg-amber-50 rounded-xl p-1 border border-amber-100">
-                                <Button size="sm" variant="ghost" className="h-8 text-emerald-600 hover:bg-emerald-100" onClick={() => handleApproveTask(task.taskId, 'APPROVED')}><ThumbsUp className="h-4 w-4" /></Button>
-                                <Button size="sm" variant="ghost" className="h-8 text-rose-600 hover:bg-rose-100" onClick={() => handleApproveTask(task.taskId, 'REJECTED')}><ThumbsDown className="h-4 w-4" /></Button>
-                              </div>
-                            )}
-                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TaskExecutionHub 
+            tasks={tasks} 
+            onUpdate={refreshTasks} 
+          />
         </TabsContent>
 
         <TabsContent value="costs" className="outline-none">
@@ -1150,50 +1086,113 @@ export default function WorkOrderDetailPage() {
 
       {/* ── ADD EXECUTION STEP DIALOG ─────────────────────────── */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl">
+        <DialogContent className="sm:max-w-md bg-white border-primary/20 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckSquare className="h-5 w-5 text-primary" />
-              Add Execution Step
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <CheckSquare className="h-5 w-5" />
+              New Execution Step
             </DialogTitle>
+            <DialogDescription>
+              Define a specific task or sub-step for this work order.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Step Title</Label>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Step Title (Optional)</Label>
               <Input
                 placeholder="e.g. Inspect hydraulic seals"
                 value={newTaskTitle}
                 onChange={e => setNewTaskTitle(e.target.value)}
+                className="bg-slate-50/50 border-slate-200"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Instructions / Description <span className="text-rose-500">*</span></Label>
+            
+            <div className="grid gap-2">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Parent Task (Optional)</Label>
+              <select 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={newTaskParentId || ""}
+                onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
+              >
+                <option value="">Root Task</option>
+                {tasks.filter(t => !t.parentTaskId).map(t => (
+                  <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Instructions / Description <span className="text-rose-500">*</span></Label>
               <Textarea
                 placeholder="Detailed description of what must be done..."
-                rows={4}
+                rows={3}
                 value={newTaskDesc}
                 onChange={e => setNewTaskDesc(e.target.value)}
+                className="bg-slate-50/50 border-slate-200 resize-none"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Estimated Duration (hours)</Label>
-              <Input
-                type="number"
-                step="0.5"
-                placeholder="e.g. 1.5"
-                value={newTaskEst}
-                onChange={e => setNewTaskEst(e.target.value)}
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+               <div className="grid gap-2">
+                  <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Priority</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value)}
+                  >
+                     <option value="LOW">LOW</option>
+                     <option value="MEDIUM">MEDIUM</option>
+                     <option value="HIGH">HIGH</option>
+                     <option value="CRITICAL">CRITICAL</option>
+                  </select>
+               </div>
+               <div className="grid gap-2">
+                  <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Est. Duration (Hrs)</Label>
+                  <Input 
+                    type="number"
+                    step="0.5"
+                    placeholder="1.5"
+                    value={newTaskEst}
+                    onChange={(e) => setNewTaskEst(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200"
+                  />
+               </div>
             </div>
+
+            <div className="grid gap-2">
+               <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Due Date</Label>
+               <Input 
+                 type="datetime-local"
+                 value={newTaskDueDate}
+                 onChange={(e) => setNewTaskDueDate(e.target.value)}
+                 className="bg-slate-50/50 border-slate-200"
+               />
+            </div>
+
+            {isManager && (
+               <div className="grid gap-2">
+                 <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Assign To</Label>
+                 <select 
+                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                   value={newTaskAssignedTo}
+                   onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                 >
+                   <option value="">Select Technician...</option>
+                   {technicians.map(t => (
+                     <option key={t.userId} value={t.userId}>{t.fullName}</option>
+                   ))}
+                 </select>
+               </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
+          <DialogFooter className="pt-2">
+            <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={handleCreateTask}
               disabled={!newTaskDesc.trim()}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
             >
-              Add Step
+              Create Step
             </Button>
           </DialogFooter>
         </DialogContent>

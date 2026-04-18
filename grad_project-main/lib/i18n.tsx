@@ -198,6 +198,16 @@ const translations = {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
     allRightsReserved: "All rights reserved",
+
+    // Meter Alerts
+    preventiveRecommendation: "Preventive Maintenance Recommendation",
+    thresholdExceededTitle: "Threshold Exceeded",
+    thresholdExceededDesc: "One or more meters have exceeded their defined thresholds. Early intervention is recommended to prevent critical failure.",
+    createPreventiveWO: "Create Preventive Work Order",
+    ignoreAlert: "Ignore for now",
+    recommendedPlan: "Recommended Action Plan",
+    equipmentUnderRepair: "Equipment status updated to Under Repair.",
+    woCreatedSuccess: "Preventive Work Order created successfully.",
   },
   fr: {
     // Navigation
@@ -392,6 +402,16 @@ const translations = {
     privacyPolicy: "Politique de confidentialité",
     termsOfService: "Conditions d'utilisation",
     allRightsReserved: "Tous droits réservés",
+
+    // Meter Alerts
+    preventiveRecommendation: "Recommandation de Maintenance Préventive",
+    thresholdExceededTitle: "Seuil dépassé",
+    thresholdExceededDesc: "Un ou plusieurs compteurs ont dépassé leurs seuils définis. Une intervention précoce est recommandée pour éviter une panne critique.",
+    createPreventiveWO: "Créer un Ordre de Travail Préventif",
+    ignoreAlert: "Ignorer pour l'instant",
+    recommendedPlan: "Plan d'action recommandé",
+    equipmentUnderRepair: "Statut de l'équipement mis à jour : En réparation.",
+    woCreatedSuccess: "Ordre de travail préventif créé avec succès.",
   },
 }
 

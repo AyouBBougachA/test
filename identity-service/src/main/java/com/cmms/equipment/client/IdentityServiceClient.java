@@ -19,4 +19,12 @@ public class IdentityServiceClient {
     public boolean checkUserExists(Integer id) {
         return id != null && userRepository.existsById(id);
     }
+
+    public String getDepartmentName(Integer id) {
+        if (id == null) return null;
+        return departmentRepository.findById(id)
+                .map(d -> d.getDepartmentName())
+                .orElse(null);
+    }
 }
+

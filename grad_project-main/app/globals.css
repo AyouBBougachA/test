@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.985 0.002 250);
+  --background: oklch(0.965 0.01 250);
   --foreground: oklch(0.2 0.02 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.02 260);
@@ -20,7 +20,7 @@
   --accent-foreground: oklch(0.99 0 0);
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0.01 250);
+  --border: oklch(0.88 0.01 250);
   --input: oklch(0.92 0.01 250);
   --ring: oklch(0.55 0.2 280);
   --chart-1: oklch(0.55 0.2 280);

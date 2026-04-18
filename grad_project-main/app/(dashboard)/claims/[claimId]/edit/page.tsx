@@ -203,22 +203,7 @@ export default function EditClaimPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("department")} *</label>
-                <Select value={departmentId} onValueChange={setDepartmentId} required disabled={isLoading}>
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        language === "fr" ? "Sélectionnez le département..." : "Select department..."
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentOptions.map((dept) => (
-                      <SelectItem key={dept.departmentId} value={String(dept.departmentId)}>
-                        {dept.departmentName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input value={claim?.departmentName ?? ""} readOnly />
               </div>
 
               <div className="space-y-2">

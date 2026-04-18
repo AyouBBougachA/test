@@ -9,9 +9,10 @@ import com.cmms.equipment.exception.ResourceNotFoundException;
 import com.cmms.equipment.repository.EquipmentCategoryRepository;
 import com.cmms.equipment.repository.EquipmentModelRepository;
 import com.cmms.equipment.repository.EquipmentRepository;
-import com.cmms.equipment.repository.EquipmentHistoryRepository;
-import com.cmms.equipment.repository.MeterRepository;
 import com.cmms.equipment.repository.MeterThresholdRepository;
+import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.maintenance.entity.WorkOrder;
+import com.cmms.identity.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+
+import com.cmms.equipment.repository.EquipmentHistoryRepository;
+import com.cmms.equipment.repository.MeterRepository;
 
 import com.cmms.equipment.client.IdentityServiceClient;
 import com.cmms.identity.security.UserPrincipal;
@@ -38,13 +46,16 @@ public class EquipmentService {
     private final EquipmentCategoryRepository categoryRepository;
     private final EquipmentModelRepository modelRepository;
     private final IdentityServiceClient identityServiceClient;
+    private final WorkOrderRepository workOrderRepository;
+    private final AuditLogService auditLogService;
 
     private String getCurrentUserIdOrEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
             return "SYSTEM"; // Fallback for internal calls
         }
-        
+
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipal userPrincipal) {
             Integer userId = userPrincipal.getUser().getUserId();
@@ -59,7 +70,8 @@ public class EquipmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<Equipment> searchEquipment(Integer departmentId, String status, String query) {
+    public List<Equipment> searchEquipment(Integer departmentId, String status, String classification,
+            String criticality, String query) {
         Specification<Equipment> spec = (root, cq, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -67,14 +79,28 @@ public class EquipmentService {
                 predicates.add(cb.equal(root.get("departmentId"), departmentId));
             }
             if (status != null && !status.isBlank()) {
-                predicates.add(cb.equal(root.get("status"), EquipmentStatus.valueOf(status)));
+                try {
+                    predicates.add(cb.equal(root.get("status"), EquipmentStatus.valueOf(status.toUpperCase())));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            if (classification != null && !classification.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("classification")), classification.toLowerCase()));
+            }
+            if (criticality != null && !criticality.isBlank()) {
+                try {
+                    predicates.add(cb.equal(root.get("criticality"),
+                            com.cmms.equipment.entity.EquipmentCriticality.valueOf(criticality.toUpperCase())));
+                } catch (IllegalArgumentException ignored) {
+                }
             }
             if (query != null && !query.isBlank()) {
                 String likePattern = "%" + query.toLowerCase() + "%";
                 Predicate nameOrSerial = cb.or(
                         cb.like(cb.lower(root.get("name")), likePattern),
-                        cb.like(cb.lower(root.get("serialNumber")), likePattern)
-                );
+                        cb.like(cb.lower(root.get("serialNumber")), likePattern),
+                        cb.like(cb.lower(root.get("assetCode")), likePattern),
+                        cb.like(cb.lower(root.get("location")), likePattern));
                 predicates.add(nameOrSerial);
             }
 
@@ -91,24 +117,33 @@ public class EquipmentService {
     }
 
     @Transactional
-    public Equipment createEquipment(Equipment equipment, List<BigDecimal> thresholds) {
+    public Equipment createEquipment(Equipment equipment,
+            List<com.cmms.equipment.dto.EquipmentThresholdDto> thresholds) {
         validateDepartment(equipment.getDepartmentId());
         validateCategoryAndModel(equipment.getCategoryId(), equipment.getModelId());
 
-        
+        // Handle Default Criticality
+        if (equipment.getCriticality() == null) {
+            equipment.setCriticality(com.cmms.equipment.entity.EquipmentCriticality.LOW);
+        }
+
         Equipment saved = equipmentRepository.save(equipment);
         ensureMeterForEquipment(saved, thresholds);
         logHistory(saved.getEquipmentId(), "CREATED", getCurrentUserIdOrEmail());
+        logToAudit(saved.getEquipmentId(), "CREATE_EQUIPMENT", "Equipment created: " + saved.getName());
         return saved;
     }
 
     @Transactional
-    public Equipment updateEquipment(Integer id, Equipment update, List<BigDecimal> thresholds) {
+    public Equipment updateEquipment(Integer id, Equipment update,
+            List<com.cmms.equipment.dto.EquipmentThresholdDto> thresholds) {
         validateDepartment(update.getDepartmentId());
         validateCategoryAndModel(update.getCategoryId(), update.getModelId());
 
-        
         Equipment existing = getEquipmentById(id);
+        if (update.getAssetCode() != null && !update.getAssetCode().isBlank()) {
+            existing.setAssetCode(update.getAssetCode());
+        }
         existing.setName(update.getName());
         existing.setSerialNumber(update.getSerialNumber());
         existing.setStatus(update.getStatus());
@@ -119,7 +154,15 @@ public class EquipmentService {
         existing.setManufacturer(update.getManufacturer());
         existing.setModelReference(update.getModelReference());
         existing.setClassification(update.getClassification());
-        existing.setCriticality(update.getCriticality());
+        existing.setCategory(update.getCategory());
+        existing.setModel(update.getModel());
+
+        // Handle Criticality Default in Update
+        if (update.getCriticality() != null) {
+            existing.setCriticality(update.getCriticality());
+        } else if (existing.getCriticality() == null) {
+            existing.setCriticality(com.cmms.equipment.entity.EquipmentCriticality.LOW);
+        }
         existing.setMeterUnit(update.getMeterUnit());
         existing.setStartMeterValue(update.getStartMeterValue());
         existing.setPurchaseDate(update.getPurchaseDate());
@@ -127,10 +170,11 @@ public class EquipmentService {
         existing.setSupplierName(update.getSupplierName());
         existing.setContractNumber(update.getContractNumber());
         existing.setWarrantyEndDate(update.getWarrantyEndDate());
-        
+
         Equipment saved = equipmentRepository.save(existing);
         ensureMeterForEquipment(saved, thresholds);
         logHistory(saved.getEquipmentId(), "UPDATED", getCurrentUserIdOrEmail());
+        logToAudit(saved.getEquipmentId(), "UPDATE_EQUIPMENT", "Equipment profile updated: " + saved.getName());
         return saved;
     }
 
@@ -139,9 +183,10 @@ public class EquipmentService {
         Equipment existing = getEquipmentById(id);
         EquipmentStatus oldStatus = existing.getStatus();
         existing.setStatus(EquipmentStatus.valueOf(status));
-        
+
         Equipment saved = equipmentRepository.save(existing);
         logHistory(saved.getEquipmentId(), "STATUS_CHANGE: " + oldStatus + " -> " + status, getCurrentUserIdOrEmail());
+        logToAudit(saved.getEquipmentId(), "STATUS_CHANGE", "Status changed to " + status);
         return saved;
     }
 
@@ -149,15 +194,76 @@ public class EquipmentService {
     public Equipment archiveEquipment(Integer id) {
         Equipment existing = getEquipmentById(id);
         existing.setStatus(EquipmentStatus.ARCHIVED);
-        
+
         Equipment saved = equipmentRepository.save(existing);
         logHistory(saved.getEquipmentId(), "ARCHIVED", getCurrentUserIdOrEmail());
+        logToAudit(saved.getEquipmentId(), "ARCHIVE_EQUIPMENT", "Equipment archived");
         return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getEquipmentKpis() {
+        Map<String, Long> kpis = new HashMap<>();
+        kpis.put("totalEquipment", equipmentRepository.count());
+        kpis.put("criticalEquipment",
+                equipmentRepository.countByCriticality(com.cmms.equipment.entity.EquipmentCriticality.CRITICAL));
+
+        // Count both OUT_OF_SERVICE and UNDER_REPAIR as Out of Service
+        long outOfServiceCount = equipmentRepository.findAll().stream()
+                .filter(e -> e.getStatus() == EquipmentStatus.OUT_OF_SERVICE
+                        || e.getStatus() == EquipmentStatus.UNDER_REPAIR)
+                .count();
+        kpis.put("outOfService", outOfServiceCount);
+
+        // Due for maintenance calculation (simplified: has at least one meter threshold
+        // reached)
+        long dueCount = equipmentRepository.findAll().stream()
+                .filter(this::checkIfDueForMaintenance)
+                .count();
+        kpis.put("dueForMaintenance", dueCount);
+
+        return kpis;
+    }
+
+    public boolean checkIfDueForMaintenance(Equipment equipment) {
+        return meterRepository.findByEquipmentId(equipment.getEquipmentId())
+                .map(meter -> {
+                    BigDecimal currentValue = meter.getValue() != null ? meter.getValue() : BigDecimal.ZERO;
+                    List<MeterThreshold> thresholds = meterThresholdRepository.findByMeterId(meter.getMeterId());
+                    return thresholds.stream().anyMatch(t -> currentValue.compareTo(t.getThresholdValue()) >= 0);
+                })
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public LocalDateTime getLastMaintenanceDate(Integer equipmentId) {
+        return workOrderRepository.findByEquipmentId(equipmentId).stream()
+                .filter(wo -> wo.getStatus() == WorkOrder.WorkOrderStatus.COMPLETED ||
+                        wo.getStatus() == WorkOrder.WorkOrderStatus.VALIDATED ||
+                        wo.getStatus() == WorkOrder.WorkOrderStatus.CLOSED)
+                .map(WorkOrder::getCompletedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
     public List<EquipmentHistory> getHistory(Integer equipmentId) {
         return historyRepository.findByEquipmentIdOrderByCreatedAtDesc(equipmentId);
+    }
+
+    private void logToAudit(Integer equipmentId, String actionType, String details) {
+        Integer userId = null;
+        String userName = "SYSTEM";
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal) {
+            UserPrincipal principal = (UserPrincipal) auth.getPrincipal();
+            userId = principal.getUser().getUserId();
+            userName = principal.getUser().getFullName();
+        }
+
+        auditLogService.log(userId, userName, actionType, "EQUIPMENT", equipmentId, details);
     }
 
     private void logHistory(Integer equipmentId, String action, String performedBy) {
@@ -168,17 +274,18 @@ public class EquipmentService {
                 .build();
         historyRepository.save(history);
     }
-    
+
     private void validateDepartment(Integer departmentId) {
         if (departmentId != null) {
-             try {
-                 boolean exists = identityServiceClient.checkDepartmentExists(departmentId);
-                 if (!exists) {
-                     throw new IllegalArgumentException("Department ID does not exist in Identity Service: " + departmentId);
-                 }
-             } catch (Exception e) {
-                 throw new RuntimeException("Failed to validate Department ID with Identity Service", e);
-             }
+            try {
+                boolean exists = identityServiceClient.checkDepartmentExists(departmentId);
+                if (!exists) {
+                    throw new IllegalArgumentException(
+                            "Department ID does not exist in Identity Service: " + departmentId);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to validate Department ID with Identity Service", e);
+            }
         }
     }
 
@@ -191,7 +298,8 @@ public class EquipmentService {
         }
     }
 
-    private void ensureMeterForEquipment(Equipment equipment, List<BigDecimal> thresholds) {
+    private void ensureMeterForEquipment(Equipment equipment,
+            List<com.cmms.equipment.dto.EquipmentThresholdDto> thresholds) {
         if (equipment == null || equipment.getEquipmentId() == null) {
             return;
         }
@@ -204,7 +312,8 @@ public class EquipmentService {
                         .name(equipment.getName() + " Usage")
                         .unit(equipment.getMeterUnit())
                         .meterType("ODOMETER")
-                        .value(equipment.getStartMeterValue() != null ? equipment.getStartMeterValue() : BigDecimal.ZERO)
+                        .value(equipment.getStartMeterValue() != null ? equipment.getStartMeterValue()
+                                : BigDecimal.ZERO)
                         .lastReadingAt(java.time.LocalDateTime.now())
                         .build());
 
@@ -217,18 +326,20 @@ public class EquipmentService {
         updateThresholdsForMeter(savedMeter.getMeterId(), thresholds);
     }
 
-    private void updateThresholdsForMeter(Integer meterId, List<BigDecimal> thresholds) {
+    private void updateThresholdsForMeter(Integer meterId,
+            List<com.cmms.equipment.dto.EquipmentThresholdDto> thresholds) {
         if (meterId == null || thresholds == null) {
             return;
         }
         meterThresholdRepository.deleteByMeterId(meterId);
-        for (BigDecimal thresholdValue : thresholds) {
-            if (thresholdValue == null || thresholdValue.compareTo(BigDecimal.ZERO) < 0) {
+        for (com.cmms.equipment.dto.EquipmentThresholdDto dto : thresholds) {
+            if (dto.getValue() == null || dto.getValue().compareTo(BigDecimal.ZERO) < 0) {
                 throw new IllegalArgumentException("Threshold values must be non-negative");
             }
             MeterThreshold threshold = MeterThreshold.builder()
                     .meterId(meterId)
-                    .thresholdValue(thresholdValue)
+                    .thresholdValue(dto.getValue())
+                    .label(dto.getLabel())
                     .build();
             meterThresholdRepository.save(threshold);
         }

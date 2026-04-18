@@ -18,6 +18,9 @@ public class CreateTaskRequest {
 
     private String title;
     private Integer assignedToUserId;
+    private Integer parentTaskId;
     private BigDecimal estimatedDuration;
+    private java.time.LocalDateTime dueDate;
+    private String priority;
     private Integer orderIndex;
 }

@@ -10,11 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { claimsApi } from "@/lib/api/claims"
 import { usersApi } from "@/lib/api/users"
-import type { ClaimPhotoResponse, ClaimResponse, UserResponse } from "@/lib/api/types"
+import { workOrdersApi } from "@/lib/api/work-orders"
+import type { ClaimPhotoResponse, ClaimResponse, UserResponse, WorkOrderResponse } from "@/lib/api/types"
 import { ApiError } from "@/lib/api/client"
 import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { Textarea } from "@/components/ui/textarea"
+import { WorkOrderLifecycleFlow } from "@/components/work-orders/WorkOrderLifecycleFlow"
 import {
   Dialog,
   DialogContent,
@@ -85,6 +87,7 @@ export default function ClaimDetailsPage() {
   const [claim, setClaim] = useState<ClaimResponse | null>(null)
   const [photos, setPhotos] = useState<ClaimPhotoResponse[]>([])
   const [technicians, setTechnicians] = useState<UserResponse[]>([])
+  const [linkedWo, setLinkedWo] = useState<WorkOrderResponse | null>(null)
   const photoUrlRef = useRef<Record<number, string>>({})
   const [photoUrls, setPhotoUrls] = useState<Record<number, string>>({})
   const [error, setError] = useState<string | null>(null)
@@ -116,6 +119,15 @@ export default function ClaimDetailsPage() {
         const claimRes = await claimsApi.getById(claimId)
         if (!cancelled) setClaim(claimRes)
         
+        if (claimRes.linkedWoId) {
+          try {
+            const woRes = await workOrdersApi.getById(claimRes.linkedWoId)
+            if (!cancelled) setLinkedWo(woRes)
+          } catch (e) {
+            console.error("Failed to fetch linked WO", e)
+          }
+        }
+
         const techs = await usersApi.getAll()
         if (!cancelled) setTechnicians(techs.filter(t => t.roleName === 'TECHNICIAN' || t.roleId === 3))
       } catch (err) {
@@ -472,6 +484,21 @@ export default function ClaimDetailsPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {linkedWo && (
+        <Card className="border-indigo-100 shadow-xl overflow-hidden">
+          <div className="h-1 bg-indigo-600 w-full" />
+          <CardHeader className="bg-muted/50 border-b border-border/50">
+            <CardTitle className="flex justify-between items-center text-sm uppercase tracking-widest text-indigo-900">
+              <span>Conversion Work Order Status</span>
+              <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-card">WO-{linkedWo.woId}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pt-6">
+            <WorkOrderLifecycleFlow status={linkedWo.status} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
          <Card>

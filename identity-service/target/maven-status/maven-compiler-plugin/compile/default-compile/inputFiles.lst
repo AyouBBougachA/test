@@ -25,8 +25,10 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\WorkOrderStatusHistoryRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\controller\DocumentController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\repository\SparePartRepository.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\EquipmentThresholdDto.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\client\IdentityServiceClient.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\controller\InventoryController.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\entity\TaskAuditLog.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\CreateMaintenancePlanRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\CreateUserRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\exception\ResourceNotFoundException.java
@@ -36,12 +38,14 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\UpdateTaskRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\exception\ResourceNotFoundException.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\repository\ClaimStatusHistoryRepository.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\entity\TaskPhoto.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\service\WorkOrderService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\controller\ClaimsController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\mapper\UserMapper.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\controller\DepartmentController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\config\BootstrapAdminProperties.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\CmmsApplication.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\TaskPhotoRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\controller\AuditLogController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\CreateDepartmentRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\RoleResponse.java
@@ -63,6 +67,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\RejectClaimRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\controller\RestockController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\WorkOrderResponse.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\MeterThresholdRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\entity\WorkOrderAssignment.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\WorkOrderStatusHistoryResponse.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\ClaimStatusUpdateRequest.java
@@ -114,6 +119,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\bi\controller\KpiController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\service\ClaimPhotoService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\UpdateClaimRequest.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\CreateMeterRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\notifications\repository\NotificationRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\EquipmentRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\security\UserPrincipal.java
@@ -169,6 +175,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\service\MeterTriggerService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\notifications\service\NotificationService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\DepartmentResponse.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\TaskAuditLogRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\exception\AuthenticationFailedException.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\repository\PartUsageRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\ClaimPhotoResponse.java

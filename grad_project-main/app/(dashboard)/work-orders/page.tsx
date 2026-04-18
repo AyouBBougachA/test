@@ -34,6 +34,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { workOrdersApi } from "@/lib/api/work-orders"
@@ -59,6 +67,13 @@ export default function WorkOrdersPage() {
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [showArchived, setShowArchived] = useState(false)
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filter, showArchived])
 
   const dateLocale = language === 'fr' ? fr : enUS
 
@@ -121,12 +136,30 @@ export default function WorkOrdersPage() {
 
   const filteredOrders = useMemo(() => {
     return workOrders.filter(wo => {
-      const matchesSearch = wo.title.toLowerCase().includes(search.toLowerCase()) || 
-                           wo.woCode.toLowerCase().includes(search.toLowerCase())
-      const matchesFilter = filter === "all" || wo.status.toLowerCase() === filter.toLowerCase()
-      return matchesSearch && matchesFilter
+      const q = search.toLowerCase()
+      const matchesSearch = wo.title.toLowerCase().includes(q) || 
+                           wo.woCode.toLowerCase().includes(q) ||
+                           (wo.equipmentName?.toLowerCase().includes(q) ?? false)
+
+      const f = filter.toLowerCase()
+      if (f === "all") return matchesSearch
+      
+      // Check for type filter
+      if (f === "preventive" || f === "corrective" || f === "predictive") {
+        return matchesSearch && wo.woType.toLowerCase() === f
+      }
+
+      // Check for status filter
+      return matchesSearch && wo.status.toLowerCase() === f
     })
   }, [workOrders, search, filter])
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredOrders.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredOrders, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
 
   const getStatusBadge = (status: string) => {
     switch (status.toUpperCase()) {
@@ -303,7 +336,7 @@ export default function WorkOrdersPage() {
             bg: "bg-rose-500/10"
           },
         ].map((stat, i) => (
-          <Card key={i} className="border-none bg-card/50 backdrop-blur-sm shadow-sm ring-1 ring-border">
+          <Card key={i} className="shadow-sm border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
               <div className={`${stat.bg} p-2 rounded-lg`}>
@@ -323,7 +356,7 @@ export default function WorkOrdersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder={language === 'fr' ? "Rechercher un ordre..." : "Search work orders..."} 
-            className="pl-9 bg-card/50 backdrop-blur-sm border-border"
+            className="pl-9 bg-card border-border shadow-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -333,7 +366,7 @@ export default function WorkOrdersPage() {
             variant="outline" 
             onClick={() => setShowArchived(!showArchived)}
             className={cn(
-              "bg-card/50 border-border transition-colors",
+              "bg-card border-border shadow-sm transition-colors",
               showArchived && "bg-primary/10 border-primary text-primary"
             )}
           >
@@ -341,21 +374,28 @@ export default function WorkOrdersPage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-card/50 border-border">
+              <Button variant="outline" className="bg-card border-border shadow-sm">
                 <Filter className="h-4 w-4 mr-2" />
                 {language === 'fr' ? 'Filtrer' : 'Filter'}: {filter.charAt(0).toUpperCase() + filter.slice(1)}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setFilter("all")}>All</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-xl border-border">
+              <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/50 mb-1">Status</div>
+              <DropdownMenuItem onClick={() => setFilter("all")}>All Statuses</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("created")}>Created</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("assigned")}>Assigned</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("scheduled")}>Scheduled</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("in_progress")}>In Progress</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setFilter("completed")}>Completed</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("validated")}>Validated</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("closed")}>Closed</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("cancelled")}>Cancelled</DropdownMenuItem>
+              
+              <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/50 my-1">Type</div>
+              <DropdownMenuItem onClick={() => setFilter("preventive")} className="text-emerald-500 font-bold italic">
+                <Wrench className="h-3.5 w-3.5 mr-2" />
+                Preventive
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("corrective")} className="text-rose-500 font-bold italic">
+                <AlertCircle className="h-3.5 w-3.5 mr-2" />
+                Corrective
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -363,7 +403,7 @@ export default function WorkOrdersPage() {
 
       {/* Work Orders List */}
       <motion.div variants={fadeInUp}>
-        <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border overflow-hidden">
+        <Card className="border-border shadow-sm overflow-hidden">
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between mb-2">
               <CardTitle className="text-xl">
@@ -390,29 +430,29 @@ export default function WorkOrdersPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Code</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Title</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Assignee</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Duration</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground">Status</th>
-                      <th className="text-left py-4 px-6 font-semibold text-foreground whitespace-nowrap">Updated</th>
-                      <th className="text-right py-4 px-6 font-semibold text-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((wo) => (
-                      <tr key={wo.woId} className="border-b border-border hover:bg-muted/30 transition-colors group">
-                        <td className="py-4 px-6 font-mono text-xs text-primary font-bold">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Assignee</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="whitespace-nowrap">Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedOrders.map((wo) => (
+                      <TableRow key={wo.woId} className="cursor-pointer hover:bg-muted/30 group">
+                        <TableCell className="font-mono text-xs text-primary font-bold">
                           {wo.woCode}
-                        </td>
-                        <td className="py-4 px-6 max-w-xs">
+                        </TableCell>
+                        <TableCell className="max-w-xs">
                           <div className="font-medium text-foreground truncate">{wo.title}</div>
                           <div className="text-xs text-muted-foreground truncate">{wo.description}</div>
-                        </td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
                                 {wo.assignedToName?.split(' ').map(n => n[0]).join('') || '?'}
@@ -423,14 +463,14 @@ export default function WorkOrdersPage() {
                             <Wrench className="h-3 w-3" />
                             <span>{wo.equipmentName}</span>
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <Clock className="h-3.5 w-3.5" />
                             <span>{wo.estimatedDuration || '—'}h</span>
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex flex-col gap-1.5">
                             {getStatusBadge(wo.status)}
                             {wo.hasPendingAdHocTasks && (
@@ -440,8 +480,8 @@ export default function WorkOrdersPage() {
                               </Badge>
                             )}
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2 text-muted-foreground font-medium text-xs">
                             <Calendar className="h-3.5 w-3.5 opacity-50" />
                             <span>
@@ -450,21 +490,46 @@ export default function WorkOrdersPage() {
                                 : formatDistanceToNow(new Date(wo.createdAt), { addSuffix: true, locale: dateLocale })}
                             </span>
                           </div>
-                        </td>
-                        <td className="py-4 px-6 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Link href={`/work-orders/${wo.woId}`}>
                             <Button variant="ghost" size="sm" className="h-8 p-2 text-primary hover:bg-primary/10 rounded-lg">
                               {language === 'fr' ? 'Gérer' : 'Manage'}
                             </Button>
                           </Link>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border p-4">
+              <p className="text-sm text-muted-foreground">
+                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredOrders.length}</span> {language === "fr" ? "résultats" : "results"}
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  {language === "fr" ? "Précédent" : "Previous"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {language === "fr" ? "Suivant" : "Next"}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
     </motion.div>

@@ -1,9 +1,12 @@
 import { requestJson, withQuery } from './client'
-import type { TaskResponse } from './types'
+import type { TaskResponse, TaskPhotoResponse } from './types'
 
 export const tasksApi = {
   getAll: (params?: { status?: string; woId?: number }) =>
     requestJson<TaskResponse[]>(withQuery('/tasks', params)),
+
+  getById: (taskId: number) =>
+    requestJson<TaskResponse>(`/tasks/${taskId}`),
 
   getByWorkOrder: (woId: number) =>
     requestJson<TaskResponse[]>(`/tasks/work-order/${woId}`),
@@ -46,4 +49,17 @@ export const tasksApi = {
     requestJson<void>(withQuery(`/tasks/sub-tasks/${subTaskId}`, { completed }), {
       method: 'PATCH',
     }),
+    
+  uploadPhoto: async (taskId: number, file: File, type: 'BEFORE' | 'AFTER'): Promise<TaskPhotoResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return requestJson<TaskPhotoResponse>(withQuery(`/tasks/${taskId}/photos`, { type }), {
+      method: 'POST',
+      body: formData,
+    })
+  },
+
+  getPhotoUrl: (taskId: number, photoId: number) => {
+    return `http://localhost:8081/api/tasks/${taskId}/photos/${photoId}/download`
+  }
 }

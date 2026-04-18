@@ -17,6 +17,8 @@ import com.cmms.maintenance.entity.WorkOrderAssignment;
 import com.cmms.maintenance.entity.WorkOrderFollower;
 import com.cmms.identity.entity.User;
 import com.cmms.identity.repository.UserRepository;
+import com.cmms.identity.repository.DepartmentRepository;
+import com.cmms.identity.entity.Department;
 import com.cmms.claims.exception.ResourceNotFoundException;
 import com.cmms.identity.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +55,7 @@ public class WorkOrderService {
     private final TaskRepository taskRepository;
     private final WorkOrderAssignmentRepository assignmentRepository;
     private final WorkOrderFollowerRepository followerRepository;
+    private final DepartmentRepository departmentRepository;
     private final com.cmms.notifications.service.NotificationService notificationService;
 
     @Transactional(readOnly = true)
@@ -77,6 +80,8 @@ public class WorkOrderService {
 
         Equipment equipment = equipmentRepository.findById(request.getEquipmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Equipment not found"));
+
+        validateAssignment(equipment, request.getAssignedToUserId(), request.getSecondaryAssigneeIds());
 
         WorkOrder wo = WorkOrder.builder()
                 .claimId(request.getClaimId())
@@ -167,6 +172,10 @@ public class WorkOrderService {
 
         User assignee = userRepository.findById(request.getAssignedToUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
+
+        Equipment equipment = equipmentRepository.findById(wo.getEquipmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Equipment not found"));
+        validateAssignment(equipment, request.getAssignedToUserId(), request.getSecondaryAssigneeIds());
 
         wo.setAssignedToUserId(assignee.getUserId());
         
@@ -423,6 +432,25 @@ public class WorkOrderService {
         }
     }
 
+    private void validateAssignment(Equipment equipment, Integer primaryUserId, List<Integer> secondaryUserIds) {
+        List<Integer> allUserIds = new ArrayList<>();
+        if (primaryUserId != null) allUserIds.add(primaryUserId);
+        if (secondaryUserIds != null) allUserIds.addAll(secondaryUserIds);
+
+        if (allUserIds.isEmpty()) return;
+
+        List<User> users = userRepository.findAllById(allUserIds);
+        for (User user : users) {
+            if (user.getDepartment() != null && !Objects.equals(user.getDepartment().getDepartmentId(), equipment.getDepartmentId())) {
+                throw new IllegalStateException(String.format(
+                        "Technician %s belongs to department '%s' but this equipment is assigned to a different department.",
+                        user.getFullName(),
+                        user.getDepartment().getDepartmentName()
+                ));
+            }
+        }
+    }
+
     private WorkOrder getWoEntity(Integer id) {
         return workOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Work Order not found"));
@@ -501,6 +529,8 @@ public class WorkOrderService {
                 .stream().collect(Collectors.toMap(User::getUserId, u -> u));
         Map<Integer, Claim> claimById = claimRepository.findAllById(wos.stream().map(WorkOrder::getClaimId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(Claim::getClaimId, c -> c));
+        Map<Integer, Department> departmentById = departmentRepository.findAllById(equipmentById.values().stream().map(Equipment::getDepartmentId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Department::getDepartmentId, d -> d));
 
         LocalDateTime now = LocalDateTime.now();
         List<Integer> woIds = wos.stream().map(WorkOrder::getWoId).collect(Collectors.toList());
@@ -552,6 +582,8 @@ public class WorkOrderService {
                     .claimCode(claim == null ? null : String.format("CLM-%03d", claim.getClaimId()))
                     .equipmentId(wo.getEquipmentId())
                     .equipmentName(eq == null ? null : eq.getName())
+                    .departmentId(eq == null ? null : eq.getDepartmentId())
+                    .departmentName(eq == null || eq.getDepartmentId() == null || departmentById.get(eq.getDepartmentId()) == null ? null : departmentById.get(eq.getDepartmentId()).getDepartmentName())
                     .woType(wo.getWoType().name())
                     .priority(wo.getPriority().name())
                     .status(wo.getStatus().name())

@@ -11,7 +11,6 @@ export default function PlanningLayout({ children }: { children: React.ReactNode
   const tabs = [
     { name: "Kanban Board", href: "/planning/kanban", icon: Kanban },
     { name: "Calendar View", href: "/planning/calendar", icon: Calendar },
-    { name: "Team Workload", href: "/planning/workload", icon: BarChart3 },
   ]
 
   return (

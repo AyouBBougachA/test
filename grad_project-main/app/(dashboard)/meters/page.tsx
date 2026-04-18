@@ -9,9 +9,11 @@ import {
   Download,
   Filter,
   Gauge,
+  Plus,
   RefreshCw,
   Search,
   TrendingUp,
+  Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,6 +42,10 @@ import { mapMeterResponseToUiCard, type UiMeterCard } from "@/lib/adapters"
 import { downloadCsv } from "@/lib/export"
 import { ApiError } from "@/lib/api/client"
 import { useToast } from "@/components/ui/use-toast"
+import { workOrdersApi } from "@/lib/api/work-orders"
+import { equipmentApi } from "@/lib/api/equipment"
+import { useAuth } from "@/lib/auth-context"
+import { cn } from "@/lib/utils"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -55,6 +61,13 @@ export default function MetersPage() {
   const { t, language } = useI18n()
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const showNotAvailable = (feature: string) => {
     toast({
@@ -83,7 +96,13 @@ export default function MetersPage() {
   const [logOperation, setLogOperation] = useState<MeterOperation>("ADD")
   const [logAmount, setLogAmount] = useState<string>("")
   const [thresholdValue, setThresholdValue] = useState<string>("")
+  const [thresholdLabel, setThresholdLabel] = useState<string>("")
   const [isSaving, setIsSaving] = useState(false)
+
+  // Recommendation logic
+  const { user } = useAuth()
+  const [recommendationOpen, setRecommendationOpen] = useState(false)
+  const [alertMeters, setAlertMeters] = useState<UiMeterCard[]>([])
 
   const getApiErrorMessage = (err: unknown): string => {
     if (err instanceof ApiError) {
@@ -107,7 +126,25 @@ export default function MetersPage() {
     const load = async () => {
       try {
         const res = await metersApi.getAll()
-        if (!cancelled) setMeters(res)
+        if (cancelled) return
+        setMeters(res)
+
+        // Check for alerts
+        const uiM = res.map(mapMeterResponseToUiCard)
+        const alerts = uiM.filter(m => m.status === 'warning' || m.status === 'critical')
+
+        if (alerts.length > 0) {
+          // Fetch active work orders to see if we should suppress the auto-popup
+          const activeWOs = await workOrdersApi.list({ type: 'PREVENTIVE' })
+          const unsolvedAlerts = alerts.filter(m =>
+            !activeWOs.some(wo => wo.equipmentId === m.equipmentId && wo.status !== 'CLOSED' && wo.status !== 'VALIDATED')
+          )
+
+          if (unsolvedAlerts.length > 0) {
+            setAlertMeters(unsolvedAlerts)
+            setRecommendationOpen(true)
+          }
+        }
       } catch {
         if (!cancelled) {
           setMeters([])
@@ -180,14 +217,21 @@ export default function MetersPage() {
   }
 
   const filteredMeters = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return uiMeters
-    return uiMeters.filter(
-      (m) =>
-        (m.name ?? "").toLowerCase().includes(q) ||
-        (m.equipmentLabel ?? "").toLowerCase().includes(q)
-    )
+    return uiMeters.filter((meter) => {
+      const q = searchQuery.toLowerCase()
+      return (
+        meter.name.toLowerCase().includes(q) ||
+        meter.equipmentLabel.toLowerCase().includes(q)
+      )
+    })
   }, [searchQuery, uiMeters])
+
+  const paginatedMeters = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredMeters.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredMeters, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredMeters.length / itemsPerPage)
 
   const stats = useMemo(() => {
     const total = uiMeters.length
@@ -240,6 +284,7 @@ export default function MetersPage() {
     setLogOperation("ADD")
     setLogAmount("")
     setThresholdValue("")
+    setThresholdLabel("")
     setManageMode(mode)
     setManageOpen(true)
   }
@@ -278,8 +323,8 @@ export default function MetersPage() {
     }
   }
 
-  const onCreateThreshold = async (e: FormEvent) => {
-    e.preventDefault()
+  const onCreateThreshold = async (e?: FormEvent) => {
+    if (e) e.preventDefault()
     if (!selectedMeterId || isSaving) return
     const value = Number(thresholdValue)
     if (!Number.isFinite(value) || value <= 0) {
@@ -289,9 +334,17 @@ export default function MetersPage() {
       })
       return
     }
+    if (!thresholdLabel.trim()) {
+      toast({
+        title: language === "fr" ? "Nom requis" : "Name required",
+        description: language === "fr" ? "Veuillez donner un nom au seuil." : "Please provide a name for this threshold.",
+        variant: "destructive",
+      })
+      return
+    }
     setIsSaving(true)
     try {
-      await metersApi.createThreshold(selectedMeterId, value)
+      await metersApi.createThreshold(selectedMeterId, { thresholdValue: value, label: thresholdLabel.trim() })
       toast({ title: language === "fr" ? "Seuil ajouté" : "Threshold added" })
       const [all, th] = await Promise.all([
         metersApi.getAll(),
@@ -300,9 +353,57 @@ export default function MetersPage() {
       setMeters(all)
       setThresholds(th)
       setThresholdValue("")
+      setThresholdLabel("")
     } catch (err) {
       toast({
         title: language === "fr" ? "Ajout impossible" : "Add failed",
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCreatePreventiveWO = async (meter: UiMeterCard) => {
+    if (isSaving || !meter.equipmentId) return
+    setIsSaving(true)
+    try {
+      // Data enrichment
+      const equipRes = await equipmentApi.getById(meter.equipmentId)
+      const equip = equipRes || { name: meter.equipmentLabel, assetCode: 'N/A', location: 'N/A' }
+
+      const payload = {
+        title: `PREVENTIVE: ${equip.name} (${meter.name})`,
+        description: `Threshold ALERT: ${meter.value} ${meter.unit} (Threshold: ${meter.primaryThreshold} ${meter.unit}).\nEquipment: ${equip.name} [${equip.assetCode}]\nLocation: ${equip.location}\nSuggested Plan: Perform deep inspection and necessary component replacement.`,
+        equipmentId: meter.equipmentId,
+        priority: meter.status === 'critical' ? 'CRITICAL' : 'HIGH',
+        woType: 'PREVENTIVE',
+      }
+
+      await workOrdersApi.create(payload)
+
+      // Update Equipment Status if possible
+      try {
+        await equipmentApi.updateStatus(meter.equipmentId, 'UNDER_REPAIR')
+      } catch (e) {
+        console.warn("Failed to update equipment status", e)
+      }
+
+      toast({
+        title: language === 'fr' ? "Succès" : "Success",
+        description: language === 'fr' ? "Ordre de travail préventif créé." : "Preventive Work Order created.",
+      })
+
+      setAlertMeters(prev => prev.filter(m => m.id !== meter.id))
+      // Only close if no more alerts
+      if (alertMeters.length <= 1) setRecommendationOpen(false)
+
+      onSyncAll()
+    } catch (err) {
+      console.error("Failed to create preventive WO", err)
+      toast({
+        title: language === "fr" ? "Erreur" : "Error",
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -318,6 +419,72 @@ export default function MetersPage() {
       animate="visible"
       className="space-y-6"
     >
+      <Dialog open={recommendationOpen} onOpenChange={setRecommendationOpen}>
+        <DialogContent className="sm:max-w-xl bg-card border-border shadow-2xl overflow-hidden p-0 rounded-2xl">
+          <div className="h-1 w-full bg-rose-500" />
+          <div className="p-6 space-y-6">
+            <DialogHeader>
+              <div className="flex items-center gap-3 text-rose-500 mb-1">
+                <AlertTriangle className="h-6 w-6" />
+                <DialogTitle className="text-xl font-bold uppercase tracking-tight">
+                  {t('thresholdExceededTitle')}
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-sm text-muted-foreground font-medium">
+                {t('thresholdExceededDesc')}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className={cn(
+              "grid gap-3 max-h-[400px] overflow-y-auto pr-1",
+              alertMeters.length > 1 ? "grid-cols-2" : "grid-cols-1"
+            )}>
+              {alertMeters.map(meter => (
+                <div key={meter.id} className="p-4 rounded-xl bg-muted/40 border border-border/60 space-y-3 relative overflow-hidden group">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-sm text-foreground truncate">{meter.equipmentLabel}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">{meter.name}</p>
+                    </div>
+                    <Badge className={cn("text-[9px] h-4.5 px-1.5", meter.status === 'critical' ? 'bg-rose-500' : 'bg-amber-500')}>
+                      {meter.status.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-baseline justify-between border-y border-border/10 py-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black">{meter.value.toLocaleString()}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground">{meter.unit}</span>
+                    </div>
+                    <span className="text-[10px] font-black text-rose-500 uppercase">Limit: {meter.primaryThreshold?.toLocaleString() ?? '--'}</span>
+                  </div>
+
+                  <Button
+                    onClick={() => handleCreatePreventiveWO(meter)}
+                    disabled={isSaving}
+                    className="w-full bg-primary hover:bg-primary/90 h-8 text-[10px] font-bold uppercase tracking-wider rounded-lg"
+                  >
+                    {isSaving ? <RefreshCw className="h-3 w-3 animate-spin mr-2" /> : <Wrench className="h-3.5 w-3.5 mr-2" />}
+                    {t('createPreventiveWO')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter className="pt-1 flex sm:justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRecommendationOpen(false)}
+                className="text-xs text-muted-foreground hover:text-foreground h-8"
+              >
+                {t('ignoreAlert')}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -339,118 +506,108 @@ export default function MetersPage() {
           if (!open) setManageMode("manage")
         }}
       >
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{language === "fr" ? "Gérer le compteur" : "Manage meter"}</DialogTitle>
+            <DialogTitle>
+              {language === "fr" ? "Gérer le compteur" : "Manage meter"}
+            </DialogTitle>
             <DialogDescription>
-              {selectedMeter
-                ? `${selectedMeter.name} • ${selectedMeter.equipmentLabel}`
-                : language === "fr" ? "Actions sur le compteur." : "Meter actions."}
+              {selectedMeter ? `${selectedMeter.name} • ${selectedMeter.equipmentLabel}` : "Actions"}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4">
-              <div className="rounded-lg border p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Valeur actuelle" : "Current value"}</div>
-                  <div className="font-medium">{selectedMeter ? `${selectedMeter.value.toLocaleString()} ${selectedMeter.unit}` : "—"}</div>
-                </div>
-              </div>
-
-              <form onSubmit={onRecordLog} className="space-y-3 rounded-lg border p-3">
-                <div className="text-sm font-medium">{language === "fr" ? "Enregistrer une lecture" : "Record reading"}</div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>{language === "fr" ? "Opération" : "Operation"}</Label>
-                    <Select value={logOperation} onValueChange={(v) => setLogOperation(v as MeterOperation)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={language === "fr" ? "Choisir" : "Select"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ADD">{language === "fr" ? "Ajouter" : "Add"}</SelectItem>
-                        <SelectItem value="SUBTRACT">{language === "fr" ? "Soustraire" : "Subtract"}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{language === "fr" ? "Valeur" : "Amount"}</Label>
-                    <Input
-                      type="number"
-                      value={logAmount}
-                      onChange={(e) => setLogAmount(e.target.value)}
-                      min={0}
-                      step="any"
-                      autoFocus={manageMode === "log"}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={isSaving || !selectedMeterId}>
-                    {language === "fr" ? "Enregistrer" : "Record"}
-                  </Button>
-                </DialogFooter>
-              </form>
-
-              <div className="space-y-2 rounded-lg border p-3">
-                <div className="text-sm font-medium">{language === "fr" ? "Seuils" : "Thresholds"}</div>
-                {isManageLoading ? (
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Chargement..." : "Loading..."}</div>
-                ) : thresholds.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Aucun seuil" : "No thresholds"}</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {thresholds
-                      .slice()
-                      .sort((a, b) => a.thresholdValue - b.thresholdValue)
-                      .slice(0, 12)
-                      .map((th, idx) => (
-                        <Badge key={th.thresholdId} variant="outline">
-                          {(language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`)} • {th.thresholdValue.toLocaleString()}
-                        </Badge>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              <form onSubmit={onCreateThreshold} className="space-y-3 rounded-lg border p-3">
-                <div className="text-sm font-medium">{language === "fr" ? "Ajouter un seuil" : "Add threshold"}</div>
-                <div className="space-y-2">
-                  <Label>{language === "fr" ? "Seuil" : "Threshold"}</Label>
-                  <Input type="number" value={thresholdValue} onChange={(e) => setThresholdValue(e.target.value)} min={0} step="any" />
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={isSaving || !selectedMeterId}>
-                    {language === "fr" ? "Ajouter" : "Add"}
-                  </Button>
-                </DialogFooter>
-              </form>
+          <div className="space-y-6 pt-2">
+            <div className="flex flex-col gap-2 rounded-xl bg-muted/40 p-4 border border-border/50">
+              <span className="text-xs font-bold text-muted-foreground uppercase">{language === "fr" ? "Valeur Actuelle" : "Current Value"}</span>
+              <span className="text-3xl font-black text-primary">{selectedMeter ? `${selectedMeter.value.toLocaleString()} ${selectedMeter.unit}` : "—"}</span>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2 rounded-lg border p-3">
-                <div className="text-sm font-medium">{language === "fr" ? "Lectures récentes" : "Recent readings"}</div>
-                {isLogsLoading ? (
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Chargement..." : "Loading..."}</div>
-                ) : logs.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Aucune lecture" : "No readings"}</div>
-                ) : (
-                  <div className="space-y-2">
-                    {logs
-                      .slice()
-                      .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
-                      .slice(0, 12)
-                      .map((l) => (
-                        <div key={l.logId} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                          <div className="min-w-0">
-                            <div className="font-medium">{l.operation} {l.value}</div>
-                            <div className="text-xs text-muted-foreground">{new Date(l.recordedAt).toLocaleString()}</div>
-                          </div>
-                          <div className="text-muted-foreground">→ {l.resultingValue}</div>
-                        </div>
-                      ))}
+            <form onSubmit={onRecordLog} className="space-y-4">
+              <h4 className="text-sm font-semibold">{language === "fr" ? "Enregistrer une lecture" : "Record Reading"}</h4>
+              <div className="flex gap-2 items-center">
+                <Select value={logOperation} onValueChange={(v) => setLogOperation(v as MeterOperation)}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Op" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADD">{language === "fr" ? "Ajouter (+)" : "Add (+)"}</SelectItem>
+                    <SelectItem value="SUBTRACT">{language === "fr" ? "Soustraire (-)" : "Subtract (-)"}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  value={logAmount}
+                  onChange={(e) => setLogAmount(e.target.value)}
+                  placeholder={language === "fr" ? "Montant" : "Amount"}
+                  className="flex-1"
+                  autoFocus={manageMode === "log"}
+                />
+              </div>
+              <Button type="submit" className="w-full font-bold" disabled={isSaving || !selectedMeterId}>
+                {language === "fr" ? "Enregistrer" : "Record"}
+              </Button>
+            </form>
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold">{language === "fr" ? "Seuils" : "Thresholds"}</h4>
+              {thresholds.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No thresholds yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {thresholds.sort((a, b) => a.thresholdValue - b.thresholdValue).map(th => (
+                    <Badge key={th.thresholdId} variant="secondary" className="px-3 py-1 text-xs">
+                      {th.label && <span className="font-bold text-primary mr-1">{th.label}:</span>}
+                      {th.thresholdValue.toLocaleString()}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              <div className="grid grid-cols-[1fr,1fr,auto] gap-2 pt-2">
+                <Input
+                  type="text"
+                  value={thresholdLabel}
+                  onChange={(e) => setThresholdLabel(e.target.value)}
+                  placeholder={language === "fr" ? "Nom" : "Name"}
+                />
+                <Input
+                  type="number"
+                  value={thresholdValue}
+                  onChange={(e) => setThresholdValue(e.target.value)}
+                  placeholder={language === "fr" ? "Valeur" : "Value"}
+                  onKeyDown={(e) => { if (e.key === 'Enter') onCreateThreshold() }}
+                />
+                <Button onClick={() => onCreateThreshold()} variant="secondary" disabled={isSaving || !selectedMeterId}>Add</Button>
+              </div>
+            </div>
+
+            {selectedMeter && (selectedMeter.status === 'warning' || selectedMeter.status === 'critical') && (
+              <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 space-y-3">
+                <p className="text-sm font-black text-orange-600 uppercase flex items-center gap-2">
+                  <Wrench className="h-4 w-4" /> {language === "fr" ? "Recommandation" : "Recommendation"}
+                </p>
+                <Button
+                  onClick={() => handleCreatePreventiveWO(selectedMeter)}
+                  disabled={isSaving}
+                  variant="destructive"
+                  className="w-full font-bold"
+                >
+                  {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                  {language === "fr" ? "Créer OT Préventif" : "Create Preventive WO"}
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h4 className="text-sm font-semibold">{language === "fr" ? "Activité Récente" : "Recent Activity"}</h4>
+              <div className="space-y-2">
+                {logs.sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()).slice(0, 3).map((l) => (
+                  <div key={l.logId} className="flex items-center justify-between text-sm py-1">
+                    <span className="font-medium text-muted-foreground">{l.operation === "ADD" ? "+" : "-"}{l.value}</span>
+                    <span className="font-mono font-bold">→ {l.resultingValue}</span>
                   </div>
-                )}
+                ))}
+                {logs.length === 0 && <p className="text-sm text-muted-foreground italic">No history</p>}
               </div>
             </div>
           </div>
@@ -541,98 +698,123 @@ export default function MetersPage() {
           <Card>
             <CardContent className="py-6 text-destructive">{error}</CardContent>
           </Card>
-        ) : filteredMeters.length === 0 ? (
+        ) : paginatedMeters.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-muted-foreground">
               {language === "fr" ? "Aucun compteur" : "No meters"}
             </CardContent>
           </Card>
         ) : (
-          filteredMeters.map((meter, index) => (
-          <motion.div
-            key={meter.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-mono text-xs text-muted-foreground">{meter.displayId}</p>
-                    <CardTitle className="text-base">{meter.name}</CardTitle>
-                  </div>
-                  <Badge variant={getStatusColor(meter.status)}>
-                    {meter.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{meter.equipmentLabel}</p>
-                
-                <div className="space-y-2">
-                  <div className="flex items-end justify-between">
-                    <span className="text-3xl font-bold">{meter.value.toLocaleString()}</span>
-                    <span className="text-sm text-muted-foreground">{meter.unit}</span>
-                  </div>
-                  {meter.thresholds.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      {language === "fr" ? "Seuil non défini" : "Threshold not set"}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {meter.thresholds
-                        .slice()
-                        .sort((a, b) => a - b)
-                            .map((th, idx) => (
-                              <div key={`${idx}-${th}`} className="space-y-1">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>
-                                    {language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`} • {th.toLocaleString()}
-                              </span>
-                              <span>
-                                {th > 0
-                                  ? `${Math.round((meter.value / th) * 100)}%`
-                                  : "—"}
-                              </span>
-                            </div>
-                            <div className="h-2 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className={`h-full rounded-full transition-all ${getProgressColor(meter.status)}`}
-                                style={{
-                                  width: th > 0 ? `${Math.min((meter.value / th) * 100, 100)}%` : "0%",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
+          paginatedMeters.map((meter, index) => (
+            <motion.div
+              key={meter.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-mono text-xs text-muted-foreground">{meter.displayId}</p>
+                      <CardTitle className="text-base">{meter.name}</CardTitle>
                     </div>
-                  )}
-                </div>
+                    <Badge variant={getStatusColor(meter.status)}>
+                      {meter.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">{meter.equipmentLabel}</p>
 
-                <button
-                  type="button"
-                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => openManage(meter, "logs")}
-                >
-                  <Clock className="h-3 w-3" />
-                  {language === "fr" ? "Dernière lecture" : "Last reading"}: {meter.lastReading ? new Date(meter.lastReading).toLocaleString() : "—"}
-                </button>
+                  <div className="space-y-2">
+                    <div className="flex items-end justify-between">
+                      <span className="text-3xl font-bold">{meter.value.toLocaleString()}</span>
+                      <span className="text-sm text-muted-foreground">{meter.unit}</span>
+                    </div>
+                    {meter.thresholds.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {language === "fr" ? "Seuil non défini" : "Threshold not set"}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {meter.thresholds
+                          .slice()
+                          .sort((a, b) => a - b)
+                          .map((th, idx) => (
+                            <div key={`${idx}-${th}`} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>
+                                  {language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`} • {th.toLocaleString()}
+                                </span>
+                                <span>
+                                  {th > 0
+                                    ? `${Math.round((meter.value / th) * 100)}%`
+                                    : "—"}
+                                </span>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className={`h-full rounded-full transition-all ${getProgressColor(meter.status)}`}
+                                  style={{
+                                    width: th > 0 ? `${Math.min((meter.value / th) * 100, 100)}%` : "0%",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
 
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openManage(meter, "log")}>
-                    {language === "fr" ? "Journal" : "Log"}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openManage(meter, "manage")}>
-                    {language === "fr" ? "Gérer" : "Manage"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => openManage(meter, "logs")}
+                  >
+                    <Clock className="h-3 w-3" />
+                    {language === "fr" ? "Dernière lecture" : "Last reading"}: {meter.lastReading ? new Date(meter.lastReading).toLocaleString() : "—"}
+                  </button>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openManage(meter, "log")}>
+                      {language === "fr" ? "Journal" : "Log"}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openManage(meter, "manage")}>
+                      {language === "fr" ? "Gérer" : "Manage"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))
         )}
       </motion.div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border border-border bg-card rounded-xl shadow-sm p-4 mt-6">
+          <p className="text-sm text-muted-foreground">
+            {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredMeters.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredMeters.length}</span> {language === "fr" ? "résultats" : "results"}
+          </p>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              {language === "fr" ? "Précédent" : "Previous"}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              {language === "fr" ? "Suivant" : "Next"}
+            </Button>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

@@ -11,10 +11,19 @@ import {
   Wrench,
   MoreVertical,
   ChevronRight,
+  AlertTriangle,
+  History,
+  Briefcase,
+  LayoutDashboard,
   Plus,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  CheckCircle,
+  Timer,
+  PauseCircle
 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { TaskExecutionHub } from "@/components/tasks/TaskExecutionHub"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +50,7 @@ import { useAuth } from "@/lib/auth-context"
 import { tasksApi } from "@/lib/api/tasks"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import type { TaskResponse, WorkOrderResponse } from "@/lib/api/types"
-import { format } from "date-fns"
+import { format, isPast } from "date-fns"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -58,11 +67,9 @@ export default function TasksPage() {
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
 
-  // Add Task State
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [selectedWoId, setSelectedWoId] = useState<string>("")
-  const [newTaskDesc, setNewTaskDesc] = useState("")
-  const [newTaskDuration, setNewTaskDuration] = useState("")
+  // Detailed Task View
+  const [selectedTask, setSelectedTask] = useState<TaskResponse | null>(null)
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
 
   // Reschedule State
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false)
@@ -71,17 +78,43 @@ export default function TasksPage() {
   const [dueDate, setDueDate] = useState("")
   const [rescheduleDuration, setRescheduleDuration] = useState("")
 
+  // New Task State
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [selectedWoId, setSelectedWoId] = useState<string>("")
+  const [newTaskDesc, setNewTaskDesc] = useState("")
+  const [newTaskDuration, setNewTaskDuration] = useState("")
+  const [newTaskParentId, setNewTaskParentId] = useState<number | null>(null)
+  const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM")
+  const [newTaskDueDate, setNewTaskDueDate] = useState("")
+  const [newTaskAssignedTo, setNewTaskAssignedTo] = useState("")
+  const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
+
   const loadData = async () => {
     if (!isAuthenticated) return
     setIsLoading(true)
     try {
+      const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
       const [tasksData, woData] = await Promise.all([
         tasksApi.getAll(),
         workOrdersApi.list()
       ])
       setTasks(tasksData)
-      // Only keep WOs where user is assigned
-      setMyWorkOrders(woData.filter(wo => wo.assignedToUserId === user?.id))
+      // Managers see all WOs; technicians only see their assigned WOs
+      if (isManager) {
+        setMyWorkOrders(woData)
+      } else {
+        setMyWorkOrders(woData.filter(wo => wo.assignedToUserId === user?.id))
+      }
+
+      if (isManager) {
+        try {
+          const { usersApi } = await import("@/lib/api/users")
+          const techs = await usersApi.getAll()
+          setTechnicians(techs.filter(t => t.roleName === 'TECHNICIAN' || t.roleId === 3))
+        } catch { }
+      } else {
+        setNewTaskAssignedTo(user!.id.toString())
+      }
     } catch (error) {
       console.error("Failed to load tasks", error)
     } finally {
@@ -89,8 +122,8 @@ export default function TasksPage() {
     }
   }
 
-  const handleAddAdHocTask = async (woIdOverride?: number) => {
-    const targetWoId = woIdOverride || parseInt(selectedWoId)
+  const handleAddAdHocTask = async () => {
+    const targetWoId = parseInt(selectedWoId)
     if (!targetWoId || !newTaskDesc) return
 
     try {
@@ -98,18 +131,26 @@ export default function TasksPage() {
         woId: targetWoId,
         description: newTaskDesc,
         estimatedDuration: newTaskDuration ? parseFloat(newTaskDuration) : null,
-        title: "Ad-hoc Tech Task"
+        title: newTaskDesc.split(' ').slice(0, 5).join(' '),
+        parentTaskId: newTaskParentId,
+        priority: newTaskPriority,
+        dueDate: newTaskDueDate || null,
+        assignedToUserId: newTaskAssignedTo ? parseInt(newTaskAssignedTo) : undefined
       })
       setNewTaskDesc("")
       setNewTaskDuration("")
+      setNewTaskParentId(null)
+      setNewTaskPriority("MEDIUM")
+      setNewTaskDueDate("")
+      setNewTaskAssignedTo("")
       setIsAddDialogOpen(false)
       loadData()
-      alert("Task proposed successfully. Pending manager approval.")
     } catch (e) {
       console.error("Failed to add task", e)
-      alert("Failed to add task")
     }
   }
+
+  const [technicians, setTechnicians] = useState<any[]>([])
 
   const openRescheduleFor = (woId: number) => {
     const wo = myWorkOrders.find(w => w.woId === woId)
@@ -153,15 +194,16 @@ export default function TasksPage() {
     })
   }, [tasks, search, filter])
 
-  const toggleComplete = async (task: TaskResponse) => {
-    if (task.status === 'DONE') return
-    try {
-      await tasksApi.complete(task.taskId)
-      loadData()
-    } catch (error) {
-      console.error("Failed to complete task", error)
+  const kpis = useMemo(() => {
+    return {
+      total: tasks.length,
+      inProgress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
+      blocked: tasks.filter(t => t.status === 'BLOCKED').length,
+      completed: tasks.filter(t => t.status === 'DONE' || t.status === 'PASS').length,
+      overdue: tasks.filter(t => t.dueDate && isPast(new Date(t.dueDate)) && t.status !== 'DONE').length,
+      hours: tasks.reduce((acc, t) => acc + (t.actualDuration || 0), 0)
     }
-  }
+  }, [tasks])
 
   if (isAuthLoading) {
     return (
@@ -177,40 +219,42 @@ export default function TasksPage() {
     <motion.div 
       initial="initial" 
       animate="animate" 
-      className="flex-1 space-y-6 overflow-auto pb-10"
+      className="flex-1 space-y-6 overflow-auto pb-10 pr-2"
     >
       {/* Header */}
       <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {language === 'fr' ? 'Mes Tâches' : 'Maintenance Tasks'}
-          </h1>
-          <p className="text-muted-foreground">
-            {language === 'fr' 
-              ? 'Suivez et validez les étapes individuelles de vos interventions.' 
-              : 'Track and validate individual steps of your interventions.'}
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="bg-primary/10 p-3 rounded-2xl shadow-inner border border-primary/20">
+             <LayoutDashboard className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              {language === 'fr' ? 'Gestion des Tâches' : 'Execution Task Center'}
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">
+              Hospital Maintenance Operations & Clinical Compliance
+            </p>
+          </div>
         </div>
 
-        {/* Global Add Task */}
-        {user?.roleName?.toUpperCase() === 'TECHNICIAN' && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <div className="flex items-center gap-2">
+           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+              <Button className="h-10 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none">
                 <Plus className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Nouvelle Tâche' : 'Add Task'}
+                New Major Task
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-card/95 backdrop-blur-xl">
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Propose Ad-hoc Task</DialogTitle>
+                <DialogTitle>Create Execution Task</DialogTitle>
                 <DialogDescription>
-                  Adding a task to one of your assigned work orders.
+                  Define a new task or sub-task for maintenance.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label>Work Order</Label>
+                  <Label>Linked Work Order</Label>
                   <select 
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={selectedWoId}
@@ -223,67 +267,105 @@ export default function TasksPage() {
                   </select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Description</Label>
+                  <Label>Parent Task (Optional)</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={newTaskParentId || ""}
+                    onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
+                  >
+                    <option value="">Root Task</option>
+                    {tasks.filter(t => !t.parentTaskId).map(t => (
+                      <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Task Instruction</Label>
                   <Input 
-                    placeholder="What needs to be done?" 
+                    placeholder="e.g. Sterilize surgical unit components" 
                     value={newTaskDesc}
                     onChange={(e) => setNewTaskDesc(e.target.value)}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label>Estimated Duration (hours)</Label>
-                  <Input 
-                    type="number" 
-                    step="0.5"
-                    placeholder="e.g. 1.5" 
-                    value={newTaskDuration}
-                    onChange={(e) => setNewTaskDuration(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="grid gap-2">
+                      <Label>Priority</Label>
+                      <select 
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value)}
+                      >
+                         <option value="LOW">LOW</option>
+                         <option value="MEDIUM">MEDIUM</option>
+                         <option value="HIGH">HIGH</option>
+                         <option value="CRITICAL">CRITICAL</option>
+                      </select>
+                   </div>
+                   <div className="grid gap-2">
+                      <Label>Estimated (Hours)</Label>
+                      <Input 
+                        type="number"
+                        step="0.5"
+                        placeholder="1.5"
+                        value={newTaskDuration}
+                        onChange={(e) => setNewTaskDuration(e.target.value)}
+                      />
+                   </div>
                 </div>
+                <div className="grid gap-2">
+                   <Label>Due Date</Label>
+                   <Input 
+                     type="datetime-local"
+                     value={newTaskDueDate}
+                     onChange={(e) => setNewTaskDueDate(e.target.value)}
+                   />
+                </div>
+                {isManager && (
+                   <div className="grid gap-2">
+                     <Label>Assigned To</Label>
+                     <select 
+                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                       value={newTaskAssignedTo}
+                       onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                     >
+                       <option value="">Select Technician...</option>
+                       {technicians.map(t => (
+                         <option key={t.userId} value={t.userId}>{t.fullName}</option>
+                       ))}
+                     </select>
+                   </div>
+                )}
               </div>
               <DialogFooter>
-                <Button onClick={() => handleAddAdHocTask()}>Propose Task</Button>
+                <Button variant="ghost" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => handleAddAdHocTask()}>Create Task</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+        </div>
       </motion.div>
 
       {/* Stats Overview */}
-      <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-3">
+      <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {[
-          { 
-            title: language === 'fr' ? 'À faire' : 'To Do', 
-            count: tasks.filter(t => t.status === 'TODO').length, 
-            icon: Clock, 
-            color: "text-amber-500",
-            bg: "bg-amber-500/10"
-          },
-          { 
-            title: language === 'fr' ? 'Complétées' : 'Completed', 
-            count: tasks.filter(t => t.status === 'DONE').length, 
-            icon: CheckCircle2, 
-            color: "text-emerald-500",
-            bg: "bg-emerald-500/10"
-          },
-          { 
-            title: 'Total', 
-            count: tasks.length, 
-            icon: Wrench, 
-            color: "text-blue-500",
-            bg: "bg-blue-500/10"
-          },
+          { label: 'Total', value: kpis.total, icon: Briefcase, color: "text-slate-500", bg: "bg-slate-500/10", border: "border-slate-200/50" },
+          { label: 'In Progress', value: kpis.inProgress, icon: Timer, color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-200/50" },
+          { label: 'Blocked', value: kpis.blocked, icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-200/50" },
+          { label: 'Completed', value: kpis.completed, icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-200/50" },
+          { label: 'Overdue', value: kpis.overdue, icon: AlertCircle, color: "text-rose-500", bg: "bg-rose-500/10", border: "border-rose-200/50" },
+          { label: 'Logged', value: `${kpis.hours}h`, icon: Clock, color: "text-indigo-500", bg: "bg-indigo-500/10", border: "border-indigo-200/50" },
         ].map((stat, i) => (
-          <Card key={i} className="border-none bg-card/40 backdrop-blur-md shadow-sm ring-1 ring-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-              <div className={`${stat.bg} p-2 rounded-lg`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.count}</div>
-            </CardContent>
+          <Card key={i} className={cn(
+            "border border-border/50 bg-card/50 backdrop-blur-sm shadow-none transition-all duration-300 hover:scale-[1.02] hover:bg-card",
+            "p-3 flex flex-col justify-between min-h-[90px]"
+          )}>
+            <div className="flex items-center justify-between gap-2">
+               <div className={cn("p-1.5 rounded-lg shrink-0", stat.bg, stat.color)}>
+                  <stat.icon className="h-3.5 w-3.5" />
+               </div>
+               <span className="text-xl font-bold tracking-tight text-foreground truncate">{stat.value}</span>
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-2">{stat.label}</p>
           </Card>
         ))}
       </motion.div>
@@ -293,169 +375,74 @@ export default function TasksPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={language === 'fr' ? "Rechercher une tâche..." : "Search tasks..."} 
-            className="pl-9 bg-card/40 backdrop-blur-md border-border"
+            placeholder="Search tasks by instruction or ID..." 
+            className="pl-9 bg-card border-border/60 h-11 focus:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="bg-card/40 border-border">
-              <Filter className="h-4 w-4 mr-2" />
-              {filter === 'all' ? 'All Status' : filter}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" className="h-11 border-border/60 bg-card shadow-sm">
+               <Filter className="h-4 w-4 mr-2" /> Filters
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setFilter("all")}>All</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilter("TODO")}>To Do</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilter("DONE")}>Completed</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-11 border-border/60 bg-card shadow-sm font-medium">
+                  Status: {filter === 'all' ? 'All' : filter}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilter("all")}>All Status</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setFilter("TODO")}>To Do</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("IN_PROGRESS")}>In Progress</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("DONE")}>Completed</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("BLOCKED")}>Blocked</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
       </motion.div>
 
-      {/* Tasks List */}
+      {/* Tasks Table */}
       <motion.div variants={fadeInUp}>
-        <Card className="border-none bg-card/30 backdrop-blur-md shadow-xl ring-1 ring-border">
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground animate-pulse font-medium">Synchronizing tasks...</p>
-              </div>
-            ) : filteredTasks.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium">No tasks found</h3>
-                <p className="text-muted-foreground">Either you are all caught up or no tasks match your filter.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {filteredTasks.sort((a,b) => a.orderIndex - b.orderIndex).map((task) => (
-                  <div key={task.taskId} className="flex items-start gap-4 p-4 hover:bg-muted/30 transition-colors group">
-                    <button 
-                      onClick={() => toggleComplete(task)}
-                      disabled={task.status === 'DONE' || (task.isAdHoc && task.approvalStatus === 'PENDING')}
-                      title={task.isAdHoc && task.approvalStatus === 'PENDING' ? 'Pending manager approval' : ''}
-                      className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                        task.status === 'DONE' 
-                          ? 'bg-emerald-500 border-emerald-500 text-white' 
-                          : 'border-muted-foreground/30 hover:border-primary'
-                      } ${task.isAdHoc && task.approvalStatus === 'PENDING' ? 'opacity-50 cursor-not-allowed border-amber-300' : ''}`}
-                    >
-                      {task.status === 'DONE' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                      {!task.status === 'DONE' && task.isAdHoc && task.approvalStatus === 'PENDING' && <Clock className="h-2.5 w-2.5 text-amber-500" />}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-medium transition-all ${task.status === 'DONE' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                        {task.description}
-                      </div>
-                      <div className="flex items-center gap-4 mt-1">
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex items-center">
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-indigo-200 text-indigo-700 bg-indigo-50/50">WO-{task.woId}</Badge>
-                          {user?.roleName?.toUpperCase() === 'TECHNICIAN' && !task.isAdHoc && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-4 w-4 ml-1 hover:bg-indigo-100 text-indigo-600"
-                              onClick={() => {
-                                setSelectedWoId(task.woId.toString());
-                                setIsAddDialogOpen(true);
-                              }}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                        
-                        {task.isAdHoc && (
-                          <>
-                            <Badge variant="secondary" className="text-[8px] px-1 py-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 font-bold uppercase tracking-tighter">AD-HOC</Badge>
-                            {task.approvalStatus === 'PENDING' && <Badge variant="outline" className="text-[8px] px-1 py-0 text-amber-600 border-amber-200 bg-amber-50/30">Pending Review</Badge>}
-                            {task.approvalStatus === 'APPROVED' && <Badge variant="outline" className="text-[8px] px-1 py-0 text-emerald-600 border-emerald-200 bg-emerald-50/30">Approved</Badge>}
-                            {task.approvalStatus === 'REJECTED' && <Badge variant="outline" className="text-[8px] px-1 py-0 text-rose-600 border-rose-200 bg-rose-50/30">Rejected</Badge>}
-                          </>
-                        )}
-
-                        {task.completedAt && (
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground ml-2">
-                            <Clock className="h-3 w-3" />
-                            <span>{format(new Date(task.completedAt), 'MMM d, HH:mm')}</span>
-                          </div>
-                        )}
-                      </div>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => window.location.href=`/work-orders/${task.woId}`}>
-                          View Work Order
-                        </DropdownMenuItem>
-                        {user?.roleName?.toUpperCase() === 'TECHNICIAN' && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openRescheduleFor(task.woId)}>
-                              Edit WO Schedule
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <div className="bg-card rounded-xl border border-border/50 p-20 flex flex-col items-center justify-center gap-4">
+             <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+             <p className="text-sm font-bold text-muted-foreground animate-pulse uppercase tracking-widest">Loading task hierarchy...</p>
+          </div>
+        ) : (
+          <TaskExecutionHub 
+            tasks={filteredTasks}
+            onUpdate={loadData}
+          />
+        )}
       </motion.div>
 
-      {/* Shared Reschedule Dialog */}
       <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Work Order Schedule</DialogTitle>
+            <DialogTitle>Update Execution Deadline</DialogTitle>
             <DialogDescription>
-              Adjusting timelines for WO-{rescheduleWoId}
+              Adjusting timelines for technical intervention WO-{rescheduleWoId}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label>Planned Start</Label>
-              <Input 
-                type="datetime-local" 
-                value={plannedStart}
-                onChange={(e) => setPlannedStart(e.target.value)}
-              />
+              <Input type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label>Due Date</Label>
-              <Input 
-                type="datetime-local" 
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
+              <Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label>Estimated Duration (Hours)</Label>
-              <Input 
-                type="number" 
-                step="0.5"
-                value={rescheduleDuration}
-                onChange={(e) => setRescheduleDuration(e.target.value)}
-              />
+              <Input type="number" step="0.5" value={rescheduleDuration} onChange={(e) => setRescheduleDuration(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRescheduleDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleReschedule}>Save Schedule</Button>
+            <Button onClick={handleReschedule} className="bg-indigo-600 hover:bg-indigo-700">Sync Schedule</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

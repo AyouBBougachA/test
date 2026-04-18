@@ -18,7 +18,12 @@ public class TaskResponse {
     private String        status;
     private Integer       assignedToUserId;
     private String        assignedToName;
+    private Integer       parentTaskId;
     private BigDecimal    estimatedDuration;
+    private BigDecimal    actualDuration;
+    private LocalDateTime dueDate;
+    private String        priority;
+    private Integer       departmentId;
     private Integer       orderIndex;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
@@ -33,4 +38,34 @@ public class TaskResponse {
     private String        approvalStatus;
     private Integer       approvedByUserId;
     private LocalDateTime approvedAt;
+    private List<TaskAuditLogResponse> auditLogs;
+    private List<TaskResponse> childTasks;
+    private Double progress;
+    private Long totalTimerDuration;
+    private LocalDateTime currentTimerStartedAt;
+    private List<TaskPhotoResponse> photos;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TaskPhotoResponse {
+        private Integer photoId;
+        private String photoUrl;
+        private String type;
+        private LocalDateTime capturedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TaskAuditLogResponse {
+        private Long id;
+        private String oldStatus;
+        private String newStatus;
+        private String changedBy;
+        private String note;
+        private LocalDateTime changedAt;
+    }
 }

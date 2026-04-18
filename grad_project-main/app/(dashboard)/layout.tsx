@@ -18,11 +18,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [isAuthenticated, isLoading, router])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
-      <div className="lg:pl-64">
+      <div className="flex-1 flex flex-col min-w-0">
         <DashboardHeader />
-        <main className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8 lg:pt-4">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 lg:pt-4">
           {children}
         </main>
       </div>

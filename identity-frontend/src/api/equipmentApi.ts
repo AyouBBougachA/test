@@ -42,11 +42,19 @@ export const equipmentApi = {
     const response = await api.get('/equipment');
     return response.data;
   },
-  search: async (departmentId?: number, status?: string, q?: string): Promise<Equipment[]> => {
+  search: async (
+    departmentId?: number,
+    status?: string,
+    q?: string,
+    classification?: string,
+    criticality?: string
+  ): Promise<Equipment[]> => {
     const params = new URLSearchParams();
     if (departmentId) params.append('departmentId', departmentId.toString());
     if (status) params.append('status', status);
     if (q) params.append('q', q);
+    if (classification) params.append('classification', classification);
+    if (criticality) params.append('criticality', criticality);
     const response = await api.get(`/equipment/search?${params.toString()}`);
     return response.data;
   },
@@ -68,6 +76,10 @@ export const equipmentApi = {
   },
   archive: async (id: number): Promise<Equipment> => {
     const response = await api.patch(`/equipment/${id}/archive`);
+    return response.data;
+  },
+  getKpis: async (): Promise<any> => {
+    const response = await api.get('/equipment/kpis');
     return response.data;
   },
 

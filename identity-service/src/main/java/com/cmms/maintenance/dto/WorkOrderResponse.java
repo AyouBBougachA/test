@@ -18,6 +18,8 @@ public class WorkOrderResponse {
     private String  claimCode;     // "CLM-001" if originated from a claim
     private Integer equipmentId;
     private String  equipmentName;
+    private Integer departmentId;
+    private String  departmentName;
     private Integer parentWoId;
     private String  parentWoCode;
 

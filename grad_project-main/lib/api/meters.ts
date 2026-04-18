@@ -21,11 +21,11 @@ export const metersApi = {
 
   getLogs: (id: number) => requestJson<MeterLog[]>(`/meters/${id}/logs`),
 
-  createThreshold: (id: number, thresholdValue: number) =>
+  createThreshold: (id: number, data: { thresholdValue: number; label: string }) =>
     requestJson<MeterThreshold>(`/meters/${id}/thresholds`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(thresholdValue),
+      body: JSON.stringify(data),
     }),
 
   getThresholds: (id: number) => requestJson<MeterThreshold[]>(`/meters/${id}/thresholds`),

@@ -276,7 +276,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="h-12 w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+                className="h-12 w-full"
               >
                 {isSubmitting ? (language === "fr" ? "Connexion..." : "Signing in...") : t("login")}
               </Button>

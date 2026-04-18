@@ -79,6 +79,7 @@ export type EquipmentStatus = 'OPERATIONAL' | 'UNDER_REPAIR' | 'ARCHIVED'
 
 export interface EquipmentResponse {
   equipmentId: number
+  assetCode: string
   name: string
   serialNumber: string
   status: string
@@ -92,13 +93,20 @@ export interface EquipmentResponse {
   criticality?: string | null
   meterUnit?: string | null
   startMeterValue?: number | null
-  thresholds?: Array<number>
+  thresholds?: EquipmentThresholdDto[]
   purchaseDate?: string | null
   commissioningDate?: string | null
   supplierName?: string | null
   contractNumber?: string | null
   warrantyEndDate?: string | null
+  lastMaintenanceDate?: string | null
+  dueForMaintenance?: boolean
   createdAt: string
+}
+
+export interface EquipmentThresholdDto {
+  value: number
+  label: string
 }
 
 export interface EquipmentRequest {
@@ -115,7 +123,7 @@ export interface EquipmentRequest {
   criticality?: string | null
   meterUnit?: string | null
   startMeterValue?: number | null
-  thresholds?: Array<number>
+  thresholds?: EquipmentThresholdDto[]
   purchaseDate?: string | null
   commissioningDate?: string | null
   supplierName?: string | null
@@ -173,7 +181,13 @@ export interface MeterThreshold {
   thresholdId: number
   meterId: number
   thresholdValue: number
+  label?: string | null
   createdAt: string
+}
+
+export interface CreateMeterThresholdRequest {
+  thresholdValue: number
+  label: string
 }
 
 export interface EquipmentCategory {
@@ -318,6 +332,8 @@ export interface WorkOrderResponse {
   parentWoCode?: string | null
   equipmentId: number
   equipmentName?: string | null
+  departmentId?: number | null
+  departmentName?: string | null
   woType: WorkOrderType | string
   priority: WorkOrderPriority | string
   status: WorkOrderStatus | string
@@ -466,16 +482,45 @@ export interface TaskResponse {
   approvalStatus?: TaskApprovalStatus | string | null
   approvedByUserId?: number | null
   approvedAt?: string | null
-  failureReason?: string | null
+  priority?: string | null
+  departmentId?: number | null
+  parentTaskId?: number | null
+  actualDuration?: number | null
+  dueDate?: string | null
+  progress?: number | null
+  totalTimerDuration?: number | null
+  currentTimerStartedAt?: string | null
   subTasks?: SubTaskResponse[] | null
+  childTasks?: TaskResponse[] | null
+  auditLogs?: TaskAuditLogResponse[] | null
+  photos?: TaskPhotoResponse[] | null
+}
+
+export interface TaskPhotoResponse {
+  photoId: number
+  photoUrl: string
+  type: 'BEFORE' | 'AFTER'
+  capturedAt: string
+}
+
+export interface TaskAuditLogResponse {
+  id: number
+  oldStatus?: string | null
+  newStatus: string
+  changedBy: string
+  note?: string | null
+  changedAt: string
 }
 
 export interface CreateTaskRequest {
   woId: number
   title?: string | null
-  description?: string | null
+  description: string
+  parentTaskId?: number | null
   assignedToUserId?: number | null
   estimatedDuration?: number | null
+  dueDate?: string | null
+  priority?: string | null
   orderIndex?: number | null
 }
 
@@ -485,6 +530,9 @@ export interface UpdateTaskRequest {
   notes?: string | null
   assignedToUserId?: number | null
   estimatedDuration?: number | null
+  actualDuration?: number | null
+  dueDate?: string | null
+  priority?: string | null
   orderIndex?: number | null
   blockedReason?: string | null
 }

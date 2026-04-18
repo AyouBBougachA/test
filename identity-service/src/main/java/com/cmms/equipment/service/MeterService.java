@@ -69,7 +69,7 @@ public class MeterService {
         meterRepository.save(meter);
 
         logRepository.save(log);
-        
+
         // Trigger automated maintenance checks
         meterTriggerService.evaluateMeterReadings(meter);
 
@@ -82,10 +82,11 @@ public class MeterService {
     }
 
     @Transactional
-    public MeterThreshold createThreshold(Integer meterId, BigDecimal thresholdValue) {
-         MeterThreshold threshold = MeterThreshold.builder()
+    public MeterThreshold createThreshold(Integer meterId, BigDecimal thresholdValue, String label) {
+        MeterThreshold threshold = MeterThreshold.builder()
                 .meterId(meterId)
                 .thresholdValue(thresholdValue)
+                .label(label)
                 .build();
         return thresholdRepository.save(threshold);
     }
@@ -101,18 +102,24 @@ public class MeterService {
         for (MeterThreshold threshold : thresholds) {
             if (value != null && threshold.getThresholdValue() != null
                     && value.compareTo(threshold.getThresholdValue()) >= 0) {
-                return Optional.of("Threshold Exceeded: Current " + value + " >= Threshold " + threshold.getThresholdValue());
+                return Optional
+                        .of("Threshold Exceeded: Current " + value + " >= Threshold " + threshold.getThresholdValue());
             }
         }
         return Optional.empty();
     }
+
     @Transactional
     public Meter updateMeter(Integer id, Meter meterDetails) {
         Meter meter = getMeterById(id);
-        if (meterDetails.getName() != null) meter.setName(meterDetails.getName());
-        if (meterDetails.getUnit() != null) meter.setUnit(meterDetails.getUnit());
-        if (meterDetails.getMeterType() != null) meter.setMeterType(meterDetails.getMeterType());
-        if (meterDetails.getEquipmentId() != null) meter.setEquipmentId(meterDetails.getEquipmentId());
+        if (meterDetails.getName() != null)
+            meter.setName(meterDetails.getName());
+        if (meterDetails.getUnit() != null)
+            meter.setUnit(meterDetails.getUnit());
+        if (meterDetails.getMeterType() != null)
+            meter.setMeterType(meterDetails.getMeterType());
+        if (meterDetails.getEquipmentId() != null)
+            meter.setEquipmentId(meterDetails.getEquipmentId());
         return meterRepository.save(meter);
     }
 }

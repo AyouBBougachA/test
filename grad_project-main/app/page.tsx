@@ -229,7 +229,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link href="/login">
-              <Button className="bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700">
+              <Button >
                 {t("requestDemo")}
               </Button>
             </Link>

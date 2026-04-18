@@ -2,6 +2,7 @@ com\cmms\maintenance\repository\TaskRepository.class
 com\cmms\maintenance\service\WorkOrderService$1.class
 com\cmms\equipment\controller\DocumentController.class
 com\cmms\identity\dto\DepartmentResponse.class
+com\cmms\maintenance\service\TaskService$PhotoFile.class
 com\cmms\inventory\entity\PartUsage.class
 com\cmms\maintenance\dto\CreateTaskRequest.class
 com\cmms\equipment\repository\EquipmentDocumentRepository.class
@@ -73,13 +74,17 @@ com\cmms\bi\dto\DashboardStatsResponse.class
 com\cmms\bi\repository\InventoryTransactionRepository.class
 com\cmms\maintenance\dto\WorkOrderLaborResponse.class
 com\cmms\maintenance\dto\WorkOrderResponse$WorkOrderResponseBuilder.class
+com\cmms\maintenance\repository\TaskAuditLogRepository.class
+com\cmms\maintenance\dto\TaskResponse$TaskAuditLogResponse$TaskAuditLogResponseBuilder.class
 com\cmms\identity\service\AuditLogService.class
+com\cmms\maintenance\dto\TaskResponse$TaskAuditLogResponse.class
 com\cmms\identity\entity\AuditLog$AuditLogBuilder.class
 com\cmms\maintenance\entity\WorkOrder$WorkOrderType.class
 com\cmms\equipment\controller\EquipmentModelController.class
 com\cmms\maintenance\dto\UpdateWorkOrderRequest.class
 com\cmms\bi\controller\KpiController.class
 com\cmms\identity\controller\RoleController.class
+com\cmms\maintenance\entity\TaskAuditLog$TaskAuditLogBuilder.class
 com\cmms\equipment\dto\EquipmentRequest.class
 com\cmms\identity\entity\Role$RoleBuilder.class
 com\cmms\ai\dto\PredictionResponse.class
@@ -87,6 +92,7 @@ com\cmms\equipment\controller\EquipmentCategoryController.class
 com\cmms\maintenance\entity\Task$TaskBuilder.class
 com\cmms\equipment\entity\EquipmentModel.class
 com\cmms\identity\exception\ErrorResponse.class
+com\cmms\equipment\dto\EquipmentThresholdDto.class
 com\cmms\equipment\repository\MeterRepository.class
 com\cmms\maintenance\entity\MaintenancePlan.class
 com\cmms\identity\exception\DuplicateResourceException.class
@@ -96,6 +102,7 @@ com\cmms\equipment\repository\MeterThresholdRepository.class
 com\cmms\maintenance\entity\Task.class
 com\cmms\claims\service\ClaimPhotoService$PhotoFile.class
 com\cmms\identity\exception\AuthenticationFailedException.class
+com\cmms\maintenance\dto\TaskResponse$TaskPhotoResponse.class
 com\cmms\equipment\entity\MeterThreshold$MeterThresholdBuilder.class
 com\cmms\maintenance\dto\WorkloadResponse.class
 com\cmms\maintenance\repository\WorkOrderLaborRepository.class
@@ -117,6 +124,7 @@ com\cmms\maintenance\service\MaintenancePlanService$1.class
 com\cmms\inventory\controller\InventoryController.class
 com\cmms\identity\mapper\UserMapper.class
 com\cmms\bi\entity\InventoryTransaction.class
+com\cmms\maintenance\entity\TaskPhoto.class
 com\cmms\claims\dto\ClaimAssignRequest.class
 com\cmms\identity\mapper\DepartmentMapper.class
 com\cmms\notifications\entity\Notification.class
@@ -128,6 +136,7 @@ com\cmms\maintenance\dto\CompleteWorkOrderRequest.class
 com\cmms\claims\service\ClaimService$1.class
 com\cmms\maintenance\entity\WorkOrderAssignment.class
 com\cmms\bi\dto\KpiResponse$KpiResponseBuilder.class
+com\cmms\maintenance\dto\TaskResponse$TaskPhotoResponse$TaskPhotoResponseBuilder.class
 com\cmms\identity\exception\ResourceNotFoundException.class
 com\cmms\inventory\service\InventoryService.class
 com\cmms\maintenance\dto\CancelWorkOrderRequest$CancelWorkOrderRequestBuilder.class
@@ -147,6 +156,7 @@ com\cmms\equipment\repository\EquipmentCategoryRepository.class
 com\cmms\equipment\entity\EquipmentHistory$EquipmentHistoryBuilder.class
 com\cmms\identity\dto\UserResponse.class
 com\cmms\maintenance\dto\WorkOrderStatusHistoryResponse.class
+com\cmms\maintenance\entity\TaskAuditLog.class
 com\cmms\maintenance\entity\WorkOrder$WorkOrderStatus.class
 com\cmms\maintenance\dto\UpdateTaskRequest$UpdateTaskRequestBuilder.class
 com\cmms\maintenance\dto\CreateWorkOrderRequest$CreateWorkOrderRequestBuilder.class
@@ -230,11 +240,14 @@ com\cmms\inventory\dto\SparePartResponse$SparePartResponseBuilder.class
 com\cmms\equipment\entity\EquipmentCategory.class
 com\cmms\maintenance\dto\CreateMaintenancePlanRequest$CreateMaintenancePlanRequestBuilder.class
 com\cmms\claims\entity\ClaimStatusHistory.class
+com\cmms\maintenance\entity\TaskPhoto$PhotoType.class
 com\cmms\equipment\exception\EquipmentExceptionHandler.class
 com\cmms\bi\controller\DashboardController.class
 com\cmms\equipment\service\EquipmentModelService.class
+com\cmms\maintenance\entity\Task$TaskPriority.class
 com\cmms\maintenance\controller\PlanningController.class
 com\cmms\claims\repository\ClaimPhotoRepository.class
+com\cmms\equipment\dto\EquipmentThresholdDto$EquipmentThresholdDtoBuilder.class
 com\cmms\inventory\entity\RestockRequest$RestockStatus.class
 com\cmms\equipment\entity\EquipmentDocument.class
 com\cmms\identity\config\BootstrapAdminRunner.class
@@ -265,4 +278,6 @@ com\cmms\inventory\repository\PartUsageRepository.class
 com\cmms\maintenance\repository\WorkOrderStatusHistoryRepository.class
 com\cmms\maintenance\dto\AssignWorkOrderRequest$AssignWorkOrderRequestBuilder.class
 com\cmms\identity\security\UserPrincipal.class
+com\cmms\maintenance\entity\TaskPhoto$TaskPhotoBuilder.class
 com\cmms\maintenance\dto\SubTaskResponse$SubTaskResponseBuilder.class
+com\cmms\maintenance\repository\TaskPhotoRepository.class

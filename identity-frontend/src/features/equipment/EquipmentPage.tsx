@@ -1,58 +1,65 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { equipmentApi } from '@/api/equipmentApi';
 import { departmentApi } from '@/api';
 import { useAuthStore } from '@/store/authStore';
 import { Equipment, Department } from '@/types';
-import { Card, Button, Badge, Input } from '@/components/ui';
-import { Search, Plus, Edit2, History, Archive, Loader2, Package, MapPin, Hash, FileText, RotateCcw, Layers, Boxes } from 'lucide-react';
+import { Card, Button, Badge } from '@/components/ui';
+import { 
+  Plus, Edit2, History, Archive, Loader2, Package, MapPin, 
+  Hash, FileText, RotateCcw, MoreVertical, Eye, 
+  AlertTriangle, ShieldAlert, CheckCircle2, Clock, Activity
+} from 'lucide-react';
 import EquipmentModal from './EquipmentModal';
-import HistoryModal from './HistoryModal';
-import DocumentModal from './DocumentModal';
-import CategoryManagerModal from './CategoryManagerModal';
-import ModelManagerModal from './ModelManagerModal';
-
-// Simple debounce hook helper
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-  useEffect(() => {
-    const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-}
+import EquipmentKpiCards from './components/EquipmentKpiCards';
+import EquipmentFilters from './components/EquipmentFilters';
 
 export default function EquipmentPage() {
   const { user } = useAuthStore();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [stats, setStats] = useState({
+    totalEquipment: 0,
+    criticalEquipment: 0,
+    outOfService: 0,
+    dueForMaintenance: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   
-  // Search parameters
+  // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const debouncedQuery = useDebounce(searchQuery, 400);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [departmentFilter, setDepartmentFilter] = useState<number | ''>('');
-  
+  const [classFilter, setClassFilter] = useState<string>('');
+  const [critFilter, setCritFilter] = useState<string>('');
   const [departments, setDepartments] = useState<Department[]>([]);
   
+  // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [modelManagerOpen, setModelManagerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'view'>('edit');
   const [optionsVersion, setOptionsVersion] = useState(0);
-  
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyEquipmentId, setHistoryEquipmentId] = useState<number | null>(null);
-  
-  const [documentOpen, setDocumentOpen] = useState(false);
-  const [documentEquipmentId, setDocumentEquipmentId] = useState<number | null>(null);
 
-  const fetchEquipment = async () => {
+  const fetchStats = async () => {
+    try {
+      setStatsLoading(true);
+      const data = await equipmentApi.getKpis();
+      setStats(data as any);
+    } catch (err) {
+      console.error('Failed to fetch stats', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const fetchEquipment = useCallback(async () => {
     try {
       setLoading(true);
       const data = await equipmentApi.search(
           departmentFilter === '' ? undefined : departmentFilter,
           statusFilter === '' ? undefined : statusFilter,
-          debouncedQuery === '' ? undefined : debouncedQuery
+          searchQuery === '' ? undefined : searchQuery,
+          classFilter === '' ? undefined : classFilter,
+          critFilter === '' ? undefined : critFilter
       );
       setEquipment(data);
     } catch (err) {
@@ -60,21 +67,26 @@ export default function EquipmentPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, statusFilter, departmentFilter, classFilter, critFilter]);
 
   useEffect(() => {
     departmentApi.getAll().then(setDepartments).catch(() => setDepartments([]));
+    fetchStats();
   }, []);
 
   useEffect(() => {
-    fetchEquipment();
-  }, [debouncedQuery, statusFilter, departmentFilter]);
+    const timer = setTimeout(() => {
+      fetchEquipment();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [fetchEquipment]);
 
   const handleArchive = async (id: number) => {
-    if (!window.confirm("Are you sure you want to archive this equipment? It will no longer appear in active lists.")) return;
+    if (!window.confirm("Are you sure you want to archive this equipment?")) return;
     try {
       await equipmentApi.archive(id);
       fetchEquipment();
+      fetchStats();
     } catch (err) {
       alert('Failed to archive equipment');
     }
@@ -85,6 +97,7 @@ export default function EquipmentPage() {
     try {
       await equipmentApi.updateStatus(id, 'OPERATIONAL');
       fetchEquipment();
+      fetchStats();
     } catch (err) {
       alert('Failed to restore equipment');
     }
@@ -92,171 +105,209 @@ export default function EquipmentPage() {
 
   const openCreate = () => {
     setSelectedEquipment(null);
+    setViewMode('edit');
     setModalOpen(true);
   };
 
   const openEdit = (e: Equipment) => {
     setSelectedEquipment(e);
+    setViewMode('edit');
     setModalOpen(true);
   };
 
-  const openHistory = (id: number) => {
-    setHistoryEquipmentId(id);
-    setHistoryOpen(true);
+  const openView = (e: Equipment) => {
+    setSelectedEquipment(e);
+    setViewMode('view');
+    setModalOpen(true);
   };
 
-  const openDocuments = (id: number) => {
-    setDocumentEquipmentId(id);
-    setDocumentOpen(true);
+  const getStatusBadge = (status: string) => {
+    const s = status.toUpperCase();
+    switch (s) {
+      case 'OPERATIONAL': 
+        return <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200">Operational</Badge>;
+      case 'OUT_OF_SERVICE': 
+        return <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-200">Out of Service</Badge>;
+      case 'REFORMED': 
+        return <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200">Reformed</Badge>;
+      case 'UNDER_REPAIR': 
+        return <Badge variant="default" className="bg-blue-50 text-blue-700 border-blue-200">Under Repair</Badge>;
+      case 'ARCHIVED': 
+        return <Badge variant="outline" className="text-slate-400 border-slate-200">Archived</Badge>;
+      default: 
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'OPERATIONAL': return 'success';
-      case 'UNDER_REPAIR': return 'default';
-      case 'ARCHIVED': return 'secondary';
-      default: return 'outline';
+  const getCriticalityBadge = (crit: string | undefined | null) => {
+    const c = (crit || 'MEDIUM').toUpperCase();
+    switch (c) {
+      case 'CRITICAL': 
+        return <div className="flex items-center gap-1.5 text-rose-600 font-bold text-xs"><ShieldAlert className="w-3.5 h-3.5" /> CRITICAL</div>;
+      case 'HIGH': 
+        return <div className="flex items-center gap-1.5 text-amber-600 font-bold text-xs"><AlertTriangle className="w-3.5 h-3.5" /> HIGH</div>;
+      case 'MEDIUM': 
+        return <div className="flex items-center gap-1.5 text-blue-600 font-bold text-xs"><Activity className="w-3.5 h-3.5" /> MEDIUM</div>;
+      default: 
+        return <div className="flex items-center gap-1.5 text-slate-500 font-bold text-xs"><CheckCircle2 className="w-3.5 h-3.5" /> LOW</div>;
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Equipment Inventory</h2>
-          <p className="text-muted-foreground mt-1 text-sm">Manage clinical assets, track history, and monitor status.</p>
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Equipment Referential</h2>
+          <p className="text-slate-500 mt-1 text-sm font-medium">Centralized asset management for clinical and technical excellence.</p>
         </div>
-        {(user?.roleName === 'ADMIN' || user?.roleName === 'MANAGER') && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setCategoryManagerOpen(true)} className="shadow-sm">
-              <Layers className="w-4 h-4 mr-2" />
-              Manage Categories
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => { fetchEquipment(); fetchStats(); }} className="h-11 px-4 text-slate-500 border-slate-200">
+            <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          {(user?.roleName === 'ADMIN' || user?.roleName === 'MANAGER') && (
+            <Button onClick={openCreate} className="shadow-lg shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 text-white border-none h-11 px-6">
+              <Plus className="w-5 h-5 mr-2" />
+              New Equipment
             </Button>
-            <Button variant="outline" onClick={() => setModelManagerOpen(true)} className="shadow-sm">
-              <Boxes className="w-4 h-4 mr-2" />
-              Manage Models
-            </Button>
-            <Button onClick={openCreate} className="shadow-sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Equipment
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      <Card className="shadow-sm border-border/60 bg-card overflow-hidden">
-        <div className="p-4 border-b border-border/50 flex flex-wrap items-center gap-4 bg-muted/30">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
-            <Input 
-              placeholder="Search by name, serial, or location..." 
-              className="pl-9 h-9 bg-background border-border/50 focus-visible:ring-primary/20" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <select 
-            className="h-9 rounded-md border border-border/50 bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            <option value="OPERATIONAL">Operational</option>
-            <option value="UNDER_REPAIR">Under Repair</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-          
-          <select 
-            className="h-9 rounded-md border border-border/50 bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value ? Number(e.target.value) : '')}
-          >
-            <option value="">All Departments</option>
-            {departments.map((d) => (
-                <option key={d.departmentId} value={d.departmentId}>{d.departmentName}</option>
-            ))}
-          </select>
-        </div>
+      {/* KPI Cards */}
+      <EquipmentKpiCards stats={stats} loading={statsLoading} />
 
+      {/* Filters */}
+      <EquipmentFilters 
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        deptFilter={departmentFilter}
+        setDeptFilter={setDepartmentFilter}
+        classFilter={classFilter}
+        setClassFilter={setClassFilter}
+        critFilter={critFilter}
+        setCritFilter={setCritFilter}
+        departments={departments}
+        onClear={() => {
+          setSearchQuery('');
+          setStatusFilter('');
+          setDepartmentFilter('');
+          setClassFilter('');
+          setCritFilter('');
+        }}
+      />
+
+      {/* Main Inventory Table */}
+      <Card className="shadow-xl shadow-slate-200/50 border-slate-200 bg-white overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
-              <tr>
-                <th className="px-6 py-4 font-bold tracking-wider">Equipment Details</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Location</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Status</th>
-                <th className="px-6 py-4 text-right font-bold tracking-wider">Actions</th>
+          <table className="w-full text-sm text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200">
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Asset / Identity</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Location & Service</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Type & Priority</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Status</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Last Maintenance</th>
+                <th className="px-6 py-4 text-right font-bold text-slate-500 uppercase tracking-widest text-[10px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/40 bg-card relative">
+            <tbody className="divide-y divide-slate-100">
               {loading && equipment.length === 0 ? (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto opacity-40" /></td></tr>
+                <tr>
+                  <td colSpan={6} className="px-6 py-24 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Loader2 className="w-10 h-10 animate-spin text-blue-500 opacity-40" />
+                      <p className="mt-4 text-slate-400 font-medium italic">Synchronizing assets...</p>
+                    </div>
+                  </td>
+                </tr>
               ) : equipment.length === 0 ? (
                 <tr>
-                    <td colSpan={4} className="px-6 py-20 text-center text-muted-foreground bg-muted/10">
-                        <div className="flex flex-col items-center justify-center text-center">
-                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                                <Package className="w-6 h-6 text-muted-foreground/40" />
-                            </div>
-                            <p className="font-semibold text-foreground italic">No equipment found</p>
-                            <p className="text-xs max-w-[200px] mx-auto mt-1">Start by adding your first clinical asset to the system.</p>
-                        </div>
-                    </td>
+                  <td colSpan={6} className="px-6 py-24 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
+                      <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-6">
+                        <Package className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">No assets found</h4>
+                      <p className="text-slate-500 mt-2">Adjust your filters or add a new piece of equipment to the referential base.</p>
+                      <Button variant="outline" className="mt-6 font-bold" onClick={() => setSearchQuery('')}>Reset Filters</Button>
+                    </div>
+                  </td>
                 </tr>
               ) : (
                 equipment.map((e) => (
-                  <tr key={e.equipmentId} className="hover:bg-muted/30 transition-colors group">
+                  <tr 
+                    key={e.equipmentId} 
+                    className="hover:bg-blue-50/30 transition-all cursor-pointer group"
+                    onClick={() => openView(e)}
+                  >
                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-center text-primary">
-                                <Package className="w-4.5 h-4.5" />
-                            </div>
-                            <div>
-                                <div className="font-bold text-foreground">{e.name}</div>
-                                <div className="text-muted-foreground text-xs flex items-center gap-1">
-                                    <Hash className="w-3 h-3 opacity-50" />
-                                    {e.serialNumber}
-                                </div>
-                            </div>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                          <Package className="w-5 h-5" />
                         </div>
+                        <div>
+                          <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors uppercase tracking-tight">{e.name}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 font-mono">{e.assetCode || 'NO-CODE'}</span>
+                            <span className="text-slate-400 text-xs flex items-center gap-1">
+                              <Hash className="w-3 h-3 opacity-60" /> {e.serialNumber}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <MapPin className="w-3.5 h-3.5 opacity-50" />
-                            <span className="font-medium">{e.location}</span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-slate-700 font-semibold text-xs">
+                          <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                          {e.location}
                         </div>
+                        <div className="text-[10px] text-slate-400 uppercase font-black pl-5 tracking-tighter">
+                          {e.departmentName || 'Central Storage'}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={getStatusVariant(e.status)}>
-                        {e.status}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="text-slate-500 hover:text-primary hover:bg-primary/10" onClick={() => openHistory(e.equipmentId)}>
-                                <History className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-slate-500 hover:text-primary hover:bg-primary/10" onClick={() => openDocuments(e.equipmentId)}>
-                                <FileText className="w-4 h-4" />
-                            </Button>
-                            {(user?.roleName === 'ADMIN' || user?.roleName === 'MANAGER') && (
-                                <>
-                                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-primary hover:bg-primary/10" onClick={() => openEdit(e)}>
-                                        <Edit2 className="w-4 h-4" />
-                                    </Button>
-                                    {e.status === 'ARCHIVED' ? (
-                                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-emerald-600 hover:bg-emerald-50" onClick={() => handleRestore(e.equipmentId)}>
-                                        <RotateCcw className="w-4 h-4" />
-                                      </Button>
-                                    ) : (
-                                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleArchive(e.equipmentId)}>
-                                        <Archive className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                </>
-                            )}
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-bold text-slate-400 border border-slate-200 px-2 py-0.5 rounded bg-slate-50 inline-block uppercase tracking-widest leading-none">
+                          {e.classification || 'BIOMEDICAL'}
                         </div>
+                        <div>{getCriticalityBadge(e.criticality)}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {getStatusBadge(e.status)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {e.lastMaintenanceDate ? (
+                        <div className="flex flex-col">
+                          <span className="text-slate-700 font-bold flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                            {new Date(e.lastMaintenanceDate).toLocaleDateString()}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {new Date(e.lastMaintenanceDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic tracking-tighter">No record</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1 opacity-1 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
+                        <Button variant="ghost" size="icon" className="w-8 h-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => openView(e)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="w-8 h-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => openEdit(e)}>
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="w-8 h-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleArchive(e.equipmentId)}>
+                          <Archive className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -266,41 +317,17 @@ export default function EquipmentPage() {
         </div>
       </Card>
 
+      {/* Redesigned Modal */}
       <EquipmentModal 
         isOpen={modalOpen} 
         onClose={() => setModalOpen(false)} 
-        onSuccess={fetchEquipment} 
+        onSuccess={() => {
+          fetchEquipment();
+          fetchStats();
+        }} 
         equipment={selectedEquipment} 
-        optionsVersion={optionsVersion}
+        initialMode={viewMode}
       />
-
-      <CategoryManagerModal
-        isOpen={categoryManagerOpen}
-        onClose={() => setCategoryManagerOpen(false)}
-        onChange={() => setOptionsVersion((prev) => prev + 1)}
-      />
-
-      <ModelManagerModal
-        isOpen={modelManagerOpen}
-        onClose={() => setModelManagerOpen(false)}
-        onChange={() => setOptionsVersion((prev) => prev + 1)}
-      />
-
-      {historyEquipmentId && (
-        <HistoryModal
-          isOpen={historyOpen}
-          onClose={() => setHistoryOpen(false)}
-          equipmentId={historyEquipmentId}
-        />
-      )}
-
-      {documentEquipmentId && (
-        <DocumentModal
-          isOpen={documentOpen}
-          onClose={() => setDocumentOpen(false)}
-          equipmentId={documentEquipmentId}
-        />
-      )}
     </div>
   );
 }

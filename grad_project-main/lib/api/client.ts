@@ -84,7 +84,9 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
     return undefined as T
   }
 
-  return (await response.json()) as T
+  const text = await response.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 export async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {

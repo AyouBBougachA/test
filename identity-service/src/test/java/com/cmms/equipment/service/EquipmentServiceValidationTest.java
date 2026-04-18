@@ -29,11 +29,11 @@ import java.util.List;
 @ExtendWith(MockitoExtension.class)
 class EquipmentServiceValidationTest {
 
-    @Mock
-    private EquipmentRepository equipmentRepository;
+        @Mock
+        private EquipmentRepository equipmentRepository;
 
-    @Mock
-    private EquipmentHistoryRepository historyRepository;
+        @Mock
+        private EquipmentHistoryRepository historyRepository;
 
         @Mock
         private MeterRepository meterRepository;
@@ -47,59 +47,58 @@ class EquipmentServiceValidationTest {
         @Mock
         private EquipmentModelRepository equipmentModelRepository;
 
-    @Mock
-    private IdentityServiceClient identityServiceClient;
+        @Mock
+        private IdentityServiceClient identityServiceClient;
 
-    @InjectMocks
-    private EquipmentService equipmentService;
+        @InjectMocks
+        private EquipmentService equipmentService;
 
-    @Test
-    void createEquipmentRejectsUnknownDepartment() {
-        Equipment equipment = Equipment.builder()
-                .name("Pump")
-                .status(EquipmentStatus.OPERATIONAL)
-                .departmentId(99)
-                .build();
+        @Test
+        void createEquipmentRejectsUnknownDepartment() {
+                Equipment equipment = Equipment.builder()
+                                .name("Pump")
+                                .status(EquipmentStatus.OPERATIONAL)
+                                .departmentId(99)
+                                .build();
 
-        when(identityServiceClient.checkDepartmentExists(99)).thenReturn(false);
+                when(identityServiceClient.checkDepartmentExists(99)).thenReturn(false);
 
-        RuntimeException ex = assertThrows(
-                RuntimeException.class,
-                () -> equipmentService.createEquipment(equipment, List.of())
-        );
+                RuntimeException ex = assertThrows(
+                                RuntimeException.class,
+                                () -> equipmentService.createEquipment(equipment, List.of()));
 
-        assertEquals("Failed to validate Department ID with Identity Service", ex.getMessage());
-        verify(identityServiceClient).checkDepartmentExists(99);
-    }
+                assertEquals("Failed to validate Department ID with Identity Service", ex.getMessage());
+                verify(identityServiceClient).checkDepartmentExists(99);
+        }
 
-    @Test
-    void createEquipmentPersistsWhenDepartmentExists() {
-        Equipment equipment = Equipment.builder()
-                .name("Pump")
-                .status(EquipmentStatus.OPERATIONAL)
-                .departmentId(1)
-                .build();
+        @Test
+        void createEquipmentPersistsWhenDepartmentExists() {
+                Equipment equipment = Equipment.builder()
+                                .name("Pump")
+                                .status(EquipmentStatus.OPERATIONAL)
+                                .departmentId(1)
+                                .build();
 
-        Equipment saved = Equipment.builder()
-                .equipmentId(1)
-                .name("Pump")
-                .status(EquipmentStatus.OPERATIONAL)
-                .departmentId(1)
-                .build();
+                Equipment saved = Equipment.builder()
+                                .equipmentId(1)
+                                .name("Pump")
+                                .status(EquipmentStatus.OPERATIONAL)
+                                .departmentId(1)
+                                .build();
 
-        when(identityServiceClient.checkDepartmentExists(1)).thenReturn(true);
-        when(equipmentCategoryRepository.existsById(any())).thenReturn(true);
-        when(equipmentModelRepository.existsById(any())).thenReturn(true);
-        when(equipmentRepository.save(equipment)).thenReturn(saved);
-        when(historyRepository.save(any(EquipmentHistory.class)))
-                .thenReturn(EquipmentHistory.builder().build());
-        when(meterRepository.findByEquipmentId(1)).thenReturn(Optional.empty());
-        when(meterRepository.save(any(Meter.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                when(identityServiceClient.checkDepartmentExists(1)).thenReturn(true);
+                when(equipmentCategoryRepository.existsById(any())).thenReturn(true);
+                when(equipmentModelRepository.existsById(any())).thenReturn(true);
+                when(equipmentRepository.save(equipment)).thenReturn(saved);
+                when(historyRepository.save(any(EquipmentHistory.class)))
+                                .thenReturn(EquipmentHistory.builder().build());
+                when(meterRepository.findByEquipmentId(1)).thenReturn(Optional.empty());
+                when(meterRepository.save(any(Meter.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Equipment result = equipmentService.createEquipment(equipment, List.of());
+                Equipment result = equipmentService.createEquipment(equipment, List.of());
 
-        assertEquals(1, result.getEquipmentId());
-        verify(identityServiceClient).checkDepartmentExists(1);
-        verify(historyRepository).save(any(EquipmentHistory.class));
-    }
+                assertEquals(1, result.getEquipmentId());
+                verify(identityServiceClient).checkDepartmentExists(1);
+                verify(historyRepository).save(any(EquipmentHistory.class));
+        }
 }

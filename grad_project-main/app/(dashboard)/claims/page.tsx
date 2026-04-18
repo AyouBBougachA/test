@@ -123,6 +123,13 @@ export default function ClaimsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, priorityFilter])
+
   useEffect(() => {
     let cancelled = false
 
@@ -228,6 +235,14 @@ export default function ClaimsPage() {
     return matchesSearch && matchesStatus && matchesPriority
   })
 
+  const paginatedClaims = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredClaims.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredClaims, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredClaims.length / itemsPerPage)
+
+
   const derivedStats = {
     total: rows.length,
     pending: rows.filter((c) => {
@@ -302,7 +317,7 @@ export default function ClaimsPage() {
             {t("export")}
           </Button>
           <Link href="/claims/new">
-            <Button className="gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700">
+            <Button className="gap-2">
               <Plus className="h-4 w-4" />
               {t("newClaim")}
             </Button>
@@ -420,14 +435,14 @@ export default function ClaimsPage() {
                           {t("loading")}
                         </TableCell>
                       </TableRow>
-                    ) : filteredClaims.length === 0 ? (
+                    ) : paginatedClaims.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-sm text-muted-foreground">
                           {t("noData")}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredClaims.map((claim) => {
+                      paginatedClaims.map((claim) => {
                         const priority = claim.priorityLabel ?? toTitleCase(String(claim.priority ?? ""))
                         const status = toDisplayStatusLabel(
                           claim.statusLabel ?? toTitleCase(String(claim.status ?? "")),
@@ -491,6 +506,31 @@ export default function ClaimsPage() {
                   </TableBody>
                 </Table>
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t p-4">
+                  <p className="text-sm text-muted-foreground">
+                    {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredClaims.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredClaims.length}</span> {language === "fr" ? "résultats" : "results"}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      {language === "fr" ? "Précédent" : "Previous"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      {language === "fr" ? "Suivant" : "Next"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
