@@ -26,7 +26,8 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import { tasksApi } from "@/lib/api/tasks"
-import type { WorkOrderResponse, TaskResponse, UserResponse, ClaimPhotoResponse } from "@/lib/api/types"
+import { taskTemplatesApi } from "@/lib/api/task-templates"
+import type { WorkOrderResponse, TaskResponse, UserResponse, ClaimPhotoResponse, TaskTemplateResponse } from "@/lib/api/types"
 import { useAuth } from "@/lib/auth-context"
 import { claimsApi } from "@/lib/api/claims"
 import { useI18n } from "@/lib/i18n"
@@ -36,6 +37,7 @@ import { inventoryApi } from "@/lib/api/inventory"
 import { metersApi } from "@/lib/api/meters"
 import { equipmentApi } from "@/lib/api/equipment"
 import { motion } from "framer-motion"
+import { ChecklistExecution } from "@/components/regulatory/ChecklistExecution"
 import { cn } from "@/lib/utils"
 import { 
   Tabs, 
@@ -104,6 +106,12 @@ export default function WorkOrderDetailPage() {
   const [newTaskDueDate, setNewTaskDueDate] = useState("")
   const [newTaskAssignedTo, setNewTaskAssignedTo] = useState("")
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
+  
+  // Template States
+  const [creationMode, setCreationMode] = useState<'CUSTOM' | 'TEMPLATE'>('CUSTOM')
+  const [templates, setTemplates] = useState<TaskTemplateResponse[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
+  const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplateResponse | null>(null)
 
   // Reschedule state
   const [plannedStart, setPlannedStart] = useState("")
@@ -136,6 +144,8 @@ export default function WorkOrderDetailPage() {
   const [selectedPartId, setSelectedPartId] = useState("")
   const [partQty, setPartQty] = useState("1")
   const [selectedPartTaskId, setSelectedPartTaskId] = useState("")
+
+  const { t } = useI18n()
 
   const loadData = async () => {
     if (!Number.isFinite(woId)) {
@@ -175,6 +185,10 @@ export default function WorkOrderDetailPage() {
       if (user?.roleName?.toUpperCase() !== 'TECHNICIAN') {
         const techs = await usersApi.getAll()
         setTechnicians(techs.filter(t => t.roleName === 'TECHNICIAN' || t.roleId === 3))
+        
+        // Load templates for managers
+        const templatesData = await taskTemplatesApi.getAll()
+        setTemplates(templatesData)
       }
     } catch (err) {
       setError("Failed to load work order details.")
@@ -354,6 +368,7 @@ export default function WorkOrderDetailPage() {
     try {
       await tasksApi.create({
         woId,
+        templateId: (creationMode === 'TEMPLATE' && selectedTemplateId) ? parseInt(selectedTemplateId) : undefined,
         title: newTaskTitle || newTaskDesc.split(' ').slice(0, 5).join(' '),
         description: newTaskDesc,
         estimatedDuration: newTaskEst ? parseFloat(newTaskEst) : null,
@@ -363,6 +378,9 @@ export default function WorkOrderDetailPage() {
         assignedToUserId: newTaskAssignedTo ? parseInt(newTaskAssignedTo) : undefined
       })
       setIsTaskDialogOpen(false)
+      setCreationMode('CUSTOM')
+      setSelectedTemplateId("")
+      setSelectedTemplate(null)
       setNewTaskTitle("")
       setNewTaskDesc("")
       setNewTaskEst("")
@@ -374,6 +392,20 @@ export default function WorkOrderDetailPage() {
       setTasks(tasksData)
     } catch (e) {
       console.error("Task creation failed", e)
+      alert("Failed to create task. Check if all required fields are filled.")
+    }
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    const template = templates.find(t => t.id === parseInt(templateId))
+    if (template) {
+      setSelectedTemplate(template)
+      setNewTaskDesc(template.name)
+      if (template.estimatedHours) setNewTaskEst(template.estimatedHours.toString())
+      if (template.defaultPriority) setNewTaskPriority(template.defaultPriority)
+    } else {
+      setSelectedTemplate(null)
     }
   }
 
@@ -788,23 +820,31 @@ export default function WorkOrderDetailPage() {
         </TabsContent>
 
         <TabsContent value="checklist" className="outline-none space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <CheckSquare className="h-5 w-5 text-primary" />
-              Intervention Checklist
-            </h3>
-            {(isManager || isAssignedTech) && (
-              <Button size="sm" variant="outline" className="h-9 gap-2 shadow-sm" onClick={() => setIsTaskDialogOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Add Step
-              </Button>
-            )}
-          </div>
-
-          <TaskExecutionHub 
-            tasks={tasks} 
-            onUpdate={refreshTasks} 
-          />
+          {wo.woType === 'REGULATORY' ? (
+            <ChecklistExecution woId={woId} isEditable={wo.status !== 'VALIDATED' && wo.status !== 'CLOSED'} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  Intervention Checklist
+                </h3>
+                {(isManager || isAssignedTech) && (
+                  <Button size="sm" variant="outline" className="h-9 gap-2 shadow-sm" onClick={() => setIsTaskDialogOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add Step
+                  </Button>
+                )}
+              </div>
+              <TaskExecutionHub 
+                tasks={tasks}
+                onToggle={handleTaskToggle}
+                onRefresh={refreshTasks}
+                isEditable={isManager || isAssignedTech}
+                isManager={isManager}
+              />
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="costs" className="outline-none">
@@ -1096,9 +1136,71 @@ export default function WorkOrderDetailPage() {
               Define a specific task or sub-step for this work order.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-4 py-2 max-h-[70vh] overflow-auto px-1">
+            {/* Mode Selector (Manager Only) */}
+            {isManager && (
+              <div className="grid gap-2">
+                <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">{t('creationMode')}</Label>
+                <div className="grid grid-cols-2 gap-2 bg-muted/50 p-1 rounded-lg">
+                  <Button 
+                    variant={creationMode === 'CUSTOM' ? 'default' : 'ghost'} 
+                    size="sm"
+                    onClick={() => setCreationMode('CUSTOM')}
+                    className={cn("h-8 text-xs", creationMode === 'CUSTOM' && "bg-background text-foreground shadow-sm hover:bg-background")}
+                  >
+                    {t('customTask')}
+                  </Button>
+                  <Button 
+                    variant={creationMode === 'TEMPLATE' ? 'default' : 'ghost'} 
+                    size="sm"
+                    onClick={() => setCreationMode('TEMPLATE')}
+                    className={cn("h-8 text-xs", creationMode === 'TEMPLATE' && "bg-background text-foreground shadow-sm hover:bg-background")}
+                  >
+                    {t('useTemplate')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {creationMode === 'TEMPLATE' && isManager && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="grid gap-4 border-l-2 border-primary/30 pl-4 py-2 bg-primary/5 rounded-r-lg">
+                <div className="grid gap-2">
+                  <Label className="text-primary font-bold">{t('selectTemplate')}</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-primary/20 bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-primary"
+                    value={selectedTemplateId}
+                    onChange={(e) => handleTemplateChange(e.target.value)}
+                  >
+                    <option value="">-- Choose a template --</option>
+                    {templates.map(tmp => (
+                      <option key={tmp.id} value={tmp.id}>{tmp.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedTemplate && (
+                  <div className="space-y-3">
+                    <div className="text-[11px] text-muted-foreground italic bg-background/50 p-2 rounded border border-border/40 text-center">
+                      {selectedTemplate.description}
+                    </div>
+                    <div className="grid gap-1.5">
+                       <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/70">{t('generatedChecklist')}</Label>
+                       <div className="space-y-1 max-h-[120px] overflow-auto pr-1">
+                          {selectedTemplate.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs bg-background/40 p-1.5 rounded border border-border/30">
+                               <div className="h-4 w-4 rounded-full border border-primary/40 flex items-center justify-center text-[8px] font-bold text-primary">{idx + 1}</div>
+                               <span className="truncate">{item.label}</span>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
             <div className="grid gap-2">
-              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Step Title (Optional)</Label>
+              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Step Title (Ref)</Label>
               <Input
                 placeholder="e.g. Inspect hydraulic seals"
                 value={newTaskTitle}
@@ -1107,20 +1209,6 @@ export default function WorkOrderDetailPage() {
               />
             </div>
             
-            <div className="grid gap-2">
-              <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Parent Task (Optional)</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={newTaskParentId || ""}
-                onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
-              >
-                <option value="">Root Task</option>
-                {tasks.filter(t => !t.parentTaskId).map(t => (
-                  <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
-                ))}
-              </select>
-            </div>
-
             <div className="grid gap-2">
               <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Instructions / Description <span className="text-rose-500">*</span></Label>
               <Textarea
@@ -1159,14 +1247,29 @@ export default function WorkOrderDetailPage() {
                </div>
             </div>
 
-            <div className="grid gap-2">
-               <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Due Date</Label>
-               <Input 
-                 type="datetime-local"
-                 value={newTaskDueDate}
-                 onChange={(e) => setNewTaskDueDate(e.target.value)}
-                 className="bg-slate-50/50 border-slate-200"
-               />
+            <div className="grid grid-cols-2 gap-4">
+               <div className="grid gap-2">
+                  <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Due Date</Label>
+                  <Input 
+                    type="datetime-local"
+                    value={newTaskDueDate}
+                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200"
+                  />
+               </div>
+               <div className="grid gap-2">
+                  <Label className="text-[10px] uppercase font-black tracking-widest text-slate-400">Parent Step (Optional)</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={newTaskParentId || ""}
+                    onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
+                  >
+                    <option value="">No Parent</option>
+                    {tasks.filter(t => !t.parentTaskId).map(t => (
+                      <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
+                    ))}
+                  </select>
+               </div>
             </div>
 
             {isManager && (

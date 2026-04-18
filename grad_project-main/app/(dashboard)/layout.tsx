@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { useAuth } from "@/lib/auth-context"
+import { RegulatoryDuePopup } from "@/components/regulatory/RegulatoryDuePopup"
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -26,6 +27,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <RegulatoryDuePopup />
     </div>
   )
 }

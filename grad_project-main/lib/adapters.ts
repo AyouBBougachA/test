@@ -15,7 +15,7 @@ export function getRoleLabel(roleName: UiRole | null | undefined, lang: 'en' | '
     ADMIN: { en: 'Administrator', fr: 'Administrateur' },
     MAINTENANCE_MANAGER: { en: 'Maintenance Manager', fr: 'Responsable maintenance' },
     TECHNICIAN: { en: 'Technician', fr: 'Technicien' },
-    DIRECTION_FINANCE: { en: 'Direction / Finance', fr: 'Direction / Finance' },
+    FINANCE_MANAGER: { en: 'Finance Manager', fr: 'Responsable Finance' },
   }
 
   return (labels[normalized] ?? { en: roleName ?? 'User', fr: roleName ?? 'Utilisateur' })[lang]

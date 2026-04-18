@@ -34,7 +34,7 @@ public class UserController {
 
     @GetMapping("/search")
     @Operation(summary = "Search for users by criteria")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public ResponseEntity<List<UserResponse>> searchUsers(
             @RequestParam(required = false) Integer roleId,
             @RequestParam(required = false) Integer departmentId,

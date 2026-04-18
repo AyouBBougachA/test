@@ -20,6 +20,7 @@ export interface UserResponse {
   departmentName: string | null
   departmentId: number | null
   isActive: boolean
+  lastLogin: string | null
   createdAt: string
 }
 
@@ -463,6 +464,7 @@ export interface SubTaskResponse {
 export interface TaskResponse {
   taskId: number
   woId: number
+  templateId?: number | null
   title?: string | null
   description?: string | null
   notes?: string | null
@@ -514,6 +516,7 @@ export interface TaskAuditLogResponse {
 
 export interface CreateTaskRequest {
   woId: number
+  templateId?: number | null
   title?: string | null
   description: string
   parentTaskId?: number | null
@@ -643,4 +646,54 @@ export interface PredictionResponse {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
   recommendation: string
   factors: string[]
+}
+
+export interface TaskTemplateItem {
+  id: number
+  label: string
+  description?: string | null
+  sortOrder: number
+  isRequired: boolean
+  estimatedMinutes?: number | null
+}
+
+export interface TaskTemplateResponse {
+  id: number
+  code: string
+  name: string
+  description?: string | null
+  equipmentCategoryId?: number | null
+  departmentId?: number | null
+  defaultPriority: string
+  estimatedHours?: number | null
+  defaultAssigneeRole?: string | null
+  requiresValidation: boolean
+  requiresDocument: boolean
+  isActive: boolean
+  items: TaskTemplateItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TaskTemplateItemRequest {
+  label: string
+  description?: string | null
+  sortOrder: number
+  isRequired: boolean
+  estimatedMinutes?: number | null
+}
+
+export interface CreateTaskTemplateRequest {
+  code: string
+  name: string
+  description?: string | null
+  equipmentCategoryId?: number | null
+  departmentId?: number | null
+  defaultPriority: string
+  estimatedHours?: number | null
+  defaultAssigneeRole?: string | null
+  requiresValidation: boolean
+  requiresDocument: boolean
+  isActive: boolean
+  items: TaskTemplateItemRequest[]
 }

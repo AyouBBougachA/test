@@ -18,6 +18,7 @@ const translations = {
     kanban: "Kanban Board",
     workload: "Team Workload",
     gantt: "Gantt Chart",
+    regulatoryPlans: "Regulatory Plans",
     meters: "Meters",
     inventory: "Inventory",
     ai: "AI",
@@ -208,6 +209,17 @@ const translations = {
     recommendedPlan: "Recommended Action Plan",
     equipmentUnderRepair: "Equipment status updated to Under Repair.",
     woCreatedSuccess: "Preventive Work Order created successfully.",
+    
+    // Task Templates
+    useTemplate: "Use Task Template",
+    customTask: "Custom Task",
+    creationMode: "Creation Mode",
+    selectTemplate: "Select Template",
+    templatePreview: "Template Preview",
+    generatedChecklist: "Generated Checklist",
+    validationRules: "Validation Rules",
+    saveAsTask: "Save as Task",
+    templateNotes: "Template Instructions",
   },
   fr: {
     // Navigation
@@ -222,6 +234,7 @@ const translations = {
     kanban: "Tableau Kanban",
     workload: "Charge d'équipe",
     gantt: "Diagramme de Gantt",
+    regulatoryPlans: "Plans Réglementaires",
     meters: "Compteurs",
     inventory: "Inventaire",
     ai: "IA",
@@ -412,6 +425,17 @@ const translations = {
     recommendedPlan: "Plan d'action recommandé",
     equipmentUnderRepair: "Statut de l'équipement mis à jour : En réparation.",
     woCreatedSuccess: "Ordre de travail préventif créé avec succès.",
+
+    // Task Templates
+    useTemplate: "Utiliser Modèle",
+    customTask: "Tâche Personnalisée",
+    creationMode: "Mode de Création",
+    selectTemplate: "Sélectionner un Modèle",
+    templatePreview: "Aperçu du Modèle",
+    generatedChecklist: "Liste de Contrôle Générée",
+    validationRules: "Règles de Validation",
+    saveAsTask: "Enregistrer comme Tâche",
+    templateNotes: "Instructions du Modèle",
   },
 }
 

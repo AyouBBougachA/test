@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+import com.cmms.identity.security.UserPrincipal;
+import com.cmms.identity.entity.User;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +27,9 @@ public class MeterService {
     private final MeterLogRepository logRepository;
     private final MeterThresholdRepository thresholdRepository;
     private final com.cmms.maintenance.service.MeterTriggerService meterTriggerService;
+    private final com.cmms.identity.service.AuditLogService auditLogService;
+
+    private static final String ENTITY_NAME = "Meter";
 
     @Transactional(readOnly = true)
     public List<Meter> getAllMeters() {
@@ -73,6 +80,16 @@ public class MeterService {
         // Trigger automated maintenance checks
         meterTriggerService.evaluateMeterReadings(meter);
 
+        Actor actor = getCurrentActor();
+        auditLogService.log(
+                actor.userId(),
+                actor.displayName(),
+                "RECORD_METER_LOG",
+                ENTITY_NAME,
+                meterId,
+                "Recorded meter log for " + meter.getName() + ": " + op + " " + amount + " " + meter.getUnit() + " (New value: " + resulting + ")"
+        );
+
         return log;
     }
 
@@ -122,4 +139,19 @@ public class MeterService {
             meter.setEquipmentId(meterDetails.getEquipmentId());
         return meterRepository.save(meter);
     }
+
+    private Actor getCurrentActor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return new Actor(null, "System");
+        }
+        Object principal = auth.getPrincipal();
+        if (principal instanceof UserPrincipal up) {
+            User u = up.getUser();
+            return new Actor(u != null ? u.getUserId() : null, u != null ? u.getFullName() : up.getUsername());
+        }
+        return new Actor(null, auth.getName());
+    }
+
+    private record Actor(Integer userId, String displayName) {}
 }

@@ -10,4 +10,8 @@ import java.util.List;
 public interface WorkOrderLaborRepository extends JpaRepository<WorkOrderLabor, Integer> {
     List<WorkOrderLabor> findByWoId(Integer woId);
     List<WorkOrderLabor> findByUserId(Integer userId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE WorkOrderLabor l SET l.userId = NULL WHERE l.userId = :userId")
+    void nullifyTechnicianReferences(@org.springframework.data.repository.query.Param("userId") Integer userId);
 }

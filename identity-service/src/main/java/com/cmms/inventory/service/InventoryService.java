@@ -15,6 +15,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+import com.cmms.identity.security.UserPrincipal;
+import com.cmms.identity.entity.User;
+import org.springframework.security.access.AccessDeniedException;
+import java.util.Objects;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,6 +36,9 @@ public class InventoryService {
     private final com.cmms.inventory.repository.RestockRequestRepository restockRepository;
     private final com.cmms.notifications.service.NotificationService notificationService;
     private final com.cmms.identity.repository.UserRepository userRepository;
+    private final com.cmms.identity.service.AuditLogService auditLogService;
+
+    private static final String ENTITY_NAME = "SparePart";
 
     @Transactional(readOnly = true)
     public List<SparePartResponse> list(String category, String q, boolean lowStockOnly) {
@@ -68,10 +77,19 @@ public class InventoryService {
                 .unitCost(request.getUnitCost())
                 .location(request.getLocation())
                 .supplier(request.getSupplier())
-                .isArchived(false)
-                .build();
+        SparePart saved = sparePartRepository.save(part);
         
-        return toResponse(sparePartRepository.save(part));
+        Actor actor = getCurrentActor();
+        auditLogService.log(
+                actor.userId(),
+                actor.displayName(),
+                "CREATE_SPARE_PART",
+                ENTITY_NAME,
+                saved.getPartId(),
+                "Created spare part: " + saved.getName() + " (SKU: " + saved.getSku() + ")"
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -87,10 +105,19 @@ public class InventoryService {
                 .partId(id)
                 .quantityChange(change)
                 .transactionType("ADJUSTMENT")
-                .notes("Manual stock adjustment")
-                .build());
+        SparePart saved = sparePartRepository.save(part);
 
-        return toResponse(sparePartRepository.save(part));
+        Actor actor = getCurrentActor();
+        auditLogService.log(
+                actor.userId(),
+                actor.displayName(),
+                "UPDATE_STOCK",
+                ENTITY_NAME,
+                saved.getPartId(),
+                "Adjusted stock for " + saved.getName() + ": " + (part.getQuantityInStock() - change) + " -> " + quantity
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -179,6 +206,16 @@ public class InventoryService {
             notifyManagers("WARNING", "Low Stock Alert: " + part.getName() + " is below minimum level.", part.getPartId());
         }
 
+        Actor actor = getCurrentActor();
+        auditLogService.log(
+                actor.userId(),
+                actor.displayName(),
+                "USE_SPARE_PART",
+                ENTITY_NAME,
+                part.getPartId(),
+                "Used " + request.getQuantity() + " of " + part.getName() + " for WO-" + request.getWoId()
+        );
+
         return toUsageResponse(savedUsage, part.getName());
     }
 
@@ -232,4 +269,19 @@ public class InventoryService {
                 .updatedAt(part.getUpdatedAt())
                 .build();
     }
+
+    private Actor getCurrentActor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return new Actor(null, "System");
+        }
+        Object principal = auth.getPrincipal();
+        if (principal instanceof UserPrincipal up) {
+            User u = up.getUser();
+            return new Actor(u != null ? u.getUserId() : null, u != null ? u.getFullName() : up.getUsername());
+        }
+        return new Actor(null, auth.getName());
+    }
+
+    private record Actor(Integer userId, String displayName) {}
 }

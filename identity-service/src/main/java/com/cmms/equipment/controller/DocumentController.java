@@ -19,6 +19,7 @@ public class DocumentController {
 
     @PostMapping("/{equipmentId}/documents")
     @ResponseStatus(HttpStatus.CREATED)
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public EquipmentDocument upload(@PathVariable Integer equipmentId, @RequestParam("file") MultipartFile file) throws IOException {
         return documentService.uploadDocument(equipmentId, file);
     }
@@ -30,6 +31,7 @@ public class DocumentController {
 
     @DeleteMapping("/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public void delete(@PathVariable Integer documentId) {
         documentService.deleteDocument(documentId);
     }

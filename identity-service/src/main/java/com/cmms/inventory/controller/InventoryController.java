@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,6 +26,7 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN', 'FINANCE_MANAGER')")
     @Operation(summary = "List spare parts")
     public List<SparePartResponse> list(
             @RequestParam(required = false) String category,
@@ -35,6 +37,7 @@ public class InventoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new spare part")
     public SparePartResponse create(@Valid @RequestBody CreateSparePartRequest request) {
@@ -42,6 +45,7 @@ public class InventoryController {
     }
 
     @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     @Operation(summary = "Update stock level for a part")
     public SparePartResponse updateStock(@PathVariable Integer id, @RequestParam Integer quantity) {
         return inventoryService.updateStock(id, quantity);

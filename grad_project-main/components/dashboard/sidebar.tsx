@@ -26,6 +26,7 @@ import {
   Package,
   Settings,
   Shield,
+  ShieldCheck,
   Sparkles,
   Users,
   Wrench,
@@ -50,7 +51,7 @@ interface NavItem {
   label: string
   icon: typeof Home
   href?: string
-  children?: { label: string; href: string; icon?: typeof Home }[]
+  children?: { label: string; href: string; icon?: typeof Home; roles?: string[] }[]
   roles?: string[]
 }
 
@@ -121,13 +122,13 @@ export function DashboardSidebar() {
       label: t("claims"),
       icon: AlertTriangle,
       href: "/claims",
-      roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER"],
     },
     {
       label: t("workOrders"),
       icon: Wrench,
       href: "/work-orders",
-      roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN", "FINANCE_MANAGER"],
     },
     {
       label: t("tasks"),
@@ -141,6 +142,7 @@ export function DashboardSidebar() {
       children: [
         { label: t("kanban"), href: "/planning/kanban", icon: Kanban },
         { label: t("calendar"), href: "/planning/calendar", icon: Calendar },
+        { label: t("regulatoryPlans"), href: "/planning/regulatory", icon: ShieldCheck },
         { label: t("gantt"), href: "/planning/gantt", icon: GanttChart },
       ],
       roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN"],
@@ -155,7 +157,7 @@ export function DashboardSidebar() {
       label: t("inventory"),
       icon: Package,
       href: "/inventory",
-      roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER", "TECHNICIAN", "FINANCE_MANAGER"],
     },
     // Intelligence
     {
@@ -166,7 +168,7 @@ export function DashboardSidebar() {
         { label: t("predictive"), href: "/ai/predictive", icon: Activity },
         { label: t("failureAnalysis"), href: "/ai/failure-analysis", icon: AlertTriangle },
       ],
-      roles: ["ADMIN", "MAINTENANCE_MANAGER", "DIRECTION_FINANCE"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER"],
     },
     // Analytics
     {
@@ -178,20 +180,20 @@ export function DashboardSidebar() {
         { label: t("biomedical"), href: "/bi/biomedical", icon: Heart },
         { label: t("financial"), href: "/bi/financial", icon: DollarSign },
       ],
-      roles: ["ADMIN", "MAINTENANCE_MANAGER", "DIRECTION_FINANCE"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER", "FINANCE_MANAGER"],
     },
     // Administration
     {
       label: t("admin"),
       icon: Shield,
       children: [
-        { label: t("users"), href: "/admin/users", icon: Users },
-        { label: t("roles"), href: "/admin/roles", icon: Shield },
-        { label: t("referenceData"), href: "/admin/reference-data", icon: Database },
-        { label: t("rulesThresholds"), href: "/admin/rules-thresholds", icon: Settings },
-        { label: t("auditLogs"), href: "/admin/audit-logs", icon: FileText },
+        { label: t("users"), href: "/admin/users", icon: Users, roles: ["ADMIN"] },
+        { label: t("roles"), href: "/admin/roles", icon: Shield, roles: ["ADMIN"] },
+        { label: t("referenceData"), href: "/admin/reference-data", icon: Database, roles: ["ADMIN", "MAINTENANCE_MANAGER"] },
+        { label: t("rulesThresholds"), href: "/admin/rules-thresholds", icon: Settings, roles: ["ADMIN"] },
+        { label: t("auditLogs"), href: "/admin/audit-logs", icon: FileText, roles: ["ADMIN"] },
       ],
-      roles: ["ADMIN"],
+      roles: ["ADMIN", "MAINTENANCE_MANAGER"],
     },
   ]
 
@@ -291,21 +293,25 @@ export function DashboardSidebar() {
                         transition={{ duration: 0.2 }}
                         className="ml-4 mt-1 space-y-1 overflow-hidden border-l border-border pl-4"
                       >
-                        {item.children.map((child) => (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={cn(
-                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                              isActive(child.href)
-                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                            )}
-                          >
-                            {child.icon && <child.icon className="h-4 w-4" />}
-                            <span>{child.label}</span>
-                          </Link>
-                        ))}
+                        {item.children.map((child) => {
+                          if (!canAccess(child.roles)) return null
+                          
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              className={cn(
+                                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                                isActive(child.href)
+                                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                              )}
+                            >
+                              {child.icon && <child.icon className="h-4 w-4" />}
+                              <span>{child.label}</span>
+                            </Link>
+                          )
+                        })}
                       </motion.div>
                     )}
                   </AnimatePresence>

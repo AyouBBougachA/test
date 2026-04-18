@@ -10,6 +10,7 @@ com\cmms\identity\entity\User.class
 com\cmms\claims\service\ClaimService$Actor.class
 com\cmms\identity\service\DepartmentService.class
 com\cmms\inventory\dto\PartUsageResponse.class
+com\cmms\maintenance\service\RegulatoryPlanService$1.class
 com\cmms\equipment\repository\EquipmentRepository.class
 com\cmms\identity\config\BootstrapAdminProperties.class
 com\cmms\identity\controller\AuthController.class
@@ -116,8 +117,6 @@ com\cmms\equipment\client\IdentityServiceClient.class
 com\cmms\maintenance\dto\TaskResponse.class
 com\cmms\maintenance\repository\WorkOrderAssignmentRepository.class
 com\cmms\equipment\entity\Meter.class
-com\cmms\maintenance\service\WorkOrderService$Actor.class
-com\cmms\maintenance\service\WorkOrderService.class
 com\cmms\equipment\dto\MeterLogResponse.class
 com\cmms\equipment\entity\MeterLog$MeterLogBuilder.class
 com\cmms\maintenance\service\MaintenancePlanService$1.class
@@ -142,7 +141,6 @@ com\cmms\inventory\service\InventoryService.class
 com\cmms\maintenance\dto\CancelWorkOrderRequest$CancelWorkOrderRequestBuilder.class
 com\cmms\maintenance\dto\AssignWorkOrderRequest.class
 com\cmms\maintenance\entity\WorkOrder.class
-com\cmms\maintenance\controller\WorkOrdersController.class
 com\cmms\identity\security\JwtAuthenticationEntryPoint.class
 com\cmms\inventory\repository\RestockRequestRepository.class
 com\cmms\inventory\entity\SparePart.class

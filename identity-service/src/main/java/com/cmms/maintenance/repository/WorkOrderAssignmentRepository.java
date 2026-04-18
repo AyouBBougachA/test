@@ -10,4 +10,5 @@ import java.util.List;
 public interface WorkOrderAssignmentRepository extends JpaRepository<WorkOrderAssignment, Integer> {
     List<WorkOrderAssignment> findByWoId(Integer woId);
     void deleteByWoId(Integer woId);
+    void deleteByUserId(Integer userId);
 }

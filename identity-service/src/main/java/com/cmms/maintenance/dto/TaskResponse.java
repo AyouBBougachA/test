@@ -12,6 +12,7 @@ import java.util.List;
 public class TaskResponse {
     private Integer       taskId;
     private Integer       woId;
+    private Integer       templateId;
     private String        title;
     private String        description;
     private String        notes;

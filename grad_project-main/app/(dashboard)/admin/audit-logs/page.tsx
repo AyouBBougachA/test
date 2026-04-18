@@ -33,7 +33,7 @@ export default function AuditLogsPage() {
   const [query, setQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [timeRange, setTimeRange] = useState("7days")
-  const [scope, setScope] = useState<"all" | "security" | "equipment">("all")
+  const [scope, setScope] = useState<string>("all")
 
   useEffect(() => {
     if (isLoading) return
@@ -48,10 +48,25 @@ export default function AuditLogsPage() {
     setError(null)
     const load = async () => {
       try {
-        const res = 
-          scope === "security" ? await auditLogsApi.getSecurity(200) : 
-          scope === "equipment" ? await auditLogsApi.getRecent(500) : 
-          await auditLogsApi.getRecent(200)
+        let res: AuditLog[] = []
+        
+        if (scope === "security") {
+          res = await auditLogsApi.getSecurity(200)
+        } else if (scope === "all") {
+          res = await auditLogsApi.getRecent(200)
+        } else {
+          // Map scope to entity names
+          const entityMapping: Record<string, string[]> = {
+            workorder: ["WorkOrder"],
+            claim: ["Claim"],
+            inventory: ["SparePart"],
+            task: ["Task"],
+            meter: ["Meter"],
+            equipment: ["EQUIPMENT"]
+          }
+          const entities = entityMapping[scope] || [scope]
+          res = await auditLogsApi.getFiltered(entities, 500)
+        }
         
         if (cancelled) return
         setItems(res)
@@ -79,7 +94,8 @@ export default function AuditLogsPage() {
       Infinity
 
     return items.filter((l) => {
-      if (scope === "equipment" && l.entityName !== "EQUIPMENT") return false
+      // Server-side filtering is now used for scopes other than "all" and "security"
+      // but we keep this as a safeguard if needed.
       
       const createdAt = new Date(l.createdAt).getTime()
       if (Number.isNaN(createdAt)) return false
@@ -164,13 +180,18 @@ export default function AuditLogsPage() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Select value={scope} onValueChange={(v) => setScope(v as "all" | "security" | "equipment")}>
+        <Select value={scope} onValueChange={setScope}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={language === "fr" ? "Périmètre" : "Scope"} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{language === "fr" ? "Tous" : "All logs"}</SelectItem>
             <SelectItem value="security">{language === "fr" ? "Sécurité" : "Security logs"}</SelectItem>
+            <SelectItem value="workorder">{language === "fr" ? "Bons de travail" : "Work Orders"}</SelectItem>
+            <SelectItem value="claim">{language === "fr" ? "Réclamations" : "Claims"}</SelectItem>
+            <SelectItem value="inventory">{language === "fr" ? "Inventaire" : "Inventory"}</SelectItem>
+            <SelectItem value="task">{language === "fr" ? "Tâches" : "Tasks"}</SelectItem>
+            <SelectItem value="meter">{language === "fr" ? "Compteurs" : "Meters"}</SelectItem>
             <SelectItem value="equipment">{language === "fr" ? "Équipements" : "Equipment logs"}</SelectItem>
           </SelectContent>
         </Select>

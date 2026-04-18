@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/kpi")
-@PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER', 'FINANCE_MANAGER')")
 @RequiredArgsConstructor
 @Tag(name = "KPI", description = "Key Performance Indicators and BI metrics")
 @SecurityRequirement(name = "bearerAuth")

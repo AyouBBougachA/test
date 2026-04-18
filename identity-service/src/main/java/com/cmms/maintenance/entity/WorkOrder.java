@@ -34,6 +34,9 @@ public class WorkOrder {
     @Column(name = "equipment_id", nullable = false)
     private Integer equipmentId;
 
+    @Column(name = "regulatory_plan_id")
+    private Integer regulatoryPlanId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "wo_type", nullable = false)
     private WorkOrderType woType;

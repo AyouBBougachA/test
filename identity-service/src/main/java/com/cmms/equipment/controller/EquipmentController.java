@@ -58,7 +58,7 @@ public class EquipmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public EquipmentResponse create(@RequestBody EquipmentRequest request) {
         Equipment equipment = Equipment.builder()
                 .assetCode(request.getAssetCode())
@@ -92,7 +92,7 @@ public class EquipmentController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public EquipmentResponse update(@PathVariable Integer id, @RequestBody EquipmentRequest request) {
         Equipment update = Equipment.builder()
                 .assetCode(request.getAssetCode())
@@ -122,13 +122,13 @@ public class EquipmentController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public EquipmentResponse updateStatus(@PathVariable Integer id, @RequestParam String status) {
         return mapToResponse(equipmentService.updateStatus(id, status));
     }
 
     @PatchMapping("/{id}/archive")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
     public EquipmentResponse archive(@PathVariable Integer id) {
         return mapToResponse(equipmentService.archiveEquipment(id));
     }

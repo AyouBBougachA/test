@@ -14,6 +14,7 @@ import com.cmms.maintenance.repository.WorkOrderLaborRepository;
 import com.cmms.maintenance.dto.SubTaskResponse;
 import com.cmms.maintenance.entity.Task;
 import com.cmms.identity.entity.User;
+import com.cmms.identity.entity.Role;
 import com.cmms.identity.repository.UserRepository;
 import com.cmms.maintenance.entity.TaskPhoto;
 import com.cmms.identity.service.AuditLogService;
@@ -46,10 +47,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TaskService {
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_MAINTENANCE_MANAGER = "MAINTENANCE_MANAGER";
-    private static final String ROLE_TECHNICIAN = "TECHNICIAN";
-    private static final String ROLE_FINANCE_MANAGER = "FINANCE_MANAGER";
+
 
     private final TaskRepository taskRepository;
     private final WorkOrderRepository workOrderRepository;
@@ -58,8 +56,12 @@ public class TaskService {
     private final TaskAuditLogRepository auditLogRepository;
     private final com.cmms.maintenance.repository.TaskPhotoRepository taskPhotoRepository;
     private final WorkOrderLaborRepository workOrderLaborRepository;
+    private final com.cmms.maintenance.repository.TaskTemplateRepository taskTemplateRepository;
+    private final com.cmms.maintenance.repository.TaskTemplateItemRepository taskTemplateItemRepository;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+
+    private static final String ENTITY_NAME = "Task";
 
     @Value("${storage.task-photos-location:uploads/task-photos}")
     private String storageLocation;
@@ -68,14 +70,14 @@ public class TaskService {
     public List<TaskResponse> getAll() {
         Actor actor = getCurrentActorRequired();
         
-        if (actor.isAdminOrManager() || ROLE_FINANCE_MANAGER.equals(actor.role)) {
+        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) {
             return taskRepository.findAll().stream()
                     .filter(t -> t.getParentTaskId() == null) // Root tasks only
                     .map(this::toResponse)
                     .collect(Collectors.toList());
         }
         
-        if (ROLE_TECHNICIAN.equals(actor.role)) {
+        if (Role.TECHNICIAN.equals(actor.role)) {
             User user = userRepository.findById(actor.userId).orElse(null);
             Integer deptId = (user != null && user.getDepartment() != null) ? user.getDepartment().getDepartmentId() : null;
             
@@ -119,7 +121,7 @@ public class TaskService {
         boolean isAdHoc = false;
         Task.TaskApprovalStatus approvalStatus = null;
 
-        if (ROLE_TECHNICIAN.equals(actor.role)) {
+        if (Role.TECHNICIAN.equals(actor.role)) {
             if (!Objects.equals(actor.userId, wo.getAssignedToUserId())) {
                 throw new AccessDeniedException("Technicians can only create ad-hoc tasks for work orders assigned to them");
             }
@@ -137,17 +139,59 @@ public class TaskService {
                 .assignedToUserId(request.getAssignedToUserId())
                 .estimatedDuration(request.getEstimatedDuration())
                 .dueDate(request.getDueDate())
-                .priority(request.getPriority() != null ? Task.TaskPriority.valueOf(request.getPriority().toUpperCase()) : Task.TaskPriority.MEDIUM)
+                .priority(parsePriority(request.getPriority()))
                 .departmentId(wo.getEquipmentId() != null ? fetchDepartmentIdFromWo(wo) : null)
                 .orderIndex(request.getOrderIndex() != null ? request.getOrderIndex() : 0)
                 .status(Task.TaskStatus.TODO)
                 .isAdHoc(isAdHoc)
                 .createdByUserId(actor.userId)
                 .approvalStatus(approvalStatus)
+                .templateId(request.getTemplateId())
                 .build();
 
+        if (request.getTemplateId() != null) {
+            com.cmms.maintenance.entity.TaskTemplate template = taskTemplateRepository.findById(request.getTemplateId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Task template not found"));
+            
+            if (task.getTitle() == null || task.getTitle().isEmpty() || task.getTitle().equals(task.getDescription())) {
+                task.setTitle(template.getName());
+            }
+            if (task.getDescription() == null || task.getDescription().isEmpty()) {
+                task.setDescription(template.getDescription());
+            }
+            if (task.getEstimatedDuration() == null) {
+                task.setEstimatedDuration(template.getEstimatedHours());
+            }
+            if (request.getPriority() == null) {
+                task.setPriority(template.getDefaultPriority());
+            }
+        }
+
         Task saved = taskRepository.save(task);
+
+        // If template provided, generate subtasks
+        if (request.getTemplateId() != null) {
+            List<com.cmms.maintenance.entity.TaskTemplateItem> items = taskTemplateItemRepository.findByTemplateIdOrderBySortOrderAsc(request.getTemplateId());
+            for (com.cmms.maintenance.entity.TaskTemplateItem item : items) {
+                subTaskRepository.save(com.cmms.maintenance.entity.SubTask.builder()
+                        .taskId(saved.getTaskId())
+                        .description(item.getLabel() + (item.getDescription() != null ? ": " + item.getDescription() : ""))
+                        .isCompleted(false)
+                        .orderIndex(item.getSortOrder())
+                        .build());
+            }
+        }
         createAuditLog(saved.getTaskId(), null, saved.getStatus().name(), actor.displayName, "Task created");
+
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "CREATE_TASK",
+                ENTITY_NAME,
+                saved.getTaskId(),
+                "Created task for WO-" + saved.getWoId() + ": " + saved.getTitle()
+        );
+
         return toResponse(saved);
     }
 
@@ -185,7 +229,7 @@ public class TaskService {
             task.setActualDuration(request.getActualDuration());
             
             // If technician is overriding duration, mark as pending approval
-            if (ROLE_TECHNICIAN.equals(actor.role)) {
+            if (Role.TECHNICIAN.equals(actor.role)) {
                 task.setApprovalStatus(Task.TaskApprovalStatus.PENDING);
                 auditNote.append("Awaiting manager approval due to manual duration override; ");
             }
@@ -195,7 +239,7 @@ public class TaskService {
             task.setDueDate(request.getDueDate());
         }
         if (request.getPriority() != null) {
-            Task.TaskPriority newPrio = Task.TaskPriority.valueOf(request.getPriority().toUpperCase());
+            Task.TaskPriority newPrio = parsePriority(request.getPriority());
             if (task.getPriority() != newPrio) {
                 auditNote.append(String.format("Priority: %s -> %s; ", task.getPriority(), newPrio));
                 task.setPriority(newPrio);
@@ -224,7 +268,12 @@ public class TaskService {
             throw new IllegalStateException("Cannot change status of a pending ad-hoc task. It must be approved first.");
         }
 
-        Task.TaskStatus newStatus = Task.TaskStatus.valueOf(statusStr.toUpperCase());
+        Task.TaskStatus newStatus;
+        try {
+            newStatus = Task.TaskStatus.valueOf(statusStr.toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid status: " + statusStr);
+        }
         Task.TaskStatus oldStatus = task.getStatus();
 
         task.setStatus(newStatus);
@@ -269,6 +318,15 @@ public class TaskService {
         Task saved = taskRepository.save(task);
         createAuditLog(saved.getTaskId(), oldStatus.name(), newStatus.name(), actorName, "Status changed from " + oldStatus + " to " + newStatus);
 
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "UPDATE_TASK_STATUS",
+                ENTITY_NAME,
+                saved.getTaskId(),
+                "Updated status of task \"" + saved.getTitle() + "\" to " + newStatus + " on WO-" + saved.getWoId()
+        );
+
         // Fire manager notifications on key technician actions
         String taskLabel = (task.getTitle() != null ? task.getTitle() : task.getDescription());
         String techName = actorName;
@@ -304,7 +362,7 @@ public class TaskService {
             return;
         }
 
-        if (ROLE_TECHNICIAN.equals(actor.role)) {
+        if (Role.TECHNICIAN.equals(actor.role)) {
             if (Boolean.TRUE.equals(task.getIsAdHoc()) && task.getApprovalStatus() == Task.TaskApprovalStatus.PENDING && Objects.equals(task.getCreatedByUserId(), actor.userId)) {
                 taskRepository.delete(task);
                 return;
@@ -463,6 +521,7 @@ public class TaskService {
         return TaskResponse.builder()
                 .taskId(task.getTaskId())
                 .woId(task.getWoId())
+                .templateId(task.getTemplateId())
                 .title(task.getTitle())
                 .description(task.getDescription())
                 .parentTaskId(task.getParentTaskId())
@@ -532,6 +591,15 @@ public class TaskService {
             .build());
     }
 
+    private Task.TaskPriority parsePriority(String priority) {
+        if (priority == null || priority.isBlank()) return Task.TaskPriority.MEDIUM;
+        try {
+            return Task.TaskPriority.valueOf(priority.toUpperCase());
+        } catch (Exception e) {
+            return Task.TaskPriority.MEDIUM;
+        }
+    }
+
     private Integer fetchDepartmentIdFromWo(WorkOrder wo) {
         // Mocking department fetch from equipment. In real app, we'd fetch Equipment entity.
         // Assuming WorkOrder entity or Equipment has department_id.
@@ -542,19 +610,19 @@ public class TaskService {
     }
     
     private void assertCanViewTaskWo(WorkOrder wo, Actor actor) {
-        if (actor.isAdminOrManager() || ROLE_FINANCE_MANAGER.equals(actor.role)) return;
-        if (ROLE_TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) return;
+        if (Role.TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
         throw new AccessDeniedException("Not allowed to view tasks for this work order");
     }
 
     private void assertCanEditTask(Task task, Actor actor) {
         if (actor.isAdminOrManager()) return;
 
-        if (ROLE_FINANCE_MANAGER.equals(actor.role)) {
+        if (Role.FINANCE_MANAGER.equals(actor.role)) {
             throw new AccessDeniedException("FINANCE_MANAGER not allowed to edit tasks");
         }
 
-        if (ROLE_TECHNICIAN.equals(actor.role)) {
+        if (Role.TECHNICIAN.equals(actor.role)) {
             WorkOrder wo = workOrderRepository.findById(task.getWoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Linked work order not found for task"));
             
@@ -591,7 +659,7 @@ public class TaskService {
 
     private record Actor(Integer userId, String displayName, String role) {
         boolean isAdminOrManager() {
-            return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
+            return Role.ADMIN.equals(role) || Role.MAINTENANCE_MANAGER.equals(role);
         }
     }
     private void logLaborFromTask(Task task, Actor actor) {

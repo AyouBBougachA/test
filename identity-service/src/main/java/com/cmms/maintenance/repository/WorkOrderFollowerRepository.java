@@ -13,4 +13,5 @@ public interface WorkOrderFollowerRepository extends JpaRepository<WorkOrderFoll
     Optional<WorkOrderFollower> findByWoIdAndUserId(Integer woId, Integer userId);
     void deleteByWoIdAndUserId(Integer woId, Integer userId);
     boolean existsByWoIdAndUserId(Integer woId, Integer userId);
+    void deleteByUserId(Integer userId);
 }

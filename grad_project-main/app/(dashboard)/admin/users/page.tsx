@@ -563,8 +563,8 @@ export default function UsersPage() {
             <AlertDialogTitle>{language === "fr" ? "Supprimer l’utilisateur" : "Delete user"}</AlertDialogTitle>
             <AlertDialogDescription>
               {language === "fr"
-                ? `Cette action va supprimer l’utilisateur (suppression logique). ${deletingUser?.fullName ?? ""}`
-                : `This will delete the user (soft delete). ${deletingUser?.fullName ?? ""}`}
+                ? `Cette action va supprimer l’utilisateur (suppression permanente). ${deletingUser?.fullName ?? ""}`
+                : `This will delete the user (permanent deletion). ${deletingUser?.fullName ?? ""}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -649,7 +649,9 @@ export default function UsersPage() {
                             {u.isActive ? (language === "fr" ? "Actif" : "Active") : (language === "fr" ? "Inactif" : "Inactive")}
                           </Badge>
                         </td>
-                        <td className="py-4 px-6 text-muted-foreground text-xs">—</td>
+                        <td className="py-4 px-6 text-muted-foreground text-xs">
+                          {u.lastLogin ? timeAgo(u.lastLogin) : "—"}
+                        </td>
                         <td className="py-4 px-6 text-right">
                           <div className="flex gap-2 justify-end">
                             <div className="flex items-center gap-2 pr-2">
@@ -671,7 +673,7 @@ export default function UsersPage() {
                               size="sm"
                               variant="ghost"
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              disabled={!!user && u.userId === user.id}
+                              disabled={(!!user && u.userId === user.id) || (u.roleName ?? "").toUpperCase() === "ADMIN"}
                               onClick={() => askDelete(u)}
                             >
                               <Trash2 className="h-4 w-4" />

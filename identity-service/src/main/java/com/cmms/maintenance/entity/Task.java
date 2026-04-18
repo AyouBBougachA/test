@@ -24,6 +24,9 @@ public class Task {
     @Column(name = "parent_task_id")
     private Integer parentTaskId;
 
+    @Column(name = "template_id")
+    private Integer templateId;
+
     @Column(length = 255)
     private String title;
 

@@ -56,6 +56,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useAuth } from "@/lib/auth-context"
 import {
   Select,
   SelectContent,
@@ -198,6 +199,12 @@ function mapEquipmentToForm(e: EquipmentResponse): EquipmentFormState {
 export default function EquipmentPage() {
   const { t, language } = useI18n()
   const { toast } = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.roleName?.toUpperCase() === 'ADMIN'
+  const isManager = user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
+  const canManage = isAdmin || isManager
+  const canAdmin = isAdmin
+
   const [searchQuery, setSearchQuery] = useState("")
   const [classificationFilter, setClassificationFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -844,10 +851,12 @@ export default function EquipmentPage() {
             <Download className="h-4 w-4" />
             {t("export")}
           </Button>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {t("addEquipment")}
-          </Button>
+          {canManage && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              {t("addEquipment")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1535,38 +1544,42 @@ export default function EquipmentPage() {
                                 {t("view")}
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault()
-                                openDocuments(eq.id, eq.name)
-                              }}
-                            >
-                              <FileText className="mr-2 h-4 w-4" />
-                              {language === "fr" ? "Documents" : "Documents"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault()
-                                openEdit(eq.id)
-                              }}
-                            >
-                              {t("edit")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                if ((eq.status ?? "").toUpperCase() === "ARCHIVED") {
-                                  void onRestore(eq.id)
-                                } else {
-                                  void onArchive(eq.id)
-                                }
-                              }}
-                            >
-                              {(eq.status ?? "").toUpperCase() === "ARCHIVED"
-                                ? language === "fr" ? "Restaurer" : "Restore"
-                                : language === "fr" ? "Archiver" : "Archive"}
-                            </DropdownMenuItem>
+                            {canManage && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    openDocuments(eq.id, eq.name)
+                                  }}
+                                >
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  {language === "fr" ? "Documents" : "Documents"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    openEdit(eq.id)
+                                  }}
+                                >
+                                  {t("edit")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    if ((eq.status ?? "").toUpperCase() === "ARCHIVED") {
+                                      void onRestore(eq.id)
+                                    } else {
+                                      void onArchive(eq.id)
+                                    }
+                                  }}
+                                >
+                                  {(eq.status ?? "").toUpperCase() === "ARCHIVED"
+                                    ? language === "fr" ? "Restaurer" : "Restore"
+                                    : language === "fr" ? "Archiver" : "Archive"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

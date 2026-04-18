@@ -49,7 +49,8 @@ import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { tasksApi } from "@/lib/api/tasks"
 import { workOrdersApi } from "@/lib/api/work-orders"
-import type { TaskResponse, WorkOrderResponse } from "@/lib/api/types"
+import { taskTemplatesApi } from "@/lib/api/task-templates"
+import type { TaskResponse, WorkOrderResponse, TaskTemplateResponse } from "@/lib/api/types"
 import { format, isPast } from "date-fns"
 
 const fadeInUp = {
@@ -60,7 +61,7 @@ const fadeInUp = {
 
 export default function TasksPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const [tasks, setTasks] = useState<TaskResponse[]>([])
   const [myWorkOrders, setMyWorkOrders] = useState<WorkOrderResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -87,6 +88,13 @@ export default function TasksPage() {
   const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM")
   const [newTaskDueDate, setNewTaskDueDate] = useState("")
   const [newTaskAssignedTo, setNewTaskAssignedTo] = useState("")
+  
+  // Template States
+  const [creationMode, setCreationMode] = useState<'CUSTOM' | 'TEMPLATE'>('CUSTOM')
+  const [templates, setTemplates] = useState<TaskTemplateResponse[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
+  const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplateResponse | null>(null)
+
   const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
 
   const loadData = async () => {
@@ -129,6 +137,7 @@ export default function TasksPage() {
     try {
       await tasksApi.create({
         woId: targetWoId,
+        templateId: (creationMode === 'TEMPLATE' && selectedTemplateId) ? parseInt(selectedTemplateId) : undefined,
         description: newTaskDesc,
         estimatedDuration: newTaskDuration ? parseFloat(newTaskDuration) : null,
         title: newTaskDesc.split(' ').slice(0, 5).join(' '),
@@ -143,6 +152,9 @@ export default function TasksPage() {
       setNewTaskPriority("MEDIUM")
       setNewTaskDueDate("")
       setNewTaskAssignedTo("")
+      setCreationMode('CUSTOM')
+      setSelectedTemplateId("")
+      setSelectedTemplate(null)
       setIsAddDialogOpen(false)
       loadData()
     } catch (e) {
@@ -183,8 +195,22 @@ export default function TasksPage() {
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
       loadData()
+      taskTemplatesApi.getAll().then(setTemplates).catch(console.error)
     }
   }, [isAuthenticated, isAuthLoading])
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    const template = templates.find(t => t.id === parseInt(templateId))
+    if (template) {
+      setSelectedTemplate(template)
+      setNewTaskDesc(template.name)
+      if (template.estimatedHours) setNewTaskDuration(template.estimatedHours.toString())
+      if (template.defaultPriority) setNewTaskPriority(template.defaultPriority)
+    } else {
+      setSelectedTemplate(null)
+    }
+  }
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
@@ -252,9 +278,34 @@ export default function TasksPage() {
                   Define a new task or sub-task for maintenance.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-4 py-4 max-h-[70vh] overflow-auto px-1">
+                {/* Section 1 - Creation Mode (Manager Only) */}
+                {isManager && (
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('creationMode')}</Label>
+                    <div className="grid grid-cols-2 gap-2 bg-muted/50 p-1 rounded-lg">
+                      <Button 
+                        variant={creationMode === 'CUSTOM' ? 'default' : 'ghost'} 
+                        size="sm"
+                        onClick={() => setCreationMode('CUSTOM')}
+                        className={cn("h-8 text-xs", creationMode === 'CUSTOM' && "bg-background text-foreground shadow-sm hover:bg-background")}
+                      >
+                        {t('customTask')}
+                      </Button>
+                      <Button 
+                        variant={creationMode === 'TEMPLATE' ? 'default' : 'ghost'} 
+                        size="sm"
+                        onClick={() => setCreationMode('TEMPLATE')}
+                        className={cn("h-8 text-xs", creationMode === 'TEMPLATE' && "bg-background text-foreground shadow-sm hover:bg-background")}
+                      >
+                        {t('useTemplate')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid gap-2">
-                  <Label>Linked Work Order</Label>
+                  <Label>{t('workOrders')}</Label>
                   <select 
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={selectedWoId}
@@ -266,43 +317,70 @@ export default function TasksPage() {
                     ))}
                   </select>
                 </div>
+
+                {creationMode === 'TEMPLATE' && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="grid gap-4 border-l-2 border-primary/30 pl-4 py-2 bg-primary/5 rounded-r-lg">
+                    <div className="grid gap-2">
+                      <Label className="text-primary font-bold">{t('selectTemplate')}</Label>
+                      <select 
+                        className="flex h-10 w-full rounded-md border border-primary/20 bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-primary"
+                        value={selectedTemplateId}
+                        onChange={(e) => handleTemplateChange(e.target.value)}
+                      >
+                        <option value="">-- Choose a template --</option>
+                        {templates.map(tmp => (
+                          <option key={tmp.id} value={tmp.id}>{tmp.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedTemplate && (
+                      <div className="space-y-3">
+                        <div className="text-[11px] text-muted-foreground italic bg-background/50 p-2 rounded border border-border/40">
+                          {selectedTemplate.description}
+                        </div>
+                        <div className="grid gap-1.5">
+                           <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/70">{t('generatedChecklist')}</Label>
+                           <div className="space-y-1 max-h-[120px] overflow-auto pr-1">
+                              {selectedTemplate.items.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-xs bg-background/40 p-1.5 rounded border border-border/30">
+                                   <div className="h-4 w-4 rounded-full border border-primary/40 flex items-center justify-center text-[8px] font-bold text-primary">{idx + 1}</div>
+                                   <span className="truncate">{item.label}</span>
+                                   {item.isRequired && <span className="text-[8px] text-rose-500 font-bold ml-auto">REQ</span>}
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 <div className="grid gap-2">
-                  <Label>Parent Task (Optional)</Label>
-                  <select 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={newTaskParentId || ""}
-                    onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
-                  >
-                    <option value="">Root Task</option>
-                    {tasks.filter(t => !t.parentTaskId).map(t => (
-                      <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Task Instruction</Label>
+                  <Label>{t('description')}</Label>
                   <Input 
                     placeholder="e.g. Sterilize surgical unit components" 
                     value={newTaskDesc}
                     onChange={(e) => setNewTaskDesc(e.target.value)}
                   />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                    <div className="grid gap-2">
-                      <Label>Priority</Label>
+                      <Label>{t('priority')}</Label>
                       <select 
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         value={newTaskPriority}
                         onChange={(e) => setNewTaskPriority(e.target.value)}
                       >
-                         <option value="LOW">LOW</option>
-                         <option value="MEDIUM">MEDIUM</option>
-                         <option value="HIGH">HIGH</option>
-                         <option value="CRITICAL">CRITICAL</option>
+                         <option value="LOW">{t('low')}</option>
+                         <option value="MEDIUM">{t('medium')}</option>
+                         <option value="HIGH">{t('high')}</option>
+                         <option value="CRITICAL">{t('critical')}</option>
                       </select>
                    </div>
                    <div className="grid gap-2">
-                      <Label>Estimated (Hours)</Label>
+                      <Label>{t('estimatedTime')} (H)</Label>
                       <Input 
                         type="number"
                         step="0.5"
@@ -312,17 +390,34 @@ export default function TasksPage() {
                       />
                    </div>
                 </div>
-                <div className="grid gap-2">
-                   <Label>Due Date</Label>
-                   <Input 
-                     type="datetime-local"
-                     value={newTaskDueDate}
-                     onChange={(e) => setNewTaskDueDate(e.target.value)}
-                   />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Parent Task (Optional)</Label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={newTaskParentId || ""}
+                      onChange={(e) => setNewTaskParentId(e.target.value ? parseInt(e.target.value) : null)}
+                    >
+                      <option value="">Root Task</option>
+                      {tasks.filter(t => !t.parentTaskId).map(t => (
+                        <option key={t.taskId} value={t.taskId}>{t.title || t.description}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                     <Label>Due Date</Label>
+                     <Input 
+                       type="datetime-local"
+                       value={newTaskDueDate}
+                       onChange={(e) => setNewTaskDueDate(e.target.value)}
+                     />
+                  </div>
                 </div>
+
                 {isManager && (
                    <div className="grid gap-2">
-                     <Label>Assigned To</Label>
+                     <Label>{t('assignedTo')}</Label>
                      <select 
                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                        value={newTaskAssignedTo}

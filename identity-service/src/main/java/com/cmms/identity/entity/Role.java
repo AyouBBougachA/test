@@ -11,6 +11,10 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class Role {
+    public static final String ADMIN = "ADMIN";
+    public static final String MAINTENANCE_MANAGER = "MAINTENANCE_MANAGER";
+    public static final String TECHNICIAN = "TECHNICIAN";
+    public static final String FINANCE_MANAGER = "FINANCE_MANAGER";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

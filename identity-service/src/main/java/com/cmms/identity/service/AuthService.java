@@ -25,9 +25,17 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
     private final AuditLogService auditLogService;
+    private final com.cmms.identity.repository.UserRepository userRepository;
 
+    @org.springframework.transaction.annotation.Transactional
     public LoginResponse login(LoginRequest request) {
         log.info("Attempting to authenticate user: {}", request.getEmail());
+
+        // Track last login attempt
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            user.setLastLogin(java.time.LocalDateTime.now());
+            userRepository.save(user);
+        });
 
         try {
             Authentication authentication = authenticationManager.authenticate(

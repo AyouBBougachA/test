@@ -18,5 +18,6 @@ public class UserResponse {
     private String departmentName;
     private Integer departmentId;
     private Boolean isActive;
+    private LocalDateTime lastLogin;
     private LocalDateTime createdAt;
 }

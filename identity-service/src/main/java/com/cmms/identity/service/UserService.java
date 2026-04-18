@@ -13,9 +13,17 @@ import com.cmms.identity.entity.User;
 import com.cmms.identity.exception.DuplicateResourceException;
 import com.cmms.identity.exception.ResourceNotFoundException;
 import com.cmms.identity.mapper.UserMapper;
+import com.cmms.identity.repository.AuditLogRepository;
 import com.cmms.identity.repository.DepartmentRepository;
 import com.cmms.identity.repository.RoleRepository;
 import com.cmms.identity.repository.UserRepository;
+import com.cmms.maintenance.repository.WorkOrderAssignmentRepository;
+import com.cmms.maintenance.repository.WorkOrderFollowerRepository;
+import com.cmms.maintenance.repository.WorkOrderLaborRepository;
+import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.maintenance.repository.WorkOrderStatusHistoryRepository;
+import com.cmms.claims.repository.ClaimRepository;
+import com.cmms.notifications.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,6 +44,14 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final AuditLogService auditLogService;
+    private final NotificationRepository notificationRepository;
+    private final WorkOrderAssignmentRepository workOrderAssignmentRepository;
+    private final WorkOrderFollowerRepository workOrderFollowerRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final ClaimRepository claimRepository;
+    private final WorkOrderRepository workOrderRepository;
+    private final WorkOrderLaborRepository workOrderLaborRepository;
+    private final WorkOrderStatusHistoryRepository workOrderStatusHistoryRepository;
 
     private String getCurrentAuditorName() {
         org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
@@ -202,18 +218,36 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Soft delete implementation
-        user.setIsActive(false);
-        userRepository.save(user);
+        if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleName())) {
+            throw new com.cmms.identity.exception.ConflictException("Administrator accounts cannot be deleted to prevent system lockout.");
+        }
+
+        log.info("Performing hard delete for user ID: {}, Email: {}", userId, user.getEmail());
+
+        // 1. Nullify historical references to allow deletion without constraint violations
+        auditLogRepository.nullifyUserReferences(userId);
+        claimRepository.nullifyRequesterReferences(userId);
+        workOrderRepository.nullifyTechnicianReferences(userId);
+        workOrderRepository.nullifyValidatorReferences(userId);
+        workOrderLaborRepository.nullifyTechnicianReferences(userId);
+        workOrderStatusHistoryRepository.nullifyChangedByReferences(userId);
+
+        // 2. Clean up related data in junction/junk tables to avoid orphaned records
+        notificationRepository.deleteByUserId(userId);
+        workOrderAssignmentRepository.deleteByUserId(userId);
+        workOrderFollowerRepository.deleteByUserId(userId);
+
+        // 2. Perform hard delete
+        userRepository.delete(user);
 
         // Log audit (Security Action)
         auditLogService.log(
                 null,
                 getCurrentAuditorName(),
-                "SOFT_DELETE_USER",
+                "HARD_DELETE_USER",
                 "User",
                 userId,
-                "Soft deleted user account (deactivated): " + user.getEmail()
+                "Permanently deleted user account and related session data: " + user.getEmail()
         );
     }
 

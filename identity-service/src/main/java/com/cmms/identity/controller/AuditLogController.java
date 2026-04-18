@@ -28,4 +28,11 @@ public class AuditLogController {
     public List<AuditLog> getByEntity(@PathVariable String name, @PathVariable Integer id) {
         return auditLogService.getByEntity(name, id);
     }
+
+    @GetMapping("/filter")
+    public List<AuditLog> getFilteredLogs(
+            @RequestParam List<String> entityNames,
+            @RequestParam(defaultValue = "200") int limit) {
+        return auditLogService.getLogsByEntities(entityNames, limit);
+    }
 }

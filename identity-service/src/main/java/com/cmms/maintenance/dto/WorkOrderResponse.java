@@ -22,6 +22,7 @@ public class WorkOrderResponse {
     private String  departmentName;
     private Integer parentWoId;
     private String  parentWoCode;
+    private Integer regulatoryPlanId;
 
     // ── Classification ────────────────────────────────────────
     private String woType;

@@ -16,6 +16,7 @@ import com.cmms.maintenance.repository.WorkOrderFollowerRepository;
 import com.cmms.maintenance.entity.WorkOrderAssignment;
 import com.cmms.maintenance.entity.WorkOrderFollower;
 import com.cmms.identity.entity.User;
+import com.cmms.identity.entity.Role;
 import com.cmms.identity.repository.UserRepository;
 import com.cmms.identity.repository.DepartmentRepository;
 import com.cmms.identity.entity.Department;
@@ -43,10 +44,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WorkOrderService {
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_MAINTENANCE_MANAGER = "MAINTENANCE_MANAGER";
-    private static final String ROLE_TECHNICIAN = "TECHNICIAN";
-
     private final WorkOrderRepository workOrderRepository;
     private final ClaimRepository claimRepository;
     private final EquipmentRepository equipmentRepository;
@@ -57,6 +54,10 @@ public class WorkOrderService {
     private final WorkOrderFollowerRepository followerRepository;
     private final DepartmentRepository departmentRepository;
     private final com.cmms.notifications.service.NotificationService notificationService;
+    private final RegulatoryPlanService regulatoryPlanService;
+    private final com.cmms.identity.service.AuditLogService auditLogService;
+
+    private static final String ENTITY_NAME = "WorkOrder";
 
     @Transactional(readOnly = true)
     public List<WorkOrderResponse> list(String status, String type, Integer equipmentId, Integer assignedToUserId) {
@@ -104,6 +105,15 @@ public class WorkOrderService {
         }
 
         WorkOrder saved = workOrderRepository.save(wo);
+
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "CREATE_WORKORDER",
+                ENTITY_NAME,
+                saved.getWoId(),
+                "Created work order " + String.format("WO-%03d", saved.getWoId()) + ": " + saved.getTitle()
+        );
 
         if (request.getSecondaryAssigneeIds() != null) {
             for (Integer secondaryId : request.getSecondaryAssigneeIds()) {
@@ -154,10 +164,18 @@ public class WorkOrderService {
         wo.setEstimatedDuration(request.getEstimatedDuration());
         wo.setEstimatedCost(request.getEstimatedCost());
         wo.setDueDate(request.getDueDate());
-        wo.setPlannedStart(request.getPlannedStart());
-        wo.setPlannedEnd(request.getPlannedEnd());
+        WorkOrder saved = workOrderRepository.save(wo);
 
-        return toResponse(workOrderRepository.save(wo));
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "UPDATE_WORKORDER",
+                ENTITY_NAME,
+                saved.getWoId(),
+                "Updated work order details for " + String.format("WO-%03d", saved.getWoId())
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -197,14 +215,18 @@ public class WorkOrderService {
             saveStatusHistory(wo.getWoId(), wo.getStatus(), wo.getStatus(), actor.displayName, "Reassigned to " + assignee.getFullName());
         }
 
-        notificationService.sendDirect(
-                assignee.getUserId(),
-                "INFO",
-                "You have been assigned to Work Order #" + wo.getWoId() + ": " + wo.getTitle(),
-                wo.getWoId()
+        WorkOrder saved = workOrderRepository.save(wo);
+
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "ASSIGN_WORKORDER",
+                ENTITY_NAME,
+                saved.getWoId(),
+                "Assigned work order " + String.format("WO-%03d", saved.getWoId()) + " to " + assignee.getFullName()
         );
 
-        return toResponse(workOrderRepository.save(wo));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -240,6 +262,16 @@ public class WorkOrderService {
 
         WorkOrder saved = workOrderRepository.save(wo);
         saveStatusHistory(saved.getWoId(), oldStatus, newStatus, actor.displayName, request.getNote());
+
+        auditLogService.log(
+                actor.userId,
+                actor.displayName,
+                "UPDATE_WO_STATUS",
+                ENTITY_NAME,
+                saved.getWoId(),
+                "Changed status of " + String.format("WO-%03d", saved.getWoId()) + " to " + newStatus
+        );
+
         return toResponse(saved);
     }
 
@@ -263,6 +295,12 @@ public class WorkOrderService {
         saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager validated");
         
         checkAndResolveClaim(saved);
+        
+        // --- NEW: Regulatory Plan Rescheduling ---
+        if (saved.getWoType() == WorkOrder.WorkOrderType.REGULATORY && saved.getRegulatoryPlanId() != null) {
+            regulatoryPlanService.scheduleNextExecution(saved.getRegulatoryPlanId(), LocalDateTime.now());
+        }
+        // ----------------------------------------
 
         return toResponse(saved);
     }
@@ -582,6 +620,7 @@ public class WorkOrderService {
                     .claimCode(claim == null ? null : String.format("CLM-%03d", claim.getClaimId()))
                     .equipmentId(wo.getEquipmentId())
                     .equipmentName(eq == null ? null : eq.getName())
+                    .regulatoryPlanId(wo.getRegulatoryPlanId())
                     .departmentId(eq == null ? null : eq.getDepartmentId())
                     .departmentName(eq == null || eq.getDepartmentId() == null || departmentById.get(eq.getDepartmentId()) == null ? null : departmentById.get(eq.getDepartmentId()).getDepartmentName())
                     .woType(wo.getWoType().name())
@@ -659,7 +698,7 @@ public class WorkOrderService {
 
     private void assertCanUpdateStatus(WorkOrder wo, Actor actor) {
         if (actor.isAdminOrManager()) return;
-        if (ROLE_TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        if (Role.TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
         throw new AccessDeniedException("Not allowed to update this work order");
     }
 
@@ -670,10 +709,10 @@ public class WorkOrderService {
     }
 
     private Specification<WorkOrder> accessScopeSpec(Actor actor) {
-        if (actor.isAdminOrManager() || "FINANCE_MANAGER".equals(actor.role)) {
+        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) {
             return (root, cq, cb) -> cb.conjunction();
         }
-        if (ROLE_TECHNICIAN.equals(actor.role) && actor.userId != null) {
+        if (Role.TECHNICIAN.equals(actor.role) && actor.userId != null) {
             return (root, cq, cb) -> cb.equal(root.get("assignedToUserId"), actor.userId);
         }
         return (root, cq, cb) -> cb.disjunction();
@@ -698,7 +737,7 @@ public class WorkOrderService {
 
     private record Actor(Integer userId, String displayName, String role) {
         boolean isAdminOrManager() {
-            return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
+            return Role.ADMIN.equals(role) || Role.MAINTENANCE_MANAGER.equals(role);
         }
     }
 }

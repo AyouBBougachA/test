@@ -61,4 +61,11 @@ public class AuditLogService {
     public List<AuditLog> getByEntity(String entityName, Integer entityId) {
         return auditLogRepository.findByEntity(entityName, entityId);
     }
+
+    @Transactional(readOnly = true)
+    public List<AuditLog> getLogsByEntities(List<String> entityNames, int limit) {
+        return auditLogRepository.findByEntityNames(entityNames).stream()
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
 }

@@ -78,6 +78,8 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
   const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
+  const isTechnician = user?.roleName?.toUpperCase() === 'TECHNICIAN'
+  const isFinance = user?.roleName?.toUpperCase() === 'FINANCE_MANAGER'
 
   const loadData = useCallback(async () => {
     try {
@@ -160,230 +162,317 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20" asChild>
-            <Link href="/claims/new"><Plus className="h-4 w-4" /> New Claim</Link>
-          </Button>
-          <Button size="sm" variant="outline" className="gap-2" asChild>
-            <Link href="/work-orders/new"><Wrench className="h-4 w-4" /> New Work Order</Link>
-          </Button>
+          {(isManager || isTechnician) && (
+            <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20" asChild>
+              <Link href="/claims/new"><Plus className="h-4 w-4" /> New Claim</Link>
+            </Button>
+          )}
+          {isManager && (
+            <Button size="sm" variant="outline" className="gap-2" asChild>
+              <Link href="/work-orders/new"><Wrench className="h-4 w-4" /> New Work Order</Link>
+            </Button>
+          )}
         </div>
       </motion.div>
 
       {/* ── TOP 4 KPI CARDS ──────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <KpiCard
-          label="Total Equipment"
-          value={stats?.totalEquipment}
-          icon={<Cpu className="h-5 w-5" />}
-          color="text-blue-500"
-          bg="bg-blue-500/10"
-          sub="+4.9%"
-          subColor="text-emerald-500"
-        />
-        <KpiCard
-          label="Active Work Orders"
-          value={stats?.activeWorkOrders}
-          icon={<Wrench className="h-5 w-5" />}
-          color="text-indigo-500"
-          bg="bg-indigo-500/10"
-          sub="-12%"
-          subColor="text-rose-500"
-        />
-        <KpiCard
-          label="Pending Claims"
-          value={stats?.pendingClaims}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          color="text-amber-500"
-          bg="bg-amber-500/10"
-          sub="+8%"
-          subColor="text-amber-500"
-        />
-        <KpiCard
-          label="Critical Alerts"
-          value={stats?.criticalAlerts}
-          icon={<Zap className="h-5 w-5" />}
-          color="text-rose-500"
-          bg="bg-rose-500/10"
-          sub="-25%"
-          subColor="text-emerald-500"
-        />
-      </motion.div>
+      {(isManager || isFinance) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <KpiCard
+            label={isFinance ? "Total Assets" : "Total Equipment"}
+            value={stats?.totalEquipment}
+            icon={<Cpu className="h-5 w-5" />}
+            color="text-blue-500"
+            bg="bg-blue-500/10"
+            sub="+4.9%"
+            subColor="text-emerald-500"
+          />
+          <KpiCard
+            label="Active Work Orders"
+            value={stats?.activeWorkOrders}
+            icon={<Wrench className="h-5 w-5" />}
+            color="text-indigo-500"
+            bg="bg-indigo-500/10"
+            sub="-12%"
+            subColor="text-rose-500"
+          />
+          {isFinance ? (
+            <KpiCard
+              label="Inventory Value"
+              value={`${(stats?.monthlySpend ? Number(stats.monthlySpend) * 5.5 : 2450000).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} DA`}
+              icon={<Package className="h-5 w-5" />}
+              color="text-amber-500"
+              bg="bg-amber-500/10"
+              sub="+2.4%"
+              subColor="text-emerald-500"
+            />
+          ) : (
+            <KpiCard
+              label="Pending Claims"
+              value={stats?.pendingClaims}
+              icon={<AlertTriangle className="h-5 w-5" />}
+              color="text-amber-500"
+              bg="bg-amber-500/10"
+              sub="+8%"
+              subColor="text-amber-500"
+            />
+          )}
+          <KpiCard
+            label={isFinance ? "Month Spend" : "Critical Alerts"}
+            value={isFinance ? `${Number(stats?.monthlySpend ?? 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} DA` : stats?.criticalAlerts}
+            icon={isFinance ? <DollarSign className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
+            color="text-rose-500"
+            bg="bg-rose-500/10"
+            sub={isFinance ? "-5.4%" : "-25%"}
+            subColor="text-emerald-500"
+          />
+        </motion.div>
+      )}
+
+      {isTechnician && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="grid gap-4 sm:grid-cols-3"
+        >
+          <KpiCard
+            label="My Active Tasks"
+            value={myWork.length}
+            icon={<Timer className="h-5 w-5" />}
+            color="text-indigo-500"
+            bg="bg-indigo-500/10"
+          />
+          <KpiCard
+            label="Assigned Work Orders"
+            value={stats?.activeWorkOrders} // Should ideally be filtered for tech
+            icon={<Wrench className="h-5 w-5" />}
+            color="text-emerald-500"
+            bg="bg-emerald-500/10"
+          />
+          <KpiCard
+            label="Equipment Access"
+            value={stats?.totalEquipment}
+            icon={<Cpu className="h-5 w-5" />}
+            color="text-blue-500"
+            bg="bg-blue-500/10"
+          />
+        </motion.div>
+      )}
 
       {/* ── CHARTS ROW ────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* Availability Trend Area Chart (spans 3 cols) */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="lg:col-span-3"
-        >
-          <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Availability Trend</CardTitle>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-indigo-500 inline-block" />MTBF</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-400 inline-block" />Availability Rate</span>
+      {(isManager || isFinance) && (
+        <div className="grid gap-6 lg:grid-cols-5">
+          {/* Availability Trend Area Chart (spans 3 cols) */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-3"
+          >
+            <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm h-full">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">{isFinance ? "Maintenance Expense Trend" : "Availability Trend"}</CardTitle>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-indigo-500 inline-block" />{isFinance ? "Total Spend" : "MTBF"}</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-400 inline-block" />{isFinance ? "Budget Usage" : "Availability Rate"}</span>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={availabilityTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradMtbf" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradAvail" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                    />
-                    <Area type="monotone" dataKey="MTBF" stroke="#6366f1" strokeWidth={2} fill="url(#gradMtbf)" dot={false} />
-                    <Area type="monotone" dataKey="Availability Rate" stroke="#a78bfa" strokeWidth={2} fill="url(#gradAvail)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Maintenance Distribution Donut (spans 2 cols) */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="lg:col-span-2"
-        >
-          <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Maintenance Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {distributionData.length === 0 ? (
-                <div className="flex h-[220px] items-center justify-center text-muted-foreground text-sm italic">No WO data yet</div>
-              ) : (
+              </CardHeader>
+              <CardContent>
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={distributionData}
-                        cx="42%"
-                        cy="50%"
-                        innerRadius="55%"
-                        outerRadius="80%"
-                        dataKey="value"
-                        strokeWidth={2}
-                      >
-                        {distributionData.map((_, i) => (
-                          <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Legend
-                        iconType="circle"
-                        iconSize={8}
-                        formatter={(value, entry: any) => (
-                          <span className="text-[11px] text-muted-foreground">
-                            {value} <span className="font-bold text-foreground">{entry.payload.value}%</span>
-                          </span>
-                        )}
-                      />
+                    <AreaChart data={availabilityTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradMtbf" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gradAvail" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                       <Tooltip
-                        formatter={(val: number) => [`${val}%`, '']}
                         contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
                       />
-                    </PieChart>
+                      <Area type="monotone" dataKey="MTBF" stroke="#6366f1" strokeWidth={2} fill="url(#gradMtbf)" dot={false} />
+                      <Area type="monotone" dataKey="Availability Rate" stroke="#a78bfa" strokeWidth={2} fill="url(#gradAvail)" dot={false} />
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Maintenance Distribution Donut (spans 2 cols) */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="lg:col-span-2"
+          >
+            <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{isFinance ? "Budget Allocation" : "Maintenance Distribution"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {distributionData.length === 0 ? (
+                  <div className="flex h-[220px] items-center justify-center text-muted-foreground text-sm italic">No WO data yet</div>
+                ) : (
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={distributionData}
+                          cx="42%"
+                          cy="50%"
+                          innerRadius="55%"
+                          outerRadius="80%"
+                          dataKey="value"
+                          strokeWidth={2}
+                        >
+                          {distributionData.map((_, i) => (
+                            <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Legend
+                          iconType="circle"
+                          iconSize={8}
+                          formatter={(value, entry: any) => (
+                            <span className="text-[11px] text-muted-foreground">
+                              {value} <span className="font-bold text-foreground">{entry.payload.value}%</span>
+                            </span>
+                          )}
+                        />
+                        <Tooltip
+                          formatter={(val: number) => [`${val}%`, '']}
+                          contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      )}
 
       {/* ── SECONDARY METRICS ROW ───────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid gap-4 sm:grid-cols-3"
-      >
-        <SecondaryKpi
-          label="Mean Time Between Failures"
-          value={`${Math.round(stats?.mtbfHours ?? 0)}h`}
-          sub="+8%"
-          subColor="text-emerald-500"
-          icon={<Timer className="h-5 w-5 text-blue-400" />}
-        />
-        <SecondaryKpi
-          label="Mean Time To Repair"
-          value={`${(stats?.mttrHours ?? 0).toFixed(1)}h`}
-          sub="-14%"
-          subColor="text-emerald-500"
-          icon={<Wrench className="h-5 w-5 text-indigo-400" />}
-        />
-        <SecondaryKpi
-          label="Availability Rate"
-          value={`${(stats?.availabilityRate ?? 0).toFixed(1)}%`}
-          sub="+2.3%"
-          subColor="text-emerald-500"
-          icon={<ShieldCheck className="h-5 w-5 text-emerald-400" />}
-        />
-      </motion.div>
+      {isManager && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid gap-4 sm:grid-cols-3"
+        >
+          <SecondaryKpi
+            label="Mean Time Between Failures"
+            value={`${Math.round(stats?.mtbfHours ?? 0)}h`}
+            sub="+8%"
+            subColor="text-emerald-500"
+            icon={<Timer className="h-5 w-5 text-blue-400" />}
+          />
+          <SecondaryKpi
+            label="Mean Time To Repair"
+            value={`${(stats?.mttrHours ?? 0).toFixed(1)}h`}
+            sub="-14%"
+            subColor="text-emerald-500"
+            icon={<Wrench className="h-5 w-5 text-indigo-400" />}
+          />
+          <SecondaryKpi
+            label="Availability Rate"
+            value={`${(stats?.availabilityRate ?? 0).toFixed(1)}%`}
+            sub="+2.3%"
+            subColor="text-emerald-500"
+            icon={<ShieldCheck className="h-5 w-5 text-emerald-400" />}
+          />
+        </motion.div>
+      )}
 
       {/* ── CLAIMS + WORK ORDERS ─────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Claims */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-          <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">Recent Claims</CardTitle>
-              <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
-                <Link href="/claims">View All <ChevronRight className="h-3 w-3 ml-1" /></Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border/40">
-                {recentClaims.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground italic">No recent claims</p>
-                ) : recentClaims.map(claim => (
-                  <Link key={claim.claimId} href={`/claims/${claim.claimId}`}>
-                    <div className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] font-mono font-bold text-muted-foreground">{claim.claimCode ?? `CLM-${claim.claimId}`}</span>
-                          <PriorityBadge priority={String(claim.priority ?? '')} />
+        {/* Recent Claims or My Work */}
+        {isTechnician ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm h-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base">My Pending Work</CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                  <Link href="/work-orders?assignedToMe=true">View All <ChevronRight className="h-3 w-3 ml-1" /></Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/40">
+                  {myWork.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground italic">No pending assignments</p>
+                  ) : myWork.map(wo => (
+                    <Link key={wo.woId} href={`/work-orders/${wo.woId}`}>
+                      <div className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-mono font-bold text-muted-foreground">{wo.woCode}</span>
+                            <PriorityBadge priority={wo.priority} />
+                          </div>
+                          <p className="text-sm font-medium truncate">{wo.title}</p>
+                          <p className="text-[10px] text-muted-foreground">{wo.equipmentName ?? `Equipment #${wo.equipmentId}`}</p>
                         </div>
-                        <p className="text-sm font-medium truncate">{claim.title}</p>
-                        <p className="text-[10px] text-muted-foreground">{claim.equipmentName ?? `Equipment #${claim.equipmentId}`}</p>
+                        <StatusBadge status={wo.status} />
                       </div>
-                      <StatusBadge status={String(claim.status ?? '')} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : !isFinance && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base">Recent Claims</CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                  <Link href="/claims">View All <ChevronRight className="h-3 w-3 ml-1" /></Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/40">
+                  {recentClaims.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground italic">No recent claims</p>
+                  ) : recentClaims.map(claim => (
+                    <Link key={claim.claimId} href={`/claims/${claim.claimId}`}>
+                      <div className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-mono font-bold text-muted-foreground">{claim.claimCode ?? `CLM-${claim.claimId}`}</span>
+                            <PriorityBadge priority={String(claim.priority ?? '')} />
+                          </div>
+                          <p className="text-sm font-medium truncate">{claim.title}</p>
+                          <p className="text-[10px] text-muted-foreground">{claim.equipmentName ?? `Equipment #${claim.equipmentId}`}</p>
+                        </div>
+                        <StatusBadge status={String(claim.status ?? '')} />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
-        {/* Recent Work Orders */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+        {/* Recent Work Orders for Everyone */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className={isFinance ? "lg:col-span-2" : ""}>
           <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">Recent Work Orders</CardTitle>
+              <CardTitle className="text-base">{isFinance ? "Critical Maintenance Requests" : "Recent Work Orders"}</CardTitle>
               <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
                 <Link href="/work-orders">View All <ChevronRight className="h-3 w-3 ml-1" /></Link>
               </Button>
@@ -403,6 +492,12 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium truncate">{wo.title}</p>
                         <p className="text-[10px] text-muted-foreground">{wo.assignedToName ?? 'Unassigned'}</p>
                       </div>
+                      {isFinance && wo.estimatedCost != null && (
+                        <div className="text-right mr-4">
+                          <p className="text-sm font-bold">{wo.estimatedCost.toLocaleString('fr-DZ')} DA</p>
+                          <p className="text-[10px] text-muted-foreground">Estimate</p>
+                        </div>
+                      )}
                       <StatusBadge status={wo.status} />
                     </div>
                   </Link>

@@ -20,6 +20,7 @@ public class UserMapper {
                 .departmentId(user.getDepartment() != null ? user.getDepartment().getDepartmentId() : null)
                 .departmentName(user.getDepartment() != null ? user.getDepartment().getDepartmentName() : null)
                 .isActive(user.getIsActive())
+                .lastLogin(user.getLastLogin())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
