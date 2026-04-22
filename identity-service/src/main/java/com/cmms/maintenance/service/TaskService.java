@@ -70,14 +70,14 @@ public class TaskService {
     public List<TaskResponse> getAll() {
         Actor actor = getCurrentActorRequired();
         
-        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) {
+        if (actor.isAdminOrManager() || actor.hasRole(Role.FINANCE_MANAGER)) {
             return taskRepository.findAll().stream()
                     .filter(t -> t.getParentTaskId() == null) // Root tasks only
                     .map(this::toResponse)
                     .collect(Collectors.toList());
         }
         
-        if (Role.TECHNICIAN.equals(actor.role)) {
+        if (actor.hasRole(Role.TECHNICIAN)) {
             User user = userRepository.findById(actor.userId).orElse(null);
             Integer deptId = (user != null && user.getDepartment() != null) ? user.getDepartment().getDepartmentId() : null;
             
@@ -121,7 +121,7 @@ public class TaskService {
         boolean isAdHoc = false;
         Task.TaskApprovalStatus approvalStatus = null;
 
-        if (Role.TECHNICIAN.equals(actor.role)) {
+        if (actor.hasRole(Role.TECHNICIAN)) {
             if (!Objects.equals(actor.userId, wo.getAssignedToUserId())) {
                 throw new AccessDeniedException("Technicians can only create ad-hoc tasks for work orders assigned to them");
             }
@@ -229,7 +229,7 @@ public class TaskService {
             task.setActualDuration(request.getActualDuration());
             
             // If technician is overriding duration, mark as pending approval
-            if (Role.TECHNICIAN.equals(actor.role)) {
+            if (actor.hasRole(Role.TECHNICIAN)) {
                 task.setApprovalStatus(Task.TaskApprovalStatus.PENDING);
                 auditNote.append("Awaiting manager approval due to manual duration override; ");
             }
@@ -362,7 +362,7 @@ public class TaskService {
             return;
         }
 
-        if (Role.TECHNICIAN.equals(actor.role)) {
+        if (actor.hasRole(Role.TECHNICIAN)) {
             if (Boolean.TRUE.equals(task.getIsAdHoc()) && task.getApprovalStatus() == Task.TaskApprovalStatus.PENDING && Objects.equals(task.getCreatedByUserId(), actor.userId)) {
                 taskRepository.delete(task);
                 return;
@@ -391,6 +391,106 @@ public class TaskService {
 
         createAuditLog(taskId, task.getStatus().name(), task.getStatus().name(), actor.displayName, 
                 String.format("Approval status: %s -> %s", oldStatus, newStatus));
+
+        return toResponse(taskRepository.save(task));
+    }
+
+    @Transactional
+    public TaskResponse requestReplan(Integer taskId, String reason) {
+        Actor actor = getCurrentActorRequired();
+        Task task = getTaskEntity(taskId);
+        assertCanEditTask(task, actor);
+
+        task.setApprovalStatus(Task.TaskApprovalStatus.REPLAN_REQUESTED);
+        task.setBlockedReason(reason);
+        task.setStatus(Task.TaskStatus.BLOCKED);
+
+        createAuditLog(taskId, task.getStatus().name(), task.getStatus().name(), actor.displayName, 
+                "Replan requested: " + reason);
+
+        notificationService.notifyAdminAndManagers("REPLAN_REQUESTED", 
+                "Replan requested by " + actor.displayName + " for task: " + task.getTitle(), 
+                task.getWoId());
+
+        return toResponse(taskRepository.save(task));
+    }
+
+    @Transactional
+    public TaskResponse approveReplan(Integer taskId, String statusStr) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        Task task = getTaskEntity(taskId);
+
+        if (task.getApprovalStatus() != Task.TaskApprovalStatus.REPLAN_REQUESTED) {
+            throw new IllegalStateException("Task is not in REPLAN_REQUESTED status");
+        }
+
+        Task.TaskApprovalStatus approvalStatus = Task.TaskApprovalStatus.valueOf(statusStr.toUpperCase());
+        task.setApprovalStatus(approvalStatus);
+        task.setApprovedByUserId(actor.userId);
+        task.setApprovedAt(LocalDateTime.now());
+
+        if (approvalStatus == Task.TaskApprovalStatus.APPROVED) {
+            Task followOn = Task.builder()
+                    .woId(task.getWoId())
+                    .title("Follow-on: " + task.getTitle())
+                    .description("Follow-on task for original task " + taskId + ": " + task.getBlockedReason())
+                    .priority(task.getPriority())
+                    .departmentId(task.getDepartmentId())
+                    .orderIndex(task.getOrderIndex() + 1)
+                    .status(Task.TaskStatus.TODO)
+                    .parentTaskId(task.getParentTaskId())
+                    .estimatedDuration(task.getEstimatedDuration())
+                    .isAdHoc(false)
+                    .build();
+            
+            Task savedFollowOn = taskRepository.save(followOn);
+            task.setFollowOnTaskId(savedFollowOn.getTaskId());
+            task.setStatus(Task.TaskStatus.SKIPPED);
+            
+            createAuditLog(taskId, task.getStatus().name(), task.getStatus().name(), actor.displayName, 
+                    "Replan approved. Follow-on task created: " + savedFollowOn.getTaskId());
+        } else {
+            task.setStatus(Task.TaskStatus.TODO);
+            createAuditLog(taskId, task.getStatus().name(), task.getStatus().name(), actor.displayName, 
+                    "Replan rejected.");
+        }
+
+        return toResponse(taskRepository.save(task));
+    }
+
+    @Transactional
+    public TaskResponse replan(Integer taskId, String reason) {
+        Actor actor = getCurrentActorRequired();
+        assertAdminOrManager(actor);
+        Task task = getTaskEntity(taskId);
+
+        task.setApprovalStatus(Task.TaskApprovalStatus.APPROVED);
+        task.setApprovedByUserId(actor.userId);
+        task.setApprovedAt(LocalDateTime.now());
+        if (reason != null) {
+            task.setBlockedReason(reason);
+        }
+
+        Task followOn = Task.builder()
+                .woId(task.getWoId())
+                .title("Replanned: " + task.getTitle())
+                .description("Replanned task from " + taskId + (reason != null ? ": " + reason : ""))
+                .priority(task.getPriority())
+                .departmentId(task.getDepartmentId())
+                .orderIndex(task.getOrderIndex() + 1)
+                .status(Task.TaskStatus.TODO)
+                .parentTaskId(task.getParentTaskId())
+                .estimatedDuration(task.getEstimatedDuration())
+                .isAdHoc(false)
+                .build();
+        
+        Task savedFollowOn = taskRepository.save(followOn);
+        task.setFollowOnTaskId(savedFollowOn.getTaskId());
+        task.setStatus(Task.TaskStatus.SKIPPED);
+        
+        createAuditLog(taskId, task.getStatus().name(), task.getStatus().name(), actor.displayName, 
+                "Task replanned by manager. Follow-on created: " + savedFollowOn.getTaskId());
 
         return toResponse(taskRepository.save(task));
     }
@@ -546,6 +646,7 @@ public class TaskService {
                 .approvalStatus(task.getApprovalStatus() == null ? null : task.getApprovalStatus().name())
                 .approvedByUserId(task.getApprovedByUserId())
                 .approvedAt(task.getApprovedAt())
+                .followOnTaskId(task.getFollowOnTaskId())
                 .failureReason(task.getFailureReason())
                 .progress(progress)
                 .subTasks(subTasks.stream()
@@ -610,19 +711,19 @@ public class TaskService {
     }
     
     private void assertCanViewTaskWo(WorkOrder wo, Actor actor) {
-        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) return;
-        if (Role.TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        if (actor.isAdminOrManager() || actor.hasRole(Role.FINANCE_MANAGER)) return;
+        if (actor.hasRole(Role.TECHNICIAN) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
         throw new AccessDeniedException("Not allowed to view tasks for this work order");
     }
 
     private void assertCanEditTask(Task task, Actor actor) {
         if (actor.isAdminOrManager()) return;
 
-        if (Role.FINANCE_MANAGER.equals(actor.role)) {
+        if (actor.hasRole(Role.FINANCE_MANAGER)) {
             throw new AccessDeniedException("FINANCE_MANAGER not allowed to edit tasks");
         }
 
-        if (Role.TECHNICIAN.equals(actor.role)) {
+        if (actor.hasRole(Role.TECHNICIAN)) {
             WorkOrder wo = workOrderRepository.findById(task.getWoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Linked work order not found for task"));
             
@@ -651,15 +752,18 @@ public class TaskService {
             return new Actor(
                     user == null ? null : user.getUserId(),
                     user == null || user.getFullName() == null ? authentication.getName() : user.getFullName(),
-                    user == null || user.getRole() == null ? null : user.getRole().getRoleName().toUpperCase()
+                    user == null ? List.of() : user.getRoles().stream().map(r -> r.getRoleName().toUpperCase()).collect(Collectors.toList())
             );
         }
-        return new Actor(null, authentication.getName(), null);
+        return new Actor(null, authentication.getName(), List.of());
     }
 
-    private record Actor(Integer userId, String displayName, String role) {
+    private record Actor(Integer userId, String displayName, List<String> roles) {
         boolean isAdminOrManager() {
-            return Role.ADMIN.equals(role) || Role.MAINTENANCE_MANAGER.equals(role);
+            return roles.contains(Role.ADMIN) || roles.contains(Role.MAINTENANCE_MANAGER);
+        }
+        boolean hasRole(String roleName) {
+            return roles.contains(roleName);
         }
     }
     private void logLaborFromTask(Task task, Actor actor) {

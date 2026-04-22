@@ -395,9 +395,11 @@ export default function MetersPage() {
         description: language === 'fr' ? "Ordre de travail préventif créé." : "Preventive Work Order created.",
       })
 
-      setAlertMeters(prev => prev.filter(m => m.id !== meter.id))
-      // Only close if no more alerts
-      if (alertMeters.length <= 1) setRecommendationOpen(false)
+      setAlertMeters(prev => {
+        const next = prev.filter(m => m.id !== meter.id)
+        if (next.length === 0) setRecommendationOpen(false)
+        return next
+      })
 
       onSyncAll()
     } catch (err) {
@@ -419,13 +421,22 @@ export default function MetersPage() {
       animate="visible"
       className="space-y-6"
     >
-      <Dialog open={recommendationOpen} onOpenChange={setRecommendationOpen}>
-        <DialogContent className="sm:max-w-xl bg-card border-border shadow-2xl overflow-hidden p-0 rounded-2xl">
+      <Dialog open={recommendationOpen} onOpenChange={(open) => {
+        // Prevent closing by clicking outside or ESC
+        if (!open) return;
+        setRecommendationOpen(open);
+      }}>
+        <DialogContent showCloseButton={false} className="sm:max-w-xl bg-card border-border shadow-2xl overflow-hidden p-0 rounded-2xl">
           <div className="h-1 w-full bg-rose-500" />
           <div className="p-6 space-y-6">
             <DialogHeader>
               <div className="flex items-center gap-3 text-rose-500 mb-1">
-                <AlertTriangle className="h-6 w-6" />
+                <div className="relative">
+                  <AlertTriangle className="h-6 w-6" />
+                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-card shadow-sm animate-in zoom-in duration-500">
+                    {alertMeters.length}
+                  </span>
+                </div>
                 <DialogTitle className="text-xl font-bold uppercase tracking-tight">
                   {t('thresholdExceededTitle')}
                 </DialogTitle>
@@ -470,17 +481,6 @@ export default function MetersPage() {
                 </div>
               ))}
             </div>
-
-            <DialogFooter className="pt-1 flex sm:justify-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setRecommendationOpen(false)}
-                className="text-xs text-muted-foreground hover:text-foreground h-8"
-              >
-                {t('ignoreAlert')}
-              </Button>
-            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
@@ -719,7 +719,10 @@ export default function MetersPage() {
                       <p className="font-mono text-xs text-muted-foreground">{meter.displayId}</p>
                       <CardTitle className="text-base">{meter.name}</CardTitle>
                     </div>
-                    <Badge variant={getStatusColor(meter.status)}>
+                    <Badge variant={getStatusColor(meter.status)} className="gap-1 capitalize">
+                      {(meter.status === 'warning' || meter.status === 'critical') && (
+                        <AlertTriangle className="h-3 w-3" />
+                      )}
                       {meter.status}
                     </Badge>
                   </div>

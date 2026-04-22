@@ -141,10 +141,12 @@ export default function RegulatoryPlanDetailPage() {
         <div className="flex gap-2">
            <Dialog>
              <DialogTrigger asChild>
+              {plan.status === 'UPCOMING' && (
                 <Button variant="outline" className="rounded-xl border-dashed">
                     <FastForward className="h-4 w-4 mr-2" />
                     {language === 'fr' ? 'Reporter / Modifier' : 'Reschedule'}
                 </Button>
+              )}
              </DialogTrigger>
              <DialogContent className="rounded-2xl border-border bg-card/95 backdrop-blur-xl">
                 <DialogHeader>

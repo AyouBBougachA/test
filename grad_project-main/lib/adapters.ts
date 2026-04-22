@@ -8,40 +8,51 @@ export function formatDisplayId(prefix: string, numericId: number, width: number
 
 export type UiRole = string
 
-export function getRoleLabel(roleName: UiRole | null | undefined, lang: 'en' | 'fr' = 'en'): string {
+export function getRoleLabel(roleName: UiRole | null | undefined, lang: 'en' | 'fr' | 'ar' = 'en'): string {
   const normalized = (roleName ?? '').toUpperCase()
 
-  const labels: Record<string, { en: string; fr: string }> = {
-    ADMIN: { en: 'Administrator', fr: 'Administrateur' },
-    MAINTENANCE_MANAGER: { en: 'Maintenance Manager', fr: 'Responsable maintenance' },
-    TECHNICIAN: { en: 'Technician', fr: 'Technicien' },
-    FINANCE_MANAGER: { en: 'Finance Manager', fr: 'Responsable Finance' },
+  const labels: Record<string, { en: string; fr: string; ar: string }> = {
+    ADMIN: { en: 'Administrator', fr: 'Administrateur', ar: 'مسؤول' },
+    MAINTENANCE_MANAGER: { en: 'Maintenance Manager', fr: 'Responsable maintenance', ar: 'مدير الصيانة' },
+    TECHNICIAN: { en: 'Technician', fr: 'Technicien', ar: 'تقني' },
+    FINANCE_MANAGER: { en: 'Finance Manager', fr: 'Responsable Finance', ar: 'مدير مالي' },
   }
 
-  return (labels[normalized] ?? { en: roleName ?? 'User', fr: roleName ?? 'Utilisateur' })[lang]
+  return (labels[normalized] ?? { en: roleName ?? 'User', fr: roleName ?? 'Utilisateur', ar: roleName ?? 'مستخدم' })[lang]
 }
 
 export interface AuthUser {
   id: number
   name: string
   email: string
+  /** Primary role name (first role, for backwards-compat display) */
   roleName: string | null
   roleId: number | null
+  /** All assigned roles */
+  roles: { roleId: number; roleName: string }[]
   departmentName: string | null
   departmentId: number | null
   isActive: boolean
+  /** Checks if the user has ANY of the given role names */
+  hasRole: (...roleNames: string[]) => boolean
 }
 
 export function mapUserResponseToAuthUser(user: UserResponse): AuthUser {
+  const roles = user.roles ?? []
+  const primary = roles[0] ?? null
+  const hasRole = (...roleNames: string[]) =>
+    roleNames.some((rn) => roles.some((r) => r.roleName.toUpperCase() === rn.toUpperCase()))
   return {
     id: user.userId,
     name: user.fullName,
     email: user.email,
-    roleName: user.roleName,
-    roleId: user.roleId,
+    roleName: primary?.roleName ?? null,
+    roleId: primary?.roleId ?? null,
+    roles,
     departmentName: user.departmentName,
     departmentId: user.departmentId,
     isActive: user.isActive,
+    hasRole,
   }
 }
 

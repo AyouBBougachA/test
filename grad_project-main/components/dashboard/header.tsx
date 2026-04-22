@@ -63,6 +63,7 @@ import { equipmentApi } from "@/lib/api/equipment"
 import { claimsApi } from "@/lib/api/claims"
 import type { NotificationResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import { WorkOrderTypeIcon } from "@/components/work-order-type-badge"
 
 export function DashboardHeader() {
   const { t, language } = useI18n()
@@ -393,7 +394,12 @@ export function DashboardHeader() {
                         note.type === 'WARNING' ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30" :
                         note.type === 'RECOMMENDATION' ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30" : "bg-primary/10 text-primary"
                       )}>
-                        {note.type === 'WARNING' ? <AlertCircle className="h-4 w-4" /> :
+                        {/* Show WO type icon if the message references a known module */}
+                        {note.message?.toUpperCase().includes('CORRECTIVE') ? <WorkOrderTypeIcon type="CORRECTIVE" size="sm" /> :
+                         note.message?.toUpperCase().includes('PREVENTIVE') ? <WorkOrderTypeIcon type="PREVENTIVE" size="sm" /> :
+                         note.message?.toUpperCase().includes('REGULATORY') ? <WorkOrderTypeIcon type="REGULATORY" size="sm" /> :
+                         note.message?.toUpperCase().includes('PREDICTIVE') ? <WorkOrderTypeIcon type="PREDICTIVE" size="sm" /> :
+                         note.type === 'WARNING' ? <AlertCircle className="h-4 w-4" /> :
                          note.type === 'RECOMMENDATION' ? <Clock className="h-4 w-4" /> : <Info className="h-4 w-4" />}
                       </div>
                       <div className="flex flex-col gap-1 pr-6">
@@ -432,7 +438,9 @@ export function DashboardHeader() {
               </Avatar>
               <div className="hidden flex-col items-start text-left md:flex">
                 <span className="text-sm font-bold tracking-tight">{user?.name || "Guest User"}</span>
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{user ? getRoleLabel(user.roleName, language) : "—"}</span>
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                  {user ? getRoleLabel(user.roleName, language as 'en' | 'fr' | 'ar') : "—"}
+                </span>
               </div>
               <ChevronDown className="hidden h-3 w-3 text-muted-foreground md:block opacity-50" />
             </Button>

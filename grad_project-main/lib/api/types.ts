@@ -15,8 +15,12 @@ export interface UserResponse {
   fullName: string
   email: string
   phoneNumber?: string | null
-  roleName: string | null
-  roleId: number | null
+  /** All assigned roles for the user */
+  roles: { roleId: number; roleName: string }[]
+  /** @deprecated Use roles[0] instead. Kept for backwards compat. */
+  roleName?: string | null
+  /** @deprecated Use roles[0] instead. Kept for backwards compat. */
+  roleId?: number | null
   departmentName: string | null
   departmentId: number | null
   isActive: boolean
@@ -29,7 +33,7 @@ export interface CreateUserRequest {
   email: string
   phoneNumber?: string | null
   password: string
-  roleId: number
+  roleIds: number[]
   departmentId?: number | null
   isActive?: boolean
 }
@@ -39,7 +43,7 @@ export interface UpdateUserRequest {
   email?: string
   phoneNumber?: string | null
   password?: string
-  roleId?: number
+  roleIds?: number[]
   departmentId?: number | null
 }
 
@@ -72,6 +76,8 @@ export interface AuditLog {
   entityName: string | null
   entityId: number | null
   details: string
+  ipAddress?: string
+  accountName?: string
   createdAt: string
 }
 
@@ -451,7 +457,7 @@ export interface CreateWorkOrderRequest {
 }
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED' | 'SKIPPED'
-export type TaskApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type TaskApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REPLAN_REQUESTED'
 
 export interface SubTaskResponse {
   id: number
@@ -485,6 +491,7 @@ export interface TaskResponse {
   approvedByUserId?: number | null
   approvedAt?: string | null
   priority?: string | null
+  followOnTaskId?: number | null
   departmentId?: number | null
   parentTaskId?: number | null
   actualDuration?: number | null
@@ -598,6 +605,22 @@ export interface MaintenancePlanResponse {
   updatedAt?: string | null
 }
 
+export interface RecentWorkOrderDetail {
+  equipmentName: string
+  woCode: string
+  type: string
+  status: string
+  date: string
+}
+
+export interface EquipmentCostDetail {
+  name: string
+  category: string
+  department: string
+  totalCost: number
+  percentageOfTotal: number
+}
+
 export interface NotificationResponse {
   id: number
   userId: number
@@ -637,6 +660,8 @@ export interface KpiResponse {
   ytdBudget: number
   costAvoidance: number
   expectedLifeSpanScore: number
+  costlyEquipments?: EquipmentCostDetail[]
+  recentWorkOrders?: RecentWorkOrderDetail[]
 }
 
 export interface PredictionResponse {

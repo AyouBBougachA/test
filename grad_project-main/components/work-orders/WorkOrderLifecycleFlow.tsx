@@ -13,6 +13,7 @@ import {
   XCircle,
   ChevronRight
 } from "lucide-react"
+import { getStatusColorVar, getStatusTextColorVar } from "@/lib/colors-util"
 
 interface Stage {
   key: string
@@ -32,10 +33,6 @@ const STAGES: Stage[] = [
     label: "Created",
     shortLabel: "New",
     icon: <FileText className="h-4 w-4" />,
-    color: "text-blue-600",
-    bgColor: "bg-blue-600",
-    borderColor: "border-blue-600",
-    ringColor: "ring-blue-600/20",
     description: "WO has been raised from a claim or manually"
   },
   {
@@ -43,10 +40,6 @@ const STAGES: Stage[] = [
     label: "Assigned",
     shortLabel: "Assigned",
     icon: <Users className="h-4 w-4" />,
-    color: "text-violet-600",
-    bgColor: "bg-violet-600",
-    borderColor: "border-violet-600",
-    ringColor: "ring-violet-600/20",
     description: "Technician has been assigned to the intervention"
   },
   {
@@ -54,10 +47,6 @@ const STAGES: Stage[] = [
     label: "Scheduled",
     shortLabel: "Scheduled",
     icon: <Clock className="h-4 w-4" />,
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-600",
-    borderColor: "border-indigo-600",
-    ringColor: "ring-indigo-600/20",
     description: "Planned start date and deadline set"
   },
   {
@@ -65,10 +54,6 @@ const STAGES: Stage[] = [
     label: "In Progress",
     shortLabel: "Active",
     icon: <Play className="h-4 w-4" />,
-    color: "text-cyan-600",
-    bgColor: "bg-cyan-600",
-    borderColor: "border-cyan-600",
-    ringColor: "ring-cyan-600/20",
     description: "Technician is actively executing tasks"
   },
   {
@@ -76,10 +61,6 @@ const STAGES: Stage[] = [
     label: "Completed",
     shortLabel: "Done",
     icon: <CheckSquare className="h-4 w-4" />,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-600",
-    borderColor: "border-emerald-600",
-    ringColor: "ring-emerald-600/20",
     description: "All tasks completed, awaiting manager validation"
   },
   {
@@ -87,10 +68,6 @@ const STAGES: Stage[] = [
     label: "Validated",
     shortLabel: "Validated",
     icon: <CheckCircle2 className="h-4 w-4" />,
-    color: "text-teal-600",
-    bgColor: "bg-teal-600",
-    borderColor: "border-teal-600",
-    ringColor: "ring-teal-600/20",
     description: "Manager has approved and signed off the work"
   },
   {
@@ -98,10 +75,6 @@ const STAGES: Stage[] = [
     label: "Closed",
     shortLabel: "Closed",
     icon: <Archive className="h-4 w-4" />,
-    color: "text-slate-500",
-    bgColor: "bg-slate-500",
-    borderColor: "border-slate-500",
-    ringColor: "ring-slate-500/20",
     description: "Archived & closed. Labor costs are finalized"
   },
 ]
@@ -191,7 +164,14 @@ export function WorkOrderLifecycleFlow({ status }: WorkOrderLifecycleFlowProps) 
               const current = STAGES[currentIndex] ?? STAGES[0]
               return (
                 <div className="flex items-center gap-3">
-                  <div className={`${current.bgColor} p-3 rounded-2xl text-white shadow-lg shadow-${current.bgColor}/20 transition-transform duration-300 hover:scale-105`}>
+                  <div 
+                    className={`p-3 rounded-2xl shadow-lg transition-transform duration-300 hover:scale-105`}
+                    style={{
+                      backgroundColor: getStatusColorVar(current.key),
+                      color: getStatusTextColorVar(current.key),
+                      boxShadow: `0 10px 15px -3px rgba(var(--color-status-${current.key.toLowerCase().replace(/_/g, '-')}-rgb, 0,0,0), 0.2)`
+                    }}
+                  >
                     {current.icon}
                   </div>
                   <div className="space-y-0.5">
@@ -218,11 +198,18 @@ export function WorkOrderLifecycleFlow({ status }: WorkOrderLifecycleFlowProps) 
 }
 
 function StageNode({ stage, state }: { stage: Stage; state: "done" | "active" | "upcoming" }) {
+  const statusColor = getStatusColorVar(stage.key)
+  const statusTextColor = getStatusTextColorVar(stage.key)
+  const statusRgb = `var(--color-status-${stage.key.toLowerCase().replace(/_/g, '-')}-rgb, 0,0,0)`
+
   return (
     <div className="flex flex-col items-center gap-3 group" title={stage.description}>
       <div className="relative">
         {state === "active" && (
-          <span className={`absolute inset-0 rounded-full animate-ping opacity-30 ${stage.bgColor}`} />
+          <span 
+            className={`absolute inset-0 rounded-full animate-ping opacity-30`} 
+            style={{ backgroundColor: statusColor }}
+          />
         )}
         <motion.div
           initial={false}
@@ -232,13 +219,21 @@ function StageNode({ stage, state }: { stage: Stage; state: "done" | "active" | 
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
           className={`
             relative h-12 w-12 md:h-14 md:w-14 rounded-full flex items-center justify-center border-[3px] transition-all duration-300 shadow-sm
-            ${state === "done"
-              ? "bg-emerald-500 border-emerald-500 text-white shadow-emerald-200"
-              : state === "active"
-              ? `${stage.bgColor} ${stage.borderColor} text-white ring-4 ${stage.ringColor} shadow-lg`
-              : "bg-muted/30 border-border text-muted-foreground"
-            }
+            ${state === "upcoming" ? "bg-muted/30 border-border text-muted-foreground" : ""}
           `}
+          style={{
+            ...(state === "done" ? {
+              backgroundColor: statusColor,
+              borderColor: statusColor,
+              color: statusTextColor,
+              boxShadow: `0 4px 6px -1px rgba(${statusRgb}, 0.2)`
+            } : state === "active" ? {
+              backgroundColor: statusColor,
+              borderColor: statusColor,
+              color: statusTextColor,
+              boxShadow: `0 0 0 4px rgba(${statusRgb}, 0.2), 0 10px 15px -3px rgba(${statusRgb}, 0.2)`
+            } : {})
+          }}
         >
           {state === "done" ? (
             <CheckCircle2 className="h-6 w-6" />
@@ -247,11 +242,10 @@ function StageNode({ stage, state }: { stage: Stage; state: "done" | "active" | 
           )}
         </motion.div>
       </div>
-      <span className={`text-[11px] md:text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
-        state === "done" ? "text-emerald-600" : 
-        state === "active" ? stage.color : 
-        "text-slate-400"
-      }`}>
+      <span 
+        className={`text-[11px] md:text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors`}
+        style={{ color: state !== "upcoming" ? statusColor : "var(--tw-prose-muted)" }}
+      >
         {stage.shortLabel}
       </span>
     </div>

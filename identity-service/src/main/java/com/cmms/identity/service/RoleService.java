@@ -66,7 +66,7 @@ public class RoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new com.cmms.identity.exception.ResourceNotFoundException("Role not found with id: " + roleId));
 
-        if (userRepository.existsByRole_RoleId(roleId)) {
+        if (userRepository.existsByRoles_RoleId(roleId)) {
             throw new com.cmms.identity.exception.ConflictException("Cannot delete role because it is currently assigned to users.");
         }
 

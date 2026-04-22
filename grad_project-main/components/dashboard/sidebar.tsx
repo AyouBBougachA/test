@@ -63,9 +63,9 @@ export function DashboardSidebar() {
   const [expandedItems, setExpandedItems] = useState<string[]>(["planning", "ai", "bi", "admin"])
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [hasMeterAlert, setHasMeterAlert] = useState(false)
+  const [meterAlertCount, setMeterAlertCount] = useState(0)
 
-  const isMaintenanceStaff = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
+  const isMaintenanceStaff = user?.hasRole('ADMIN', 'MAINTENANCE_MANAGER') ?? false
 
   useEffect(() => {
     const checkMobile = () => {
@@ -86,14 +86,11 @@ export function DashboardSidebar() {
     const checkMeters = async () => {
       try {
         const { metersApi } = await import("@/lib/api/meters")
+        const { mapMeterResponseToUiCard } = await import("@/lib/adapters")
         const meters = await metersApi.getAll()
-        const hasAlert = meters.some(m => {
-          // Logic from adapters/page
-          const val = m.value
-          const threshold = m.thresholds && m.thresholds.length > 0 ? Math.min(...m.thresholds) : null
-          return threshold !== null && val >= threshold
-        })
-        setHasMeterAlert(hasAlert)
+        const uiM = meters.map(mapMeterResponseToUiCard)
+        const count = uiM.filter(m => m.status === 'warning' || m.status === 'critical').length
+        setMeterAlertCount(count)
       } catch (e) {
         console.error("Sidebar meter check failed", e)
       }
@@ -177,8 +174,6 @@ export function DashboardSidebar() {
       children: [
         { label: t("executive"), href: "/bi/executive", icon: BarChart3 },
         { label: t("maintenance"), href: "/bi/maintenance", icon: Wrench },
-        { label: t("biomedical"), href: "/bi/biomedical", icon: Heart },
-        { label: t("financial"), href: "/bi/financial", icon: DollarSign },
       ],
       roles: ["ADMIN", "MAINTENANCE_MANAGER", "FINANCE_MANAGER"],
     },
@@ -211,8 +206,7 @@ export function DashboardSidebar() {
     if (!roles) return true
     if (isLoading) return true
     if (!isAuthenticated || !user) return false
-    const userRole = (user.roleName ?? '').toUpperCase()
-    return roles.map((r) => r.toUpperCase()).includes(userRole)
+    return user.hasRole(...roles)
   }
 
   // Sidebar content component
@@ -331,17 +325,27 @@ export function DashboardSidebar() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <item.icon className="h-5 w-5" />
+                  <div className="relative">
+                    <item.icon className="h-5 w-5" />
+                    {collapsed && item.href === '/meters' && meterAlertCount > 0 && (
+                      <div className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-sidebar shadow-sm">
+                        {meterAlertCount > 9 ? '9+' : meterAlertCount}
+                      </div>
+                    )}
+                  </div>
                   {!collapsed && <span>{item.label}</span>}
                 </div>
-                {!collapsed && item.href === '/meters' && hasMeterAlert && (
-                  <motion.div 
-                    initial={{ scale: 0 }} 
-                    animate={{ scale: 1 }}
-                    className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white"
-                  >
-                    <AlertTriangle className="h-3 w-3" />
-                  </motion.div>
+                {!collapsed && item.href === '/meters' && meterAlertCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-500 animate-pulse" />
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }}
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm"
+                    >
+                      {meterAlertCount > 99 ? '99+' : meterAlertCount}
+                    </motion.div>
+                  </div>
                 )}
               </Link>
             )

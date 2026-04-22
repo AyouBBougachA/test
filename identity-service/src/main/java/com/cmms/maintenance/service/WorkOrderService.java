@@ -8,11 +8,15 @@ import com.cmms.maintenance.dto.*;
 import com.cmms.maintenance.entity.Task;
 import com.cmms.maintenance.entity.WorkOrder;
 import com.cmms.maintenance.entity.WorkOrderStatusHistory;
+import com.cmms.maintenance.entity.WorkOrderLabor;
 import com.cmms.maintenance.repository.TaskRepository;
 import com.cmms.maintenance.repository.WorkOrderRepository;
 import com.cmms.maintenance.repository.WorkOrderStatusHistoryRepository;
 import com.cmms.maintenance.repository.WorkOrderAssignmentRepository;
 import com.cmms.maintenance.repository.WorkOrderFollowerRepository;
+import com.cmms.maintenance.repository.WorkOrderLaborRepository;
+import com.cmms.inventory.entity.PartUsage;
+import com.cmms.inventory.repository.PartUsageRepository;
 import com.cmms.maintenance.entity.WorkOrderAssignment;
 import com.cmms.maintenance.entity.WorkOrderFollower;
 import com.cmms.identity.entity.User;
@@ -31,6 +35,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -56,6 +61,8 @@ public class WorkOrderService {
     private final com.cmms.notifications.service.NotificationService notificationService;
     private final RegulatoryPlanService regulatoryPlanService;
     private final com.cmms.identity.service.AuditLogService auditLogService;
+    private final WorkOrderLaborRepository laborRepository;
+    private final PartUsageRepository partUsageRepository;
 
     private static final String ENTITY_NAME = "WorkOrder";
 
@@ -258,6 +265,7 @@ public class WorkOrderService {
         if (newStatus == WorkOrder.WorkOrderStatus.COMPLETED) {
             wo.setCompletedAt(LocalDateTime.now());
             wo.setActualEnd(LocalDateTime.now());
+            wo.setActualCost(computeActualCost(wo.getWoId()));
         }
 
         WorkOrder saved = workOrderRepository.save(wo);
@@ -290,6 +298,7 @@ public class WorkOrderService {
         wo.setValidationNotes(request.getValidationNotes());
         wo.setValidatedAt(LocalDateTime.now());
         wo.setValidatedBy(actor.displayName);
+        wo.setActualCost(computeActualCost(wo.getWoId()));
 
         WorkOrder saved = workOrderRepository.save(wo);
         saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager validated");
@@ -319,6 +328,7 @@ public class WorkOrderService {
         wo.setStatus(WorkOrder.WorkOrderStatus.CLOSED);
         wo.setClosedAt(LocalDateTime.now());
         wo.setClosedBy(actor.displayName);
+        wo.setActualCost(computeActualCost(wo.getWoId()));
 
         WorkOrder saved = workOrderRepository.save(wo);
         saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager closed");
@@ -456,6 +466,23 @@ public class WorkOrderService {
         
         workload.sort(Comparator.comparing(WorkloadResponse::getTotalAssigned).reversed());
         return workload;
+    }
+
+    // ── Cost computation ──────────────────────────────────────────────────────
+    /** Sums labor costs + parts costs for the given WO to produce actual_cost. */
+    private BigDecimal computeActualCost(Integer woId) {
+        BigDecimal laborCost = laborRepository.findByWoId(woId).stream()
+                .map(l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal partsCost = partUsageRepository.findByWoId(woId).stream()
+                .map(p -> {
+                    if (p.getUnitCostAtUsage() == null) return BigDecimal.ZERO;
+                    return p.getUnitCostAtUsage().multiply(new BigDecimal(p.getQuantityUsed()));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return laborCost.add(partsCost);
     }
 
     private void checkAndResolveClaim(WorkOrder wo) {
@@ -698,7 +725,7 @@ public class WorkOrderService {
 
     private void assertCanUpdateStatus(WorkOrder wo, Actor actor) {
         if (actor.isAdminOrManager()) return;
-        if (Role.TECHNICIAN.equals(actor.role) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
+        if (actor.hasRole(Role.TECHNICIAN) && Objects.equals(actor.userId, wo.getAssignedToUserId())) return;
         throw new AccessDeniedException("Not allowed to update this work order");
     }
 
@@ -709,10 +736,10 @@ public class WorkOrderService {
     }
 
     private Specification<WorkOrder> accessScopeSpec(Actor actor) {
-        if (actor.isAdminOrManager() || Role.FINANCE_MANAGER.equals(actor.role)) {
+        if (actor.isAdminOrManager() || actor.hasRole(Role.FINANCE_MANAGER)) {
             return (root, cq, cb) -> cb.conjunction();
         }
-        if (Role.TECHNICIAN.equals(actor.role) && actor.userId != null) {
+        if (actor.hasRole(Role.TECHNICIAN) && actor.userId != null) {
             return (root, cq, cb) -> cb.equal(root.get("assignedToUserId"), actor.userId);
         }
         return (root, cq, cb) -> cb.disjunction();
@@ -729,15 +756,18 @@ public class WorkOrderService {
             return new Actor(
                     user == null ? null : user.getUserId(),
                     user == null || user.getFullName() == null ? authentication.getName() : user.getFullName(),
-                    user == null || user.getRole() == null ? null : user.getRole().getRoleName().toUpperCase()
+                    user == null ? List.of() : user.getRoles().stream().map(r -> r.getRoleName().toUpperCase()).collect(Collectors.toList())
             );
         }
-        return new Actor(null, authentication.getName(), null);
+        return new Actor(null, authentication.getName(), List.of());
     }
 
-    private record Actor(Integer userId, String displayName, String role) {
+    private record Actor(Integer userId, String displayName, List<String> roles) {
         boolean isAdminOrManager() {
-            return Role.ADMIN.equals(role) || Role.MAINTENANCE_MANAGER.equals(role);
+            return roles.contains(Role.ADMIN) || roles.contains(Role.MAINTENANCE_MANAGER);
+        }
+        boolean hasRole(String roleName) {
+            return roles.contains(roleName);
         }
     }
 }

@@ -80,20 +80,23 @@ public class UserService {
             throw new DuplicateResourceException("Email is already in use: " + request.getEmail());
         }
 
-        Role role = findRoleEntityById(request.getRoleId());
+        java.util.Set<Role> roles = new java.util.HashSet<>(roleRepository.findAllById(request.getRoleIds()));
+        if (roles.isEmpty()) {
+            throw new ResourceNotFoundException("No valid roles found for the provided IDs");
+        }
         Department department = null;
-        
         if (request.getDepartmentId() != null) {
             department = findDepartmentEntityById(request.getDepartmentId());
         }
+        boolean hasTechnicianRole = roles.stream().anyMatch(this::isTechnician);
 
         User user = User.builder()
                 .fullName(request.getFullName())
                 .email(request.getEmail())
-            .phoneNumber(request.getPhoneNumber())
+                .phoneNumber(request.getPhoneNumber())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(role)
-            .department(isTechnician(role) ? department : null)
+                .roles(roles)
+                .department(hasTechnicianRole ? department : null)
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
 
@@ -136,13 +139,15 @@ public class UserService {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
 
-        Role targetRole = user.getRole();
-        if (request.getRoleId() != null) {
-            targetRole = findRoleEntityById(request.getRoleId());
-            user.setRole(targetRole);
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            java.util.Set<Role> updatedRoles = new java.util.HashSet<>(roleRepository.findAllById(request.getRoleIds()));
+            if (!updatedRoles.isEmpty()) {
+                user.setRoles(updatedRoles);
+            }
         }
 
-        if (isTechnician(targetRole)) {
+        boolean hasTechnicianRole = user.getRoles().stream().anyMatch(this::isTechnician);
+        if (hasTechnicianRole) {
             if (request.getDepartmentId() != null) {
                 Department department = findDepartmentEntityById(request.getDepartmentId());
                 user.setDepartment(department);
@@ -213,12 +218,17 @@ public class UserService {
         return role != null && "TECHNICIAN".equalsIgnoreCase(role.getRoleName());
     }
 
+    private boolean hasRole(User user, String roleName) {
+        return user.getRoles().stream()
+                .anyMatch(r -> roleName.equalsIgnoreCase(r.getRoleName()));
+    }
+
     @Transactional
     public void deleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleName())) {
+        if (hasRole(user, "ADMIN")) {
             throw new com.cmms.identity.exception.ConflictException("Administrator accounts cannot be deleted to prevent system lockout.");
         }
 
@@ -257,7 +267,9 @@ public class UserService {
             List<Predicate> predicates = new ArrayList<>();
 
             if (roleId != null) {
-                predicates.add(cb.equal(root.get("role").get("roleId"), roleId));
+                // Filter where any of the user's roles matches the requested roleId
+                jakarta.persistence.criteria.Join<User, Role> rolesJoin = root.join("roles", jakarta.persistence.criteria.JoinType.INNER);
+                predicates.add(cb.equal(rolesJoin.get("roleId"), roleId));
             }
             if (departmentId != null) {
                 predicates.add(cb.equal(root.get("department").get("departmentId"), departmentId));

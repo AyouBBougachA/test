@@ -129,15 +129,9 @@ export default function WorkOrderDetailPage() {
   const [failureNote, setFailureNote] = useState("")
   const [isCritical, setIsCritical] = useState(false)
 
-  const [laborEntries, setLaborEntries] = useState<any[]>([])
   const [partUsages, setPartUsages] = useState<any[]>([])
   const [allInventory, setAllInventory] = useState<any[]>([])
   
-  // Labor Logging State
-  const [isLaborDialogOpen, setIsLaborDialogOpen] = useState(false)
-  const [laborNotes, setLaborNotes] = useState("")
-  const [laborDuration, setLaborDuration] = useState("60")
-
   // Parts Selection State
   const [isPartsDialogOpen, setIsPartsDialogOpen] = useState(false)
   const [partSearch, setPartSearch] = useState("")
@@ -170,15 +164,13 @@ export default function WorkOrderDetailPage() {
         }
       }
 
-      const [tasksData, laborData, invData, rawPartUsages] = await Promise.all([
+      const [tasksData, invData, rawPartUsages] = await Promise.all([
         workOrdersApi.getTasks(woId),
-        workOrdersApi.getLabor(woId),
         inventoryApi.list(),
         inventoryApi.getUsages(woId)
       ])
       
       setTasks(tasksData)
-      setLaborEntries(laborData)
       setAllInventory(invData)
       setPartUsages(rawPartUsages)
       
@@ -434,22 +426,7 @@ export default function WorkOrderDetailPage() {
 
   // Handlers for tasks are now managed by TaskExecutionHub shared component
 
-  const handleLogLabor = async () => {
-    if (!user) return
-    try {
-      await workOrdersApi.logLabor(woId, {
-        userId: user.id,
-        durationMinutes: parseInt(laborDuration),
-        hourlyRate: 50,
-        notes: laborNotes
-      })
-      setIsLaborDialogOpen(false)
-      setLaborNotes("")
-      loadData()
-    } catch (e) {
-      alert("Failed to log labor")
-    }
-  }
+
 
   // Approval handled by TaskExecutionHub
 
@@ -488,7 +465,7 @@ export default function WorkOrderDetailPage() {
   const isAssignedTech = user?.roleName?.toUpperCase() === 'TECHNICIAN' && user?.id === wo.assignedToUserId;
 
   const completionRate = tasks.length > 0 ? Math.round((tasks.filter(t => ['DONE', 'PASS'].includes(t.status)).length / tasks.length) * 100) : 0;
-  const totalLaborCost = laborEntries.reduce((acc, curr) => acc + (curr.totalCost || 0), 0);
+
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-20">
@@ -668,7 +645,7 @@ export default function WorkOrderDetailPage() {
         <TabsList className="bg-muted/50 p-1 border border-border inline-flex h-11 items-center justify-center rounded-xl">
           <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Overview</TabsTrigger>
           <TabsTrigger value="checklist" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Checklist & Tasks</TabsTrigger>
-          <TabsTrigger value="costs" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Parts & Labor</TabsTrigger>
+          <TabsTrigger value="costs" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Inventory & Parts</TabsTrigger>
           {wo?.claimId && claimPhotos.length > 0 && (
              <TabsTrigger value="photos" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Photos</TabsTrigger>
           )}
@@ -783,7 +760,7 @@ export default function WorkOrderDetailPage() {
               <Card className="shadow-sm border-border/60">
                 <CardHeader className="pb-2 flex flex-row items-center justify-between">
                   <CardTitle className="text-lg">Schedule</CardTitle>
-                  {(isManager || isAssignedTech) && (
+                  {(isManager || isAssignedTech) && wo.woType !== 'PREVENTIVE' && wo.woType !== 'REGULATORY' && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setIsRescheduleDialogOpen(true)}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -848,45 +825,8 @@ export default function WorkOrderDetailPage() {
         </TabsContent>
 
         <TabsContent value="costs" className="outline-none">
-          <div className="grid gap-6 md:grid-cols-2">
-             <Card className="shadow-sm border-border/60">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                   <CardTitle className="text-lg flex items-center gap-2">
-                      <Hammer className="h-5 w-5 text-primary" />
-                      Labor Logs
-                   </CardTitle>
-                   {(isManager || isAssignedTech) && (
-                      <Button size="sm" variant="outline" className="h-8" onClick={() => setIsLaborDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Log Work</Button>
-                   )}
-                </CardHeader>
-                <CardContent>
-                   <div className="space-y-4">
-                      <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between border border-border/60">
-                         <div>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Total Labor Cost</p>
-                            <p className="text-2xl font-bold text-foreground">${totalLaborCost.toFixed(2)}</p>
-                         </div>
-                         <div className="bg-primary/10 p-2 rounded-full text-primary">
-                            <TrendingDown className="h-5 w-5" />
-                         </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                         {laborEntries.length === 0 ? (
-                           <p className="text-sm text-muted-foreground italic text-center py-4">No labor logs yet.</p>
-                         ) : laborEntries.map(entry => (
-                           <div key={entry.laborId} className="flex items-center justify-between p-3 border border-border/40 rounded-xl bg-card hover:bg-muted/5 transition-colors">
-                              <div>
-                                 <p className="text-sm font-medium">{entry.userName}</p>
-                                 <p className="text-xs text-muted-foreground">{entry.durationMinutes} mins @ $50/hr</p>
-                              </div>
-                              <p className="font-bold text-foreground">${entry.totalCost ? entry.totalCost.toFixed(2) : "0.00"}</p>
-                           </div>
-                         ))}
-                      </div>
-                   </div>
-                </CardContent>
-             </Card>
+          <div className="max-w-3xl mx-auto">
+
 
              <Card className="shadow-sm border-border/60">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -1044,28 +984,7 @@ export default function WorkOrderDetailPage() {
       </Dialog>
 
       {/* MODALS */}
-      <Dialog open={isLaborDialogOpen} onOpenChange={setIsLaborDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Log Labor Hours</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-             <div className="space-y-2">
-                <Label>Duration (Minutes)</Label>
-                <Input type="number" value={laborDuration} onChange={e => setLaborDuration(e.target.value)} />
-             </div>
-             <div className="space-y-2">
-                <Label>Work Notes</Label>
-                <Textarea placeholder="What did you work on?" value={laborNotes} onChange={e => setLaborNotes(e.target.value)} />
-             </div>
-             <div className="bg-muted/50 p-4 rounded-xl flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <p className="text-sm font-medium">Estimated cost: <span className="text-primary">${((parseInt(laborDuration) || 0) * 50 / 60).toFixed(2)}</span> (@ $50/hr)</p>
-             </div>
-          </div>
-          <DialogFooter>
-             <Button onClick={handleLogLabor}>Record Hours</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
 
       <Dialog open={isPartsDialogOpen} onOpenChange={setIsPartsDialogOpen}>
         <DialogContent>

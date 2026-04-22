@@ -37,6 +37,20 @@ import { usersApi } from "@/lib/api/users"
 import type { WorkOrderResponse, UserResponse } from "@/lib/api/types"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+import { ApiError } from "@/lib/api/client"
+
+function getApiErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    const payload = err.payload as any
+    if (payload && typeof payload === "object") {
+      return payload.message || payload.error || `Request failed (${err.status})`
+    }
+    return `Request failed (${err.status})`
+  }
+  if (err instanceof Error) return err.message
+  return "An unexpected error occurred"
+}
 
 const COLUMNS = [
   { id: 'CREATED', label: 'Backlog', border: 'border-zinc-200 dark:border-zinc-800', dot: 'bg-zinc-400' },
@@ -57,6 +71,7 @@ export default function KanbanPage() {
 
   // Dialog states
   const [pendingStatusChange, setPendingStatusChange] = useState<{ id: number; status: string } | null>(null)
+  const [pendingWo, setPendingWo] = useState<WorkOrderResponse | null>(null)
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false)
@@ -78,7 +93,7 @@ export default function KanbanPage() {
         usersApi.getAll()
       ])
       setWorkOrders(wos)
-      setTechnicians(users.filter(u => u.roleName === 'TECHNICIAN' || u.roleId === 3))
+      setTechnicians(users.filter(u => u.roleName?.toUpperCase() === 'TECHNICIAN' || u.roleId === 3))
     } catch (e) {
       console.error(e)
     } finally {
@@ -110,11 +125,14 @@ export default function KanbanPage() {
     setDraggingId(null)
 
     const wo = workOrders.find(w => w.woId === id)
-    if (!wo || wo.status === status) return
+    if (!wo) return
+    // Allow re-opening dialogs even if same status
+    if (wo.status === status && !['ASSIGNED', 'SCHEDULED', 'ON_HOLD'].includes(status)) return
 
     // Special handling for certain transitions
     if (status === 'ASSIGNED') {
       setPendingStatusChange({ id, status })
+      setPendingWo(wo)
       setSelectedTechId(wo.assignedToUserId?.toString() || "")
       setIsAssignDialogOpen(true)
       return
@@ -139,6 +157,8 @@ export default function KanbanPage() {
     await executeStatusUpdate(id, status)
   }
 
+  const { toast } = useToast()
+
   const executeStatusUpdate = async (id: number, status: string, additionalData: any = {}) => {
     setActionLoading(true)
     // Optimistic Update
@@ -147,14 +167,22 @@ export default function KanbanPage() {
     try {
       if (status === 'ASSIGNED' && additionalData.assignedToUserId) {
         await workOrdersApi.assign(id, { assignedToUserId: additionalData.assignedToUserId })
+        toast({ title: "Work Order Assigned", description: "The technician has been successfully registered." })
       } else if (status === 'SCHEDULED' && additionalData.plannedStart) {
         await workOrdersApi.reschedule(id, additionalData)
+        toast({ title: "Work Order Scheduled", description: "The intervention has been updated." })
       } else {
         await workOrdersApi.updateStatus(id, { status, note: additionalData.note })
+        toast({ title: "Status Updated", description: `Work order moved to ${status.toLowerCase().replace('_', ' ')}.` })
       }
       await loadData() // Refresh to get server values
     } catch (e) {
       console.error(e)
+      toast({
+        title: "Action Failed",
+        description: getApiErrorMessage(e),
+        variant: "destructive"
+      })
       loadData() // Rollback
     } finally {
       setActionLoading(false)
@@ -188,19 +216,72 @@ export default function KanbanPage() {
     setIsOnHoldDialogOpen(false)
   }
 
+  const [columnWidth, setColumnWidth] = useState<'standard' | 'wide' | 'compact'>('standard')
+
   if (loading) {
     return <div className="flex h-96 items-center justify-center text-muted-foreground animate-pulse">Loading board...</div>
   }
 
+  const widthClass = columnWidth === 'wide' ? 'w-96' : columnWidth === 'compact' ? 'w-64' : 'w-80'
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-8 min-h-[70vh]">
+    <div className="space-y-4">
+      {/* Board Controls */}
+      <div className="flex items-center justify-between bg-card/50 backdrop-blur-sm p-2 rounded-2xl border border-border/40 shadow-sm">
+        <div className="flex items-center gap-2 pl-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mr-2">Column Width</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setColumnWidth('compact')}
+            className={cn("h-7 px-3 text-[10px] uppercase font-bold tracking-tighter rounded-lg", columnWidth === 'compact' ? "bg-primary text-primary-foreground" : "hover:bg-primary/10")}
+          >
+            Compact
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setColumnWidth('standard')}
+            className={cn("h-7 px-3 text-[10px] uppercase font-bold tracking-tighter rounded-lg", columnWidth === 'standard' ? "bg-primary text-primary-foreground" : "hover:bg-primary/10")}
+          >
+            Standard
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setColumnWidth('wide')}
+            className={cn("h-7 px-3 text-[10px] uppercase font-bold tracking-tighter rounded-lg", columnWidth === 'wide' ? "bg-primary text-primary-foreground" : "hover:bg-primary/10")}
+          >
+            Wide
+          </Button>
+        </div>
+        
+        <div className="flex items-center gap-1 pr-1 text-[10px] font-black text-muted-foreground uppercase opacity-40">
+          <ArrowRight className="h-3 w-3 animate-pulse" />
+          Scroll for more columns
+        </div>
+      </div>
+
+      <div className="relative group/kanban">
+      {/* Scroll indicator for horizontal exploration */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 pointer-events-none opacity-0 group-hover/kanban:opacity-100 transition-opacity hidden md:flex flex-col items-center gap-2 pr-4">
+        <div className="bg-primary/20 backdrop-blur-md p-3 rounded-full border border-primary/30 text-primary animate-bounce-x">
+          <ArrowRight className="h-6 w-6" />
+        </div>
+        <span className="text-[10px] font-black uppercase tracking-widest text-primary drop-shadow-sm bg-background/50 px-2 py-0.5 rounded-full">Slide for More</span>
+      </div>
+
+      <div className={cn(
+        "flex gap-6 overflow-x-auto pb-12 pt-2 px-2 min-h-[75vh] scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent hover:scrollbar-thumb-primary/40 transition-all",
+        "mask-fade-right" // Optional: custom CSS mask for fading edge
+      )}>
       {COLUMNS.map(column => {
         const columnWos = workOrders.filter(wo => wo.status === column.id)
         
         return (
           <div 
             key={column.id}
-            className="flex-shrink-0 w-80 flex flex-col gap-4"
+            className={cn("flex-shrink-0 flex flex-col gap-4 transition-all duration-500", widthClass)}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, column.id)}
           >
@@ -295,7 +376,10 @@ export default function KanbanPage() {
           </div>
         )
       })}
-      {/* ── ASSIGNMENT DIALOG ─────────────────────────────────── */}
+      </div>
+    </div>
+
+    {/* ── ASSIGNMENT DIALOG ─────────────────────────────────── */}
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -316,10 +400,22 @@ export default function KanbanPage() {
                 onChange={(e) => setSelectedTechId(e.target.value)}
               >
                 <option value="">Select a technician...</option>
-                {technicians.map(t => (
-                  <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>
+                {technicians
+                  .filter(t => !pendingWo?.departmentId || t.departmentId === pendingWo.departmentId || !t.departmentId)
+                  .map(t => (
+                  <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ' (No Department)'}</option>
                 ))}
               </select>
+              {technicians.length > 0 && technicians.filter(t => !pendingWo?.departmentId || t.departmentId === pendingWo.departmentId || !t.departmentId).length === 0 && (
+                <p className="text-[11px] text-rose-500 mt-1">
+                  No technicians found in department: {pendingWo?.departmentName || 'Unknown'}
+                </p>
+              )}
+              {technicians.length === 0 && (
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  No technicians available. Please check user roles.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

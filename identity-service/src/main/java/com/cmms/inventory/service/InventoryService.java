@@ -77,6 +77,7 @@ public class InventoryService {
                 .unitCost(request.getUnitCost())
                 .location(request.getLocation())
                 .supplier(request.getSupplier())
+                .build();
         SparePart saved = sparePartRepository.save(part);
         
         Actor actor = getCurrentActor();
@@ -105,6 +106,7 @@ public class InventoryService {
                 .partId(id)
                 .quantityChange(change)
                 .transactionType("ADJUSTMENT")
+                .build());
         SparePart saved = sparePartRepository.save(part);
 
         Actor actor = getCurrentActor();

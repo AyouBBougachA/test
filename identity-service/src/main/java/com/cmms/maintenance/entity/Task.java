@@ -107,6 +107,9 @@ public class Task {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    @Column(name = "follow_on_task_id")
+    private Integer followOnTaskId;
+
     /** Accumulated time spent on task in seconds */
     @Builder.Default
     @Column(name = "total_timer_duration")
@@ -129,7 +132,8 @@ public class Task {
     public enum TaskApprovalStatus {
         PENDING,
         APPROVED,
-        REJECTED
+        REJECTED,
+        REPLAN_REQUESTED
     }
 
     public enum TaskPriority {

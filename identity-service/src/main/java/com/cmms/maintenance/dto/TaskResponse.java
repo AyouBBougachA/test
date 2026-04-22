@@ -39,6 +39,7 @@ public class TaskResponse {
     private String        approvalStatus;
     private Integer       approvedByUserId;
     private LocalDateTime approvedAt;
+    private Integer       followOnTaskId;
     private List<TaskAuditLogResponse> auditLogs;
     private List<TaskResponse> childTasks;
     private Double progress;

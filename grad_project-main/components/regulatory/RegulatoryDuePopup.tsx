@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   ShieldAlert, 
@@ -10,7 +10,8 @@ import {
   Clock,
   AlertTriangle,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Wrench
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -26,9 +27,11 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { regulatoryApi, type RegulatoryPlanResponse } from "@/lib/api/regulatory"
 import { useI18n } from "@/lib/i18n"
+import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 
 export function RegulatoryDuePopup() {
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const { language } = useI18n()
   const router = useRouter()
   const [plans, setPlans] = useState<RegulatoryPlanResponse[]>([])
@@ -36,7 +39,15 @@ export function RegulatoryDuePopup() {
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
   useEffect(() => {
-    // Only show once per session or day
+    if (isAuthLoading || !isAuthenticated) return
+
+    // Restriction: Only Admins and Maintenance Managers see this compliance popup
+    const allowedRoles = ['ADMIN', 'MAINTENANCE_MANAGER']
+    if (!user || !user.roleName || !allowedRoles.includes(user.roleName.toUpperCase())) {
+      return
+    }
+
+    // Only show once per session unless a new critical plan appears
     const dismissed = sessionStorage.getItem('regulatory-popup-dismissed')
     if (dismissed) return
 
@@ -54,7 +65,7 @@ export function RegulatoryDuePopup() {
       }
     }
     load()
-  }, [])
+  }, [isAuthenticated, isAuthLoading])
 
   const handleDismiss = () => {
     setIsOpen(false)
@@ -66,11 +77,30 @@ export function RegulatoryDuePopup() {
     router.push(`/planning/regulatory/${id}`)
   }
 
+  const handleGenerateWO = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation()
+    try {
+      await regulatoryApi.generateWorkOrder(id)
+      setPlans(prev => prev.filter(p => p.planId !== id))
+      // If no plans left, close the popup
+      if (plans.length <= 1) {
+        handleDismiss()
+      }
+    } catch (err) {
+      console.error("Failed to generate work order", err)
+      alert("Failed to generate work order")
+    }
+  }
+
   if (plans.length === 0) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl border-border shadow-2xl p-0 overflow-hidden rounded-3xl">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // Prevent closing by clicking outside or ESC
+      if (!open) return;
+      setIsOpen(open);
+    }}>
+      <DialogContent showCloseButton={false} className="sm:max-w-md bg-card/95 backdrop-blur-xl border-border shadow-2xl p-0 overflow-hidden rounded-3xl">
         <div className="h-2 w-full bg-primary" />
         <div className="p-6 space-y-6">
           <DialogHeader className="space-y-2">
@@ -93,40 +123,37 @@ export function RegulatoryDuePopup() {
             {plans.map(plan => (
               <div 
                 key={plan.planId} 
-                className="group p-4 rounded-2xl bg-muted/40 border border-border/50 hover:bg-muted/60 hover:border-primary/30 transition-all cursor-pointer relative overflow-hidden"
-                onClick={() => handleView(plan.planId)}
+                className="group p-4 rounded-2xl bg-muted/40 border border-border/50 hover:bg-muted/60 hover:border-primary/30 transition-all relative overflow-hidden"
               >
                 <div className="flex justify-between items-start relative z-10">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1 min-w-0" onClick={() => handleView(plan.planId)} style={{cursor: 'pointer'}}>
                         <div className="flex items-center gap-2">
                             <span className="font-mono text-[10px] font-bold text-primary">{plan.planCode}</span>
                             <Badge className={cn("text-[9px] h-4 px-1.5", plan.status === 'OVERDUE' ? 'bg-rose-500' : 'bg-amber-500')}>
                                 {plan.status}
                             </Badge>
                         </div>
-                        <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{plan.title}</h4>
+                        <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">{plan.title}</h4>
                         <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium">
                             <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(plan.nextDueDate).toLocaleDateString()}</span>
-                            <span className="flex items-center gap-1 font-bold text-primary/70 italic underline">View Details <ChevronRight className="h-3 w-3" /></span>
+                            <span className="bg-amber-500/10 text-amber-600 px-1.5 rounded">{plan.equipmentName}</span>
                         </div>
                     </div>
+                    <Button 
+                      size="sm" 
+                      onClick={(e) => handleGenerateWO(e, plan.planId)}
+                      className="ml-2 bg-primary hover:bg-primary/90 text-primary-foreground h-9 shadow-lg shadow-primary/20"
+                    >
+                      <Wrench className="h-3.5 w-3.5 mr-2" />
+                      {language === 'fr' ? 'Générer OT' : 'Generate WO'}
+                    </Button>
                 </div>
               </div>
             ))}
           </div>
-
-          <DialogFooter className="pt-2 flex sm:justify-center border-t border-border/40 mt-4">
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleDismiss}
-                className="text-xs text-muted-foreground hover:text-foreground h-9 rounded-xl"
-            >
-              {language === 'fr' ? 'Plus tard' : 'Remind me later'}
-            </Button>
-          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>
+
   )
 }

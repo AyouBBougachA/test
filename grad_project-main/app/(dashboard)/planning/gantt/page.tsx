@@ -32,6 +32,7 @@ import { useI18n } from "@/lib/i18n"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import type { WorkOrderResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import { getStatusColorVar, getStatusTextColorVar } from "@/lib/colors-util"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -133,18 +134,13 @@ export default function PlanningGanttPage() {
     return { left, width }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-      case 'VALIDATED':
-        return "from-emerald-500 to-emerald-600 shadow-emerald-500/20";
-      case 'IN_PROGRESS':
-        return "from-cyan-500 to-cyan-600 shadow-cyan-500/20";
-      case 'ON_HOLD':
-      case 'DELAYED':
-        return "from-amber-500 to-amber-600 shadow-amber-500/20";
-      default: // scheduled, assigned
-        return "from-blue-500 to-indigo-600 shadow-blue-500/20";
+  const getStatusStyle = (status: string) => {
+    const bgColor = getStatusColorVar(status, 'GANTT')
+    const textColor = getStatusTextColorVar(status, 'GANTT')
+    return {
+      backgroundColor: bgColor,
+      color: textColor,
+      boxShadow: `0 4px 14px 0 rgba(var(--color-status-${status.toLowerCase().replace(/_/g, '-')}-rgb, 0,0,0), 0.39)`
     }
   }
 
@@ -213,22 +209,18 @@ export default function PlanningGanttPage() {
           <CardHeader className="border-b border-border bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                   <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                   <span>Scheduled</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                   <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-                   <span>In Progress</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                   <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                   <span>Completed</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                   <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                   <span>Delayed</span>
-                </div>
+                {['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED'].map(status => (
+                  <div key={status} className="flex items-center gap-2 text-xs text-muted-foreground">
+                     <div 
+                       className="w-3 h-3 rounded-full" 
+                       style={{ 
+                         backgroundColor: getStatusColorVar(status), 
+                         boxShadow: `0 0 8px rgba(var(--color-status-${status.toLowerCase().replace(/_/g, '-')}-rgb, 0,0,0), 0.5)` 
+                       }} 
+                     />
+                     <span>{status.replace(/_/g, ' ')}</span>
+                  </div>
+                ))}
               </div>
               <Badge variant="outline" className="font-mono text-[10px] hidden sm:block">
                 {workOrders.length} SCHEDULED WOs
@@ -312,10 +304,11 @@ export default function PlanningGanttPage() {
                                 width: `calc(${layout.width}%)`
                               }}
                             >
-                              <div className={`h-full w-full rounded-md bg-gradient-to-r shadow-lg flex items-center justify-center group/bar cursor-pointer relative ${getStatusColor(wo.status)}`}
+                              <div className={`h-full w-full rounded-md flex items-center justify-center group/bar cursor-pointer relative`}
+                                   style={getStatusStyle(wo.status)}
                                    onClick={() => window.location.href = `/work-orders/${wo.woId}`}
                               >
-                                 <Wrench className="h-3.5 w-3.5 text-white opacity-80" />
+                                 <Wrench className="h-3.5 w-3.5 opacity-80" style={{ color: 'currentColor' }} />
                                  
                                  {/* Tooltip */}
                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/bar:opacity-100 transition-all pointer-events-none z-30">

@@ -36,6 +36,12 @@ public class AuditLog {
     @Column(name = "action_details", length = 1000)
     private String details;
 
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "account_name")
+    private String accountName;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

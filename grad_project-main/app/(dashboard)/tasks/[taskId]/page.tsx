@@ -126,6 +126,34 @@ export default function TaskDetailPage() {
     } catch (e) { console.error(e) } finally { setIsSaving(false) }
   }
 
+  const handleReplanRequest = async (reason: string) => {
+    if (!task || !reason) return
+    try {
+      setIsSaving(true)
+      await tasksApi.replanRequest(task.taskId, reason)
+      await loadTask()
+      setBlockedReason("")
+    } catch (e) { console.error(e) } finally { setIsSaving(false) }
+  }
+
+  const handleApproveReplan = async (status: 'APPROVED' | 'REJECTED') => {
+    if (!task) return
+    try {
+      setIsSaving(true)
+      await tasksApi.approveReplan(task.taskId, status)
+      await loadTask()
+    } catch (e) { console.error(e) } finally { setIsSaving(false) }
+  }
+
+  const handleDirectReplan = async (reason?: string) => {
+    if (!task) return
+    try {
+      setIsSaving(true)
+      await tasksApi.replan(task.taskId, reason)
+      await loadTask()
+    } catch (e) { console.error(e) } finally { setIsSaving(false) }
+  }
+
   const statusConfig = (s: string) => {
     switch (s?.toUpperCase()) {
       case 'DONE': case 'PASS': return { color: 'bg-emerald-600', label: 'Completed', icon: <CheckCircle2 className="h-4 w-4" /> }
@@ -154,7 +182,9 @@ export default function TaskDetailPage() {
   const cfg = statusConfig(task.status)
   const isDone = task.status === 'DONE' || task.status === 'PASS'
   const isPendingApproval = task.approvalStatus === 'PENDING'
+  const isReplanRequested = task.approvalStatus === 'REPLAN_REQUESTED'
   const isInProgress = task.status === 'IN_PROGRESS'
+  const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
 
   return (
     <div className="max-w-5xl mx-auto pb-32 space-y-6">
@@ -186,6 +216,11 @@ export default function TaskDetailPage() {
                 {isPendingApproval && (
                   <Badge className="bg-amber-500 text-white text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-sm border-none animate-pulse">
                     <Clock className="h-4 w-4 mr-1.5" /> Awaiting Manager Review
+                  </Badge>
+                )}
+                {isReplanRequested && (
+                  <Badge className="bg-rose-500 text-white text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-sm border-none animate-pulse">
+                    <Calendar className="h-4 w-4 mr-1.5" /> Replan Requested
                   </Badge>
                 )}
                 <span className="text-[10px] font-black text-muted-foreground/80 tracking-tighter uppercase flex items-center gap-1">
@@ -442,6 +477,29 @@ export default function TaskDetailPage() {
               </div>
             )}
 
+            {/* REPLAN APPROVAL ACTIONS */}
+            {isReplanRequested && (user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER') && (
+              <div className="p-5 bg-rose-500/5 border border-rose-500/20 rounded-2xl flex flex-col gap-4 shadow-inner">
+                <div className="flex items-center gap-3">
+                  <div className="bg-rose-500 p-2 rounded-xl text-white">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-rose-900 uppercase tracking-tight dark:text-rose-200">Replan Request Approval</h4>
+                    <p className="text-xs text-rose-700/80 dark:text-rose-400/80 font-medium">Technician has requested to replan this task. Reason: <strong>{task.blockedReason}</strong></p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => handleApproveReplan('APPROVED')} disabled={isSaving} className="flex-1 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 font-bold gap-2">
+                    <CheckCircle2 className="h-4 w-4" /> Approve Replan (Creates Follow-on)
+                  </Button>
+                  <Button variant="outline" onClick={() => handleApproveReplan('REJECTED')} disabled={isSaving} className="flex-1 h-12 border-slate-500/30 text-slate-500 bg-card hover:bg-slate-500/5 rounded-xl font-bold gap-2">
+                    <XCircle className="h-4 w-4" /> Decline
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 p-5 bg-card rounded-2xl border border-border/60">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Blocking Issue</Label>
@@ -494,9 +552,24 @@ export default function TaskDetailPage() {
                 </Button>
               )}
               {task.status !== 'BLOCKED' && (
-                <Button variant="outline" onClick={() => handleStatus('BLOCKED')} className="h-11 px-4 border-border/60 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20 rounded-xl font-bold gap-2">
-                  <AlertCircle className="h-4 w-4" /> Block
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => handleStatus('BLOCKED')} className="h-11 px-4 border-border/60 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20 rounded-xl font-bold gap-2">
+                    <AlertCircle className="h-4 w-4" /> Block
+                  </Button>
+                  
+                  {isManager && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        const reason = blockedReason || prompt(user?.language === 'fr' ? "Raison de la replanification :" : "Reason for replanning:")
+                        if (reason !== null) handleDirectReplan(reason)
+                      }} 
+                      className="h-11 px-4 border-indigo-500/30 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl font-bold gap-2"
+                    >
+                      <History className="h-4 w-4" /> {user?.language === 'fr' ? 'Replanifier' : 'Replan Task'}
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
             <Button onClick={() => handleStatus('DONE')} className="h-11 flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/20 font-black uppercase tracking-[0.2em] text-[10px] gap-2">

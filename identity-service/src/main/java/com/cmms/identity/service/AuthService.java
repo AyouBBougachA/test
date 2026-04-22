@@ -43,12 +43,14 @@ public class AuthService {
             );
 
             UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-            String roleName = userPrincipal.getUser().getRole().getRoleName();
+            java.util.List<String> roleNames = userPrincipal.getUser().getRoles().stream()
+                    .map(com.cmms.identity.entity.Role::getRoleName)
+                    .collect(java.util.stream.Collectors.toList());
 
             String token = jwtTokenProvider.generateToken(
                     userPrincipal.getUser().getUserId(),
                     userPrincipal.getUser().getEmail(),
-                    roleName
+                    roleNames
             );
 
             UserResponse userResponse = userMapper.toResponse(userPrincipal.getUser());

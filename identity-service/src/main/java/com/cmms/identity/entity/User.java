@@ -37,9 +37,14 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id", nullable = false)
-    private Role role;
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    @Builder.Default
+    private java.util.Set<Role> roles = new java.util.HashSet<>();
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "department_id")
@@ -54,4 +59,14 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    public boolean hasRole(String... roleNames) {
+        if (roles == null || roles.isEmpty()) return false;
+        for (String name : roleNames) {
+            if (roles.stream().anyMatch(r -> r.getRoleName().equalsIgnoreCase(name))) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

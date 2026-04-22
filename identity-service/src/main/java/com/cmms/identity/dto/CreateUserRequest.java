@@ -25,8 +25,9 @@ public class CreateUserRequest {
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
 
-    @NotNull(message = "Role ID is required")
-    private Integer roleId;
+    @NotNull(message = "At least one role is required")
+    @Size(min = 1, message = "At least one role is required")
+    private java.util.List<Integer> roleIds;
 
     private Integer departmentId;
 

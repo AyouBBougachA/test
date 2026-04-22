@@ -48,8 +48,9 @@ import { workOrdersApi } from "@/lib/api/work-orders"
 import { equipmentApi } from "@/lib/api/equipment"
 import type { WorkOrderResponse, EquipmentResponse } from "@/lib/api/types"
 import { format, formatDistanceToNow } from "date-fns"
-import { fr, enUS } from "date-fns/locale"
+import { fr, enUS, ar } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { WorkOrderTypeBadge } from "@/components/work-order-type-badge"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -75,7 +76,7 @@ export default function WorkOrdersPage() {
     setCurrentPage(1)
   }, [search, filter, showArchived])
 
-  const dateLocale = language === 'fr' ? fr : enUS
+  const dateLocale = language === 'fr' ? fr : language === 'ar' ? ar : enUS
 
   const [newWO, setNewWO] = useState({
     title: "",
@@ -217,12 +218,12 @@ export default function WorkOrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {user?.roleName !== 'TECHNICIAN' && (
+          {!user?.hasRole('TECHNICIAN') && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                   <Plus className="h-4 w-4 mr-2" />
-                  {language === 'fr' ? 'Nouvel Ordre' : 'New Work Order'}
+                  {t('newWorkOrder')}
                 </Button>
               </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl">
@@ -388,13 +389,17 @@ export default function WorkOrdersPage() {
               <DropdownMenuItem onClick={() => setFilter("completed")}>Completed</DropdownMenuItem>
               
               <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/50 my-1">Type</div>
-              <DropdownMenuItem onClick={() => setFilter("preventive")} className="text-emerald-500 font-bold italic">
-                <Wrench className="h-3.5 w-3.5 mr-2" />
-                Preventive
+              <DropdownMenuItem onClick={() => setFilter("preventive")} className="gap-2">
+                <WorkOrderTypeBadge type="PREVENTIVE" lang={language as any} size="sm" />
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilter("corrective")} className="text-rose-500 font-bold italic">
-                <AlertCircle className="h-3.5 w-3.5 mr-2" />
-                Corrective
+              <DropdownMenuItem onClick={() => setFilter("corrective")} className="gap-2">
+                <WorkOrderTypeBadge type="CORRECTIVE" lang={language as any} size="sm" />
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("regulatory")} className="gap-2">
+                <WorkOrderTypeBadge type="REGULATORY" lang={language as any} size="sm" />
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("predictive")} className="gap-2">
+                <WorkOrderTypeBadge type="PREDICTIVE" lang={language as any} size="sm" />
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -437,7 +442,8 @@ export default function WorkOrdersPage() {
                       <TableHead>Title</TableHead>
                       <TableHead>Assignee</TableHead>
                       <TableHead>Duration</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{t('type')}</TableHead>
+                      <TableHead>{t('status')}</TableHead>
                       <TableHead className="whitespace-nowrap">Updated</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -469,6 +475,9 @@ export default function WorkOrdersPage() {
                             <Clock className="h-3.5 w-3.5" />
                             <span>{wo.estimatedDuration || '—'}h</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <WorkOrderTypeBadge type={wo.woType} lang={language as any} size="sm" />
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1.5">

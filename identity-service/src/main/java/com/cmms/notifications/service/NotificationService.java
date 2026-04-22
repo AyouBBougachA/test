@@ -34,7 +34,7 @@ public class NotificationService {
     @Transactional
     public void notifyRoles(List<String> roles, String type, String message, Integer referenceId) {
         List<User> users = userRepository.findAll().stream()
-                .filter(u -> u.getRole() != null && roles.contains(u.getRole().getRoleName().toUpperCase()))
+                .filter(u -> u.hasRole(roles.toArray(new String[0])))
                 .toList();
 
         for (User user : users) {

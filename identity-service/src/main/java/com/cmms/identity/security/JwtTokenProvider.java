@@ -39,7 +39,7 @@ public class JwtTokenProvider {
      * @param email   used as the JWT subject (username)
      * @param role    the user's role name (e.g. "ADMIN")
      */
-    public String generateToken(Integer userId, String email, String role) {
+    public String generateToken(Integer userId, String email, java.util.Collection<String> roles) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
@@ -50,7 +50,7 @@ public class JwtTokenProvider {
                 .expiration(expiryDate)
                 .claims(Map.of(
                         "userId", userId,
-                        "role", role
+                        "roles", roles
                 ))
                 .signWith(signingKey)
                 .compact();

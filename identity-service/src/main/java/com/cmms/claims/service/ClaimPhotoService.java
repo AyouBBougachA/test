@@ -223,18 +223,18 @@ public class ClaimPhotoService {
             if (displayName == null || displayName.isBlank()) {
                 displayName = userPrincipal.getUsername();
             }
-            String role = userPrincipal.getUser() == null || userPrincipal.getUser().getRole() == null || userPrincipal.getUser().getRole().getRoleName() == null
-                    ? null
-                    : userPrincipal.getUser().getRole().getRoleName().toUpperCase();
-            return new Actor(userId, displayName, role);
+            List<String> roles = userPrincipal.getUser() == null ? List.of() : userPrincipal.getUser().getRoles().stream()
+                    .map(r -> r.getRoleName().toUpperCase())
+                    .collect(java.util.stream.Collectors.toList());
+            return new Actor(userId, displayName, roles);
         }
 
-        return new Actor(null, authentication.getName(), null);
+        return new Actor(null, authentication.getName(), List.of());
     }
 
-    private record Actor(Integer userId, String displayName, String role) {
+    private record Actor(Integer userId, String displayName, List<String> roles) {
         boolean isAdminOrManager() {
-            return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
+            return roles.contains(ROLE_ADMIN) || roles.contains(ROLE_MAINTENANCE_MANAGER);
         }
     }
 

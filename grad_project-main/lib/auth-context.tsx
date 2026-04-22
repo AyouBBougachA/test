@@ -89,6 +89,6 @@ export function useAuth() {
   return context
 }
 
-export function getRoleLabel(roleName: string | null | undefined, lang: "en" | "fr" = "en"): string {
+export function getRoleLabel(roleName: string | null | undefined, lang: "en" | "fr" | "ar" = "en"): string {
   return getRoleLabelImpl(roleName, lang)
 }

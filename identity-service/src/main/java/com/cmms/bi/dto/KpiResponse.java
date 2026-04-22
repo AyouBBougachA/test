@@ -2,6 +2,7 @@ package com.cmms.bi.dto;
 
 import lombok.*;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -44,4 +45,34 @@ public class KpiResponse {
     private BigDecimal ytdBudget;
     private BigDecimal costAvoidance;
     private long expectedLifeSpanScore;
+
+    // Detailed costly equipments
+    private List<EquipmentCostDetail> costlyEquipments;
+
+    // Detailed recent work orders
+    private List<RecentWorkOrderDetail> recentWorkOrders;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RecentWorkOrderDetail {
+        private String equipmentName;
+        private String woCode;
+        private String type;
+        private String status;
+        private String date;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EquipmentCostDetail {
+        private String name;
+        private String category;
+        private String department;
+        private BigDecimal totalCost;
+        private double percentageOfTotal;
+    }
 }

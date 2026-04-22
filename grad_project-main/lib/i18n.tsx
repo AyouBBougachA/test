@@ -1,8 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 
-export type Language = "en" | "fr"
+export type Language = "en" | "fr" | "ar"
 
 const translations = {
   en: {
@@ -437,6 +437,209 @@ const translations = {
     saveAsTask: "Enregistrer comme Tâche",
     templateNotes: "Instructions du Modèle",
   },
+  ar: {
+    // Navigation
+    home: "الرئيسية",
+    dashboard: "لوحة التحكم",
+    equipment: "المعدات",
+    claims: "المطالبات",
+    workOrders: "أوامر العمل",
+    tasks: "المهام",
+    planning: "التخطيط",
+    calendar: "التقويم",
+    kanban: "لوحة كانبان",
+    workload: "عبء الفريق",
+    gantt: "مخطط غانت",
+    regulatoryPlans: "الخطط التنظيمية",
+    meters: "العدادات",
+    inventory: "المخزون",
+    ai: "الذكاء الاصطناعي",
+    prioritization: "الأولويات",
+    predictive: "تنبؤي",
+    failureAnalysis: "تحليل الأعطال",
+    bi: "ذكاء الأعمال",
+    executive: "الإدارة",
+    maintenance: "الصيانة",
+    biomedical: "طب حيوي",
+    financial: "مالي",
+    admin: "الإدارة",
+    users: "المستخدمون",
+    roles: "الأدوار",
+    referenceData: "البيانات المرجعية",
+    rulesThresholds: "القواعد والحدود",
+    auditLogs: "سجلات التدقيق",
+    profile: "الملف الشخصي",
+    settings: "الإعدادات",
+    logout: "تسجيل الخروج",
+    // Landing Page
+    heroTitle: "منصة CMMS للمستشفيات",
+    heroSubtitle: "إدارة مركزية للمعدات وتدفقات الصيانة مع الذكاء الاصطناعي",
+    requestDemo: "طلب عرض توضيحي",
+    signIn: "تسجيل الدخول",
+    exploreDashboard: "استكشاف لوحة التحكم",
+    features: "الميزات",
+    kpiPreview: "معاينة مؤشرات الأداء",
+    testimonials: "الشهادات",
+    // Features
+    equipmentRegistry: "سجل المعدات",
+    equipmentRegistryDesc: "قاعدة بيانات مركزية لجميع المعدات",
+    incidentWorkflow: "سير العمل للحوادث",
+    incidentWorkflowDesc: "إدارة المطالبات من الإنشاء إلى الحل",
+    workOrderManagement: "إدارة أوامر العمل",
+    workOrderManagementDesc: "أوامر عمل تصحيحية ووقائية وتنظيمية وتنبؤية",
+    taskChecklists: "قوائم التحقق",
+    taskChecklistsDesc: "قوائم تحقق رقمية مع التحقق من الخطوات",
+    planningCalendar: "التخطيط وغانت",
+    planningCalendarDesc: "تخطيط الصيانة القائم على التقويم والعدادات والتنبؤات",
+    metersThresholds: "العدادات والحدود",
+    metersThresholdsDesc: "تتبع ساعات التشغيل والدورات مع تنبيهات تلقائية",
+    sparePartsStock: "قطع الغيار والمخزون",
+    sparePartsStockDesc: "مستودع القطع مع تنبيهات المخزون الأدنى",
+    aiPrioritization: "تحديد الأولويات بالذكاء الاصطناعي",
+    aiPrioritizationDesc: "تحديد أولويات ذكي بناءً على الأهمية والتأثير",
+    predictiveMaintenance: "الصيانة التنبؤية",
+    predictiveMaintenanceDesc: "تقييم المخاطر وتوصيات التدخل",
+    biDashboards: "لوحات BI",
+    biDashboardsDesc: "لوحات تحليلية للإدارة والصيانة والمالية",
+    // KPIs
+    mtbf: "MTBF",
+    mtbfFull: "متوسط الوقت بين الأعطال",
+    mttr: "MTTR",
+    mttrFull: "متوسط وقت الإصلاح",
+    availabilityRate: "معدل التوفر",
+    correctivePreventiveRatio: "نسبة التصحيحي/الوقائي",
+    maintenanceCostEquipment: "التكلفة لكل معدة",
+    maintenanceCostService: "التكلفة لكل خدمة",
+    hours: "ساعات",
+    // Login
+    welcomeBack: "مرحباً بك!",
+    loginToAccount: "تسجيل الدخول إلى حسابك",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    rememberMe: "تذكرني",
+    forgotPassword: "نسيت كلمة المرور؟",
+    login: "تسجيل الدخول",
+    createAccountWith: "إنشاء حساب بـ",
+    demoLogins: "حسابات تجريبية",
+    administrator: "مسؤول",
+    maintenanceManager: "مدير الصيانة",
+    technician: "تقني",
+    directionFinance: "الإدارة / المالية",
+    secureLogin: "مصادقة JWT آمنة",
+    // Dashboard
+    overview: "نظرة عامة",
+    totalEquipment: "إجمالي المعدات",
+    activeWorkOrders: "أوامر العمل النشطة",
+    pendingClaims: "المطالبات المعلقة",
+    criticalAlerts: "تنبيهات حرجة",
+    recentActivity: "النشاط الأخير",
+    upcomingMaintenance: "الصيانة القادمة",
+    quickActions: "إجراءات سريعة",
+    newClaim: "مطالبة جديدة",
+    newWorkOrder: "أمر عمل جديد",
+    viewAll: "عرض الكل",
+    search: "بحث",
+    notifications: "الإشعارات",
+    // Equipment
+    equipmentList: "قائمة المعدات",
+    addEquipment: "إضافة معدة",
+    equipmentDetails: "تفاصيل المعدة",
+    serialNumber: "الرقم التسلسلي",
+    location: "الموقع",
+    department: "القسم",
+    classification: "التصنيف",
+    criticality: "الأهمية",
+    status: "الحالة",
+    lastMaintenance: "آخر صيانة",
+    nextMaintenance: "الصيانة القادمة",
+    documents: "الوثائق",
+    interventionHistory: "سجل التدخلات",
+    // Claims
+    claimsList: "قائمة المطالبات",
+    newClaimTitle: "مطالبة جديدة",
+    claimDetails: "تفاصيل المطالبة",
+    qualification: "التأهل",
+    assignment: "التعيين",
+    description: "الوصف",
+    priority: "الأولوية",
+    createdBy: "أنشئ بواسطة",
+    createdAt: "تاريخ الإنشاء",
+    assignedTo: "مسند إلى",
+    // Work Orders
+    workOrdersList: "قائمة أوامر العمل",
+    workOrderDetails: "تفاصيل أمر العمل",
+    type: "النوع",
+    corrective: "تصحيحي",
+    preventive: "وقائي",
+    regulatory: "تنظيمي",
+    estimatedTime: "الوقت المقدر",
+    actualTime: "الوقت الفعلي",
+    partsUsed: "القطع المستخدمة",
+    cost: "التكلفة",
+    // Status
+    active: "نشط",
+    outOfService: "خارج الخدمة",
+    retired: "متقاعد",
+    operational: "تشغيلي",
+    underRepair: "تحت الإصلاح",
+    archived: "مؤرشف",
+    open: "مفتوح",
+    qualified: "مؤهل",
+    assigned: "معين",
+    inProgress: "قيد التنفيذ",
+    underControl: "تحت السيطرة",
+    closed: "مغلق",
+    overdue: "متأخر",
+    critical: "حرج",
+    high: "عالي",
+    medium: "متوسط",
+    low: "منخفض",
+    // Common
+    save: "حفظ",
+    cancel: "إلغاء",
+    delete: "حذف",
+    edit: "تعديل",
+    view: "عرض",
+    export: "تصدير",
+    filter: "تصفية",
+    sort: "ترتيب",
+    actions: "الإجراءات",
+    dateRange: "نطاق التاريخ",
+    selectSite: "اختر الموقع",
+    selectDepartment: "اختر القسم",
+    allSites: "جميع المواقع",
+    allDepartments: "جميع الأقسام",
+    loading: "جار التحميل...",
+    noData: "لا توجد بيانات",
+    // Footer
+    product: "المنتج",
+    modules: "الوحدات",
+    security: "الأمان",
+    support: "الدعم",
+    contact: "التواصل",
+    privacyPolicy: "سياسة الخصوصية",
+    termsOfService: "شروط الخدمة",
+    allRightsReserved: "جميع الحقوق محفوظة",
+    // Meter Alerts
+    preventiveRecommendation: "توصية الصيانة الوقائية",
+    thresholdExceededTitle: "تجاوز الحد",
+    thresholdExceededDesc: "تجاوز عداد واحد أو أكثر حدوده المحددة. يُنصح بالتدخل المبكر.",
+    createPreventiveWO: "إنشاء أمر عمل وقائي",
+    ignoreAlert: "تجاهل الآن",
+    recommendedPlan: "خطة العمل الموصى بها",
+    equipmentUnderRepair: "تم تحديث حالة المعدة إلى: تحت الإصلاح.",
+    woCreatedSuccess: "تم إنشاء أمر العمل الوقائي بنجاح.",
+    // Task Templates
+    useTemplate: "استخدام نموذج",
+    customTask: "مهمة مخصصة",
+    creationMode: "وضع الإنشاء",
+    selectTemplate: "اختر نموذجاً",
+    templatePreview: "معاينة النموذج",
+    generatedChecklist: "قائمة التحقق المُنشأة",
+    validationRules: "قواعد التحقق",
+    saveAsTask: "حفظ كمهمة",
+    templateNotes: "تعليمات النموذج",
+  },
 }
 
 type TranslationKey = keyof typeof translations.en
@@ -445,12 +648,38 @@ interface I18nContextType {
   language: Language
   setLanguage: (lang: Language) => void
   t: (key: string) => string
+  isRTL: boolean
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>("en")
+  const [language, setLanguage] = useState<Language>('en')
+  const [mounted, setMounted] = useState(false)
+
+  const isRTL = language === 'ar'
+
+  const handleSetLanguage = useCallback((lang: Language) => {
+    setLanguage(lang)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cmms_lang', lang)
+    }
+  }, [])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('cmms_lang') as Language
+    if (saved && saved !== 'en') {
+      setLanguage(saved)
+    }
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr')
+      document.documentElement.setAttribute('lang', language)
+    }
+  }, [language, isRTL, mounted])
 
   const t = useCallback(
     (key: string): string => {
@@ -459,8 +688,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [language]
   )
 
+  if (!mounted) {
+    return null
+  }
+
   return (
-    <I18nContext.Provider value={{ language, setLanguage, t }}>
+    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage, t, isRTL }}>
       {children}
     </I18nContext.Provider>
   )
@@ -476,29 +709,27 @@ export function useI18n() {
 
 export function LanguageSwitcher() {
   const { language, setLanguage } = useI18n()
+  const langs: { code: Language; label: string }[] = [
+    { code: 'en', label: 'EN' },
+    { code: 'fr', label: 'FR' },
+    { code: 'ar', label: 'ع' },
+  ]
 
   return (
     <div className="flex items-center gap-1 rounded-full bg-muted p-1">
-      <button
-        onClick={() => setLanguage("en")}
-        className={`rounded-full px-3 py-1 text-sm font-medium transition-all ${
-          language === "en"
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        EN
-      </button>
-      <button
-        onClick={() => setLanguage("fr")}
-        className={`rounded-full px-3 py-1 text-sm font-medium transition-all ${
-          language === "fr"
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        FR
-      </button>
+      {langs.map(({ code, label }) => (
+        <button
+          key={code}
+          onClick={() => setLanguage(code)}
+          className={`rounded-full px-3 py-1 text-sm font-medium transition-all ${
+            language === code
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }

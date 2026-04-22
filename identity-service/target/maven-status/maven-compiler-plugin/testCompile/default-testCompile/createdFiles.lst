@@ -1,3 +1,4 @@
+com\cmms\equipment\service\EquipmentServiceValidationTest.class
 com\cmms\identity\controller\UserControllerTest$TestApplication.class
 com\cmms\equipment\controller\EquipmentControllerTest.class
 com\cmms\identity\security\JwtTokenProviderTest.class

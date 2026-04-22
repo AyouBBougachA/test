@@ -52,6 +52,7 @@ import { planningApi } from "@/lib/api/planning"
 import type { WorkOrderResponse, ClaimListItemResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow, format } from "date-fns"
+import { WorkOrderTypeBadge } from "@/components/work-order-type-badge"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -77,9 +78,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
-  const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
-  const isTechnician = user?.roleName?.toUpperCase() === 'TECHNICIAN'
-  const isFinance = user?.roleName?.toUpperCase() === 'FINANCE_MANAGER'
+  const isManager = user?.hasRole('ADMIN', 'MAINTENANCE_MANAGER') ?? false
+  const isTechnician = user?.hasRole('TECHNICIAN') ?? false
+  const isFinance = user?.hasRole('FINANCE_MANAGER') ?? false
 
   const loadData = useCallback(async () => {
     try {
@@ -487,7 +488,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="text-[10px] font-mono font-bold text-muted-foreground">{wo.woCode}</span>
-                          <WoTypeBadge type={wo.woType} />
+                          <WorkOrderTypeBadge type={wo.woType} lang={language as any} size="sm" />
                         </div>
                         <p className="text-sm font-medium truncate">{wo.title}</p>
                         <p className="text-[10px] text-muted-foreground">{wo.assignedToName ?? 'Unassigned'}</p>
@@ -729,19 +730,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   )
 }
 
-function WoTypeBadge({ type }: { type: string }) {
-  const map: Record<string, string> = {
-    CORRECTIVE: 'bg-rose-100 text-rose-700',
-    PREVENTIVE: 'bg-emerald-100 text-emerald-700',
-    REGULATORY: 'bg-blue-100 text-blue-700',
-    PREDICTIVE: 'bg-violet-100 text-violet-700',
-  }
-  return (
-    <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-bold uppercase", map[type?.toUpperCase()] ?? 'bg-muted text-muted-foreground')}>
-      {type}
-    </span>
-  )
-}
+// WoTypeBadge is replaced by the shared WorkOrderTypeBadge component
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {

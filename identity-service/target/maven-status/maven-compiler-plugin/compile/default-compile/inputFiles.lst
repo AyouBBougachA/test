@@ -3,9 +3,11 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\WorkOrderAssignmentRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\CreateRoleRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\entity\Department.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\entity\ColorSettings.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\service\UserService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\controller\InternalIdentityController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\SubTaskRepository.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\service\ColorSettingsService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\repository\EquipmentHistoryRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\repository\EquipmentRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\bi\repository\InventoryTransactionRepository.java
@@ -70,6 +72,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\EquipmentRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\controller\EquipmentController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\exception\ConflictException.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\bi\service\CostBackfillService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\MeterResponse.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\dto\UsePartRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\UpdateWorkOrderRequest.java
@@ -77,6 +80,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\security\JwtAuthenticationFilter.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\CreateClaimRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\mapper\RoleMapper.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\dto\ColorSettingsDto.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\ai\dto\PredictionResponse.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\entity\ClaimStatusHistory.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\repository\UserRepository.java
@@ -126,6 +130,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\dto\CreateDepartmentRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\repository\AuditLogRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\dto\ClaimQualificationRequest.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\controller\ColorSettingsController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\dto\MeterLogResponse.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\entity\Meter.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\security\JwtAuthenticationEntryPoint.java
@@ -175,7 +180,9 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\AssignWorkOrderRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\exception\ClaimsExceptionHandler.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\entity\RegulatoryPlan.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\dto\ColorUpdateRequest.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\controller\EquipmentModelController.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\settings\repository\ColorSettingsRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\repository\MeterThresholdRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\repository\RoleRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\WorkOrderFollowerRepository.java

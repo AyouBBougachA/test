@@ -15,26 +15,63 @@ import {
   eachDayOfInterval,
   isToday
 } from "date-fns"
-import { ChevronLeft, ChevronRight, Info, AlertCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Info, AlertCircle, Plus, CalendarPlus, User, Clock, MapPin, Hash } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { workOrdersApi } from "@/lib/api/work-orders"
-import type { WorkOrderResponse } from "@/lib/api/types"
+import { equipmentApi } from "@/lib/api/equipment"
+import type { WorkOrderResponse, EquipmentResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
+  const [equipments, setEquipments] = useState<EquipmentResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const { toast } = useToast()
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [newWO, setNewWO] = useState({
+    title: "",
+    description: "",
+    equipmentId: "",
+    woType: "CORRECTIVE",
+    priority: "MEDIUM"
+  })
 
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await workOrdersApi.list()
-        setWorkOrders(data)
+        const [wos, eqs] = await Promise.all([
+          workOrdersApi.list(),
+          equipmentApi.getAll()
+        ])
+        setWorkOrders(wos)
+        setEquipments(eqs)
       } catch (e) {
         console.error(e)
       } finally {
@@ -62,11 +99,83 @@ export default function CalendarPage() {
     })
   }
 
+  const handleDragStart = (e: React.DragEvent, woId: number) => {
+    e.dataTransfer.setData("woId", woId.toString())
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetDay: Date) => {
+    e.preventDefault()
+    const woId = parseInt(e.dataTransfer.getData("woId"))
+    if (!woId) return
+
+    const wo = workOrders.find(w => w.woId === woId)
+    if (!wo) return
+
+    // Keep the original time if it exists, otherwise use 09:00
+    const originalTime = wo.plannedStart ? wo.plannedStart.split('T')[1] : "09:00:00"
+    const newPlannedStart = format(targetDay, "yyyy-MM-dd") + "T" + originalTime
+
+    setIsUpdating(true)
+    // Optimistic update
+    setWorkOrders(prev => prev.map(w => w.woId === woId ? { ...w, plannedStart: newPlannedStart } : w))
+
+    try {
+      await workOrdersApi.reschedule(woId, { 
+        plannedStart: newPlannedStart,
+        plannedEnd: wo.plannedEnd ? format(targetDay, "yyyy-MM-dd") + "T" + wo.plannedEnd.split('T')[1] : null
+      })
+      toast({ title: "Updated", description: `Re-scheduled to ${format(targetDay, "MMM dd")}` })
+    } catch (err) {
+      console.error(err)
+      toast({ title: "Failed", description: "Could not re-schedule work order", variant: "destructive" })
+      // Rollback
+      const refresh = await workOrdersApi.list()
+      setWorkOrders(refresh)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleDayClick = (day: Date) => {
+    setSelectedDate(day)
+    setNewWO(prev => ({ ...prev, title: "" })) // Reset title
+    setIsCreateDialogOpen(true)
+  }
+
+  const handleCreateSubmit = async () => {
+    if (!newWO.title || !newWO.equipmentId || !selectedDate) {
+      toast({ title: "Validation Error", description: "Title and Equipment are required.", variant: "destructive" })
+      return
+    }
+
+    setIsUpdating(true)
+    try {
+      const plannedStart = format(selectedDate, "yyyy-MM-dd") + "T09:00:00"
+      await workOrdersApi.create({
+        ...newWO,
+        equipmentId: parseInt(newWO.equipmentId),
+        plannedStart,
+        status: 'SCHEDULED'
+      })
+      toast({ title: "Success", description: "Work Order created and scheduled." })
+      setIsCreateDialogOpen(false)
+      // Reload
+      const updated = await workOrdersApi.list()
+      setWorkOrders(updated)
+    } catch (err) {
+      console.error(err)
+      toast({ title: "Error", description: "Failed to create work order", variant: "destructive" })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   if (loading) {
      return <div className="flex h-96 items-center justify-center text-muted-foreground animate-pulse">Initializing calendar...</div>
   }
 
   return (
+    <>
     <Card className="shadow-xl border-border/40 overflow-hidden rounded-3xl">
       <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b border-border/60 py-4">
         <div className="flex flex-col">
@@ -108,11 +217,14 @@ export default function CalendarPage() {
               <div 
                 key={idx} 
                 className={cn(
-                  "border-r border-b border-border/40 p-1 flex flex-col gap-1 transition-colors hover:bg-muted/5",
+                  "border-r border-b border-border/40 p-1 flex flex-col gap-1 transition-colors hover:bg-muted/5 group/day relative",
                   !isCurrentMonth && "bg-muted/10 opacity-40"
                 )}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, day)}
+                onClick={() => handleDayClick(day)}
               >
-                <div className="flex justify-start p-1.5">
+                <div className="flex justify-between p-1.5 items-start">
                   <span className={cn(
                     "text-xs font-semibold h-7 w-7 flex items-center justify-center rounded-full",
                     isTodayDay && "bg-primary text-white shadow-md shadow-primary/30",
@@ -121,12 +233,20 @@ export default function CalendarPage() {
                   )}>
                     {format(day, "d")}
                   </span>
+                  <div className="opacity-0 group-hover/day:opacity-100 transition-opacity">
+                    <Plus className="h-4 w-4 text-primary cursor-pointer hover:scale-110" />
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-1">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-1 z-10" onClick={(e) => e.stopPropagation()}>
                   {dayWos.map(wo => (
-                    <Link key={wo.woId} href={`/work-orders/${wo.woId}`}>
+                    <div 
+                      key={wo.woId}
+                      draggable 
+                      onDragStart={(e) => handleDragStart(e, wo.woId)}
+                    >
+                    <Link href={`/work-orders/${wo.woId}`}>
                       <div className={cn(
-                         "text-[10px] p-1.5 rounded-lg border flex flex-col gap-0.5 shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]",
+                         "text-[10px] p-1.5 rounded-lg border flex flex-col gap-0.5 shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98] cursor-move",
                          wo.status === 'COMPLETED' ? "bg-emerald-50 border-emerald-100 text-emerald-800" :
                          wo.status === 'IN_PROGRESS' ? "bg-amber-50 border-amber-100 text-amber-800" :
                          wo.plannedStart ? "bg-indigo-50 border-indigo-100 text-indigo-800" : "bg-zinc-50 border-zinc-200 text-zinc-800"
@@ -138,6 +258,7 @@ export default function CalendarPage() {
                         <span className="truncate opacity-90 leading-tight">{wo.title}</span>
                       </div>
                     </Link>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -146,5 +267,89 @@ export default function CalendarPage() {
         </div>
       </CardContent>
     </Card>
+      {/* ── CREATE WORK ORDER DIALOG ───────────────────────────── */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Maintenance Intervention</DialogTitle>
+            <DialogDescription>
+              Fill in the details to generate a new work order for {selectedDate && format(selectedDate, "MMMM dd, yyyy")}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input 
+                required 
+                placeholder="e.g., Annual MRI Inspection" 
+                value={newWO.title}
+                onChange={(e) => setNewWO({...newWO, title: e.target.value})}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Equipment</label>
+              <select 
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                value={newWO.equipmentId}
+                onChange={(e) => setNewWO({...newWO, equipmentId: e.target.value})}
+              >
+                <option value="">Select Equipment...</option>
+                {equipments.map(eq => (
+                  <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Type</label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={newWO.woType}
+                  onChange={(e) => setNewWO({...newWO, woType: e.target.value})}
+                >
+                  <option value="CORRECTIVE">Corrective</option>
+                  <option value="PREVENTIVE">Preventive</option>
+                  <option value="PREDICTIVE">Predictive</option>
+                  <option value="REGULATORY">Regulatory</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Priority</label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={newWO.priority}
+                  onChange={(e) => setNewWO({...newWO, priority: e.target.value})}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description</label>
+              <textarea 
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground"
+                placeholder="Enter technical details..."
+                value={newWO.description}
+                onChange={(e) => setNewWO({...newWO, description: e.target.value})}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={handleCreateSubmit} 
+                className="bg-primary text-primary-foreground"
+                disabled={isUpdating}
+              >
+                {isUpdating ? "Creating..." : "Create Work Order"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

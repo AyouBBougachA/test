@@ -40,6 +40,21 @@ export const tasksApi = {
       method: 'PATCH',
     }),
 
+  replanRequest: (taskId: number, reason: string) =>
+    requestJson<TaskResponse>(withQuery(`/tasks/${taskId}/replan-request`, { reason }), {
+      method: 'PATCH',
+    }),
+
+  approveReplan: (taskId: number, status: 'APPROVED' | 'REJECTED') =>
+    requestJson<TaskResponse>(withQuery(`/tasks/${taskId}/replan-approval`, { status }), {
+      method: 'PATCH',
+    }),
+
+  replan: (taskId: number, reason?: string) =>
+    requestJson<TaskResponse>(withQuery(`/tasks/${taskId}/replan`, { reason }), {
+      method: 'PATCH',
+    }),
+
   delete: (taskId: number) =>
     requestJson<void>(`/tasks/${taskId}`, {
       method: 'DELETE',

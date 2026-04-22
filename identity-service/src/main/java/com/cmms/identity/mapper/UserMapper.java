@@ -1,5 +1,6 @@
 package com.cmms.identity.mapper;
 
+import com.cmms.identity.dto.RoleResponse;
 import com.cmms.identity.dto.UserResponse;
 import com.cmms.identity.entity.User;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,12 @@ public class UserMapper {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .roleId(user.getRole() != null ? user.getRole().getRoleId() : null)
-                .roleName(user.getRole() != null ? user.getRole().getRoleName() : null)
+                .roles(user.getRoles() != null ? user.getRoles().stream()
+                        .map(role -> RoleResponse.builder()
+                                .roleId(role.getRoleId())
+                                .roleName(role.getRoleName())
+                                .build())
+                        .collect(java.util.stream.Collectors.toList()) : java.util.Collections.emptyList())
                 .departmentId(user.getDepartment() != null ? user.getDepartment().getDepartmentId() : null)
                 .departmentName(user.getDepartment() != null ? user.getDepartment().getDepartmentName() : null)
                 .isActive(user.getIsActive())

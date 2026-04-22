@@ -115,7 +115,7 @@ export default function AuditLogsPage() {
         l.actionType,
         l.entityName,
         l.details,
-        l.userId ? `user #${l.userId}` : "system",
+        l.accountName || (l.userId ? `user #${l.userId}` : "system"),
       ]
         .filter(Boolean)
         .join(" ")
@@ -124,26 +124,17 @@ export default function AuditLogsPage() {
     })
   }, [actionFilter, items, query, timeRange])
 
-  const stats = useMemo(() => {
-    const failed = filtered.filter((l) => {
-      const action = (l.actionType ?? "").toUpperCase()
-      return action.includes("FAILED") || action.includes("DENIED")
-    }).length
-    return {
-      total: filtered.length,
-      failed,
-      success: Math.max(0, filtered.length - failed),
-    }
-  }, [filtered])
+
 
   const onExport = () => {
     downloadCsv(
       "audit-logs.csv",
-      ["id", "timestamp", "userId", "actionType", "entityName", "entityId", "details"],
+      ["id", "timestamp", "account", "ipAddress", "actionType", "entityName", "entityId", "details"],
       filtered.map((l) => [
         l.id,
         l.createdAt,
-        l.userId,
+        l.accountName || (l.userId ? `User #${l.userId}` : "System"),
+        l.ipAddress || "0.0.0.0",
         l.actionType,
         l.entityName,
         l.entityId,
@@ -229,11 +220,11 @@ export default function AuditLogsPage() {
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
                     <th className="text-left py-4 px-6 font-semibold text-foreground">Timestamp</th>
-                    <th className="text-left py-4 px-6 font-semibold text-foreground">User</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">Account</th>
+                    <th className="text-left py-4 px-6 font-semibold text-foreground">IP Address</th>
                     <th className="text-left py-4 px-6 font-semibold text-foreground">Action</th>
                     <th className="text-left py-4 px-6 font-semibold text-foreground">Resource</th>
                     <th className="text-left py-4 px-6 font-semibold text-foreground">Details</th>
-                    <th className="text-left py-4 px-6 font-semibold text-foreground">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -256,39 +247,26 @@ export default function AuditLogsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((log) => {
-                      const action = (log.actionType ?? "").toUpperCase()
-                      const failed = action.includes("FAILED") || action.includes("DENIED")
-                      return (
+                    filtered.map((log) => (
                         <tr key={log.id} className="border-b border-border hover:bg-muted/30 transition-colors">
                           <td className="py-4 px-6 text-muted-foreground text-xs">
                             {new Date(log.createdAt).toLocaleString()}
                           </td>
                           <td className="py-4 px-6 text-foreground font-medium">
-                            {log.userId ? `User #${log.userId}` : "System"}
+                            {log.accountName || "System"}
+                          </td>
+                          <td className="py-4 px-6 font-mono text-[10px] text-muted-foreground">
+                            {log.ipAddress || "0.0.0.0"}
                           </td>
                           <td className="py-4 px-6 text-muted-foreground">{log.actionType || "—"}</td>
                           <td className="py-4 px-6">
                             <Badge variant="outline">{log.entityName || "—"}</Badge>
                           </td>
-                          <td className="py-4 px-6 text-muted-foreground text-xs max-w-xs truncate">
+                          <td className="py-4 px-6 text-muted-foreground text-xs max-w-sm">
                             {log.details || "—"}
                           </td>
-                          <td className="py-4 px-6">
-                            <Badge
-                              variant="outline"
-                              className={
-                                failed
-                                  ? "bg-red-50 text-red-700 border-red-200"
-                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              }
-                            >
-                              {failed ? (language === "fr" ? "Échec" : "Failed") : (language === "fr" ? "Succès" : "Success")}
-                            </Badge>
-                          </td>
                         </tr>
-                      )
-                    })
+                    ))
                   )}
                 </tbody>
               </table>
@@ -297,33 +275,7 @@ export default function AuditLogsPage() {
         </Card>
       </motion.div>
 
-      {/* Summary Stats */}
-      <motion.div variants={fadeInUp} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-1 text-center">
-              <p className="text-3xl font-bold text-foreground">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Activities</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-1 text-center">
-              <p className="text-3xl font-bold text-emerald-600">{stats.success}</p>
-              <p className="text-sm text-muted-foreground">Successful Actions</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-1 text-center">
-              <p className="text-3xl font-bold text-red-600">{stats.failed}</p>
-              <p className="text-sm text-muted-foreground">Failed Actions</p>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+
     </motion.div>
   )
 }

@@ -41,6 +41,7 @@ import { tasksApi } from "@/lib/api/tasks"
 import { TaskTimeline } from "./TaskTimeline"
 import { format } from "date-fns"
 import { motion, AnimatePresence } from "framer-motion"
+import { getStatusColorVar } from "@/lib/colors-util"
 
 interface TaskDetailDrawerProps {
   task: TaskResponse | null
@@ -155,19 +156,24 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
   };
 
   const getStatusConfig = (status: string) => {
+    const hexColor = getStatusColorVar(status, 'DRAWER')
+    let baseConfig = { text: 'Pending', icon: <Clock className="h-4 w-4" /> }
     switch (status.toUpperCase()) {
       case 'DONE':
       case 'PASS':
-        return { color: 'bg-emerald-500', text: 'Completed', icon: <CheckCircle2 className="h-4 w-4" /> }
+        baseConfig = { text: 'Completed', icon: <CheckCircle2 className="h-4 w-4" /> }
+        break
       case 'IN_PROGRESS':
-        return { color: 'bg-blue-600', text: 'Executing...', icon: <Timer className="h-4 w-4 animate-spin-slow" /> }
+        baseConfig = { text: 'Executing...', icon: <Timer className="h-4 w-4 animate-spin-slow" /> }
+        break
       case 'BLOCKED':
-        return { color: 'bg-rose-600', text: 'Blocked', icon: <AlertTriangle className="h-4 w-4" /> }
+        baseConfig = { text: 'Blocked', icon: <AlertTriangle className="h-4 w-4" /> }
+        break
       case 'FAIL':
-        return { color: 'bg-rose-500', text: 'Failed', icon: <X className="h-4 w-4" /> }
-      default:
-        return { color: 'bg-slate-500', text: 'Pending', icon: <Clock className="h-4 w-4" /> }
+        baseConfig = { text: 'Failed', icon: <X className="h-4 w-4" /> }
+        break
     }
+    return { ...baseConfig, hexColor }
   }
 
   const config = getStatusConfig(task.status)
@@ -182,13 +188,16 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
           
           {/* PREMIUM HEADER SECTION */}
           <div className="relative overflow-hidden bg-white border-b shadow-sm z-10">
-            <div className={`h-1.5 w-full ${config.color}`} />
+            <div className={`h-1.5 w-full`} style={{ backgroundColor: config.hexColor }} />
             
             <div className="p-6 space-y-4">
               <div className="flex items-start justify-between">
                 <div className="space-y-1 mt-1">
                   <div className="flex items-center gap-2">
-                    <Badge className={`${config.color} text-white hover:${config.color} uppercase text-[10px] tracking-widest px-2 py-0.5 rounded-sm border-none shadow-sm`}>
+                    <Badge 
+                      className="text-white uppercase text-[10px] tracking-widest px-2 py-0.5 rounded-sm border-none shadow-sm"
+                      style={{ backgroundColor: config.hexColor }}
+                    >
                       {config.icon}
                       <span className="ml-1.5">{config.text}</span>
                     </Badge>

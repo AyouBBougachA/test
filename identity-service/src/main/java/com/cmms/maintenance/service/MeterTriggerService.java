@@ -90,8 +90,7 @@ public class MeterTriggerService {
     private void notifyManagers(String type, String message, Integer referenceId) {
         // Find all Maintenance Managers and Admins
         List<User> managers = userRepository.findAll().stream()
-            .filter(u -> u.getRole() != null && 
-                (u.getRole().getRoleName().equals("ADMIN") || u.getRole().getRoleName().equals("MAINTENANCE_MANAGER")))
+            .filter(u -> u.hasRole("ADMIN", "MAINTENANCE_MANAGER"))
             .toList();
 
         for (User manager : managers) {

@@ -641,7 +641,7 @@ public class ClaimService {
         if (actor.isAdminOrManager()) {
             return;
         }
-        if (ROLE_TECHNICIAN.equals(actor.role) && actor.userId != null && Objects.equals(actor.userId, claim.getAssignedToUserId())) {
+        if (actor.hasRole(ROLE_TECHNICIAN) && actor.userId != null && Objects.equals(actor.userId, claim.getAssignedToUserId())) {
             return;
         }
         throw new AccessDeniedException("Not allowed to update claim status");
@@ -657,8 +657,7 @@ public class ClaimService {
     private User getTechnicianOrThrow(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
-        String role = user.getRole() == null || user.getRole().getRoleName() == null ? null : user.getRole().getRoleName().toUpperCase();
-        if (!ROLE_TECHNICIAN.equals(role)) {
+        if (!user.hasRole(ROLE_TECHNICIAN)) {
             throw new IllegalArgumentException("Assigned user must have TECHNICIAN role");
         }
         return user;
@@ -686,10 +685,10 @@ public class ClaimService {
     }
 
     private Specification<Claim> accessScopeSpec(Actor actor) {
-        if (actor.isAdminOrManager() || "FINANCE_MANAGER".equals(actor.role)) {
+        if (actor.isAdminOrManager() || actor.hasRole("FINANCE_MANAGER")) {
             return (root, cq, cb) -> cb.conjunction();
         }
-        if (ROLE_TECHNICIAN.equals(actor.role) && actor.userId != null) {
+        if (actor.hasRole(ROLE_TECHNICIAN) && actor.userId != null) {
             return (root, cq, cb) -> cb.or(
                     cb.equal(root.get("assignedToUserId"), actor.userId),
                     cb.equal(root.get("requesterId"), actor.userId)
@@ -797,18 +796,21 @@ public class ClaimService {
             if (displayName == null || displayName.isBlank()) {
                 displayName = userPrincipal.getUsername();
             }
-            String role = user == null || user.getRole() == null || user.getRole().getRoleName() == null
-                    ? null
-                    : user.getRole().getRoleName().toUpperCase();
-            return new Actor(userId, displayName, role);
+            List<String> roles = user == null ? List.of() : user.getRoles().stream()
+                    .map(r -> r.getRoleName().toUpperCase())
+                    .collect(Collectors.toList());
+            return new Actor(userId, displayName, roles);
         }
 
-        return new Actor(null, authentication.getName(), null);
+        return new Actor(null, authentication.getName(), List.of());
     }
 
-    private record Actor(Integer userId, String displayName, String role) {
+    private record Actor(Integer userId, String displayName, List<String> roles) {
         boolean isAdminOrManager() {
-            return ROLE_ADMIN.equals(role) || ROLE_MAINTENANCE_MANAGER.equals(role);
+            return roles.contains(ROLE_ADMIN) || roles.contains(ROLE_MAINTENANCE_MANAGER);
+        }
+        boolean hasRole(String roleName) {
+            return roles.contains(roleName);
         }
     }
 }

@@ -20,7 +20,7 @@ import java.util.Map;
  * Global exception handler that converts exceptions into clean, consistent JSON error responses.
  */
 @Slf4j
-@RestControllerAdvice(basePackages = "com.cmms.identity")
+@RestControllerAdvice(basePackages = "com.cmms")
 public class GlobalExceptionHandler {
 
     // ─── 400 Validation Errors ───────────────────────────────────────────────
@@ -81,10 +81,14 @@ public class GlobalExceptionHandler {
     }
 
     // ─── 404 Not Found ───────────────────────────────────────────────────────
-
-    @ExceptionHandler(ResourceNotFoundException.class)
+    
+    @ExceptionHandler({
+        com.cmms.identity.exception.ResourceNotFoundException.class,
+        com.cmms.equipment.exception.ResourceNotFoundException.class,
+        com.cmms.claims.exception.ResourceNotFoundException.class
+    })
     public ResponseEntity<ErrorResponse> handleNotFound(
-            ResourceNotFoundException ex, WebRequest request) {
+            RuntimeException ex, WebRequest request) {
 
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
@@ -103,6 +107,27 @@ public class GlobalExceptionHandler {
             ConflictException ex, WebRequest request) {
 
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(
+            IllegalStateException ex, WebRequest request) {
+
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(
+            IllegalArgumentException ex, WebRequest request) {
+
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex, WebRequest request) {
+
+        return buildResponse(HttpStatus.BAD_REQUEST, "Invalid parameter value: " + ex.getName(), request);
     }
 
     // ─── 500 Internal Server Error ────────────────────────────────────────────

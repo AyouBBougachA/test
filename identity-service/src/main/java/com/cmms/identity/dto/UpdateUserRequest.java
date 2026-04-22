@@ -20,7 +20,7 @@ public class UpdateUserRequest {
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
 
-    private Integer roleId;
+    private java.util.List<Integer> roleIds;
 
     private Integer departmentId;
 }

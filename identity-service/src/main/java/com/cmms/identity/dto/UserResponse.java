@@ -13,8 +13,7 @@ public class UserResponse {
     private String fullName;
     private String email;
     private String phoneNumber;
-    private String roleName;
-    private Integer roleId;
+    private java.util.List<RoleResponse> roles;
     private String departmentName;
     private Integer departmentId;
     private Boolean isActive;

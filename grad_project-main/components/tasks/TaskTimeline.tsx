@@ -3,6 +3,7 @@
 import { format } from "date-fns"
 import { CheckCircle2, Circle, Clock, AlertCircle, XCircle, Info } from "lucide-react"
 import { TaskAuditLogResponse } from "@/lib/api/types"
+import { getStatusColorVar } from "@/lib/colors-util"
 
 interface TaskTimelineProps {
   logs: TaskAuditLogResponse[]
@@ -19,18 +20,20 @@ export function TaskTimeline({ logs }: TaskTimelineProps) {
   }
 
   const getStatusIcon = (status: string) => {
+    const color = getStatusColorVar(status, 'TIMELINE')
     switch (status.toUpperCase()) {
       case 'DONE':
       case 'PASS':
-        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+      case 'COMPLETED':
+        return <CheckCircle2 className="h-4 w-4" style={{ color }} />
       case 'IN_PROGRESS':
-        return <Clock className="h-4 w-4 text-blue-500" />
+        return <Clock className="h-4 w-4" style={{ color }} />
       case 'BLOCKED':
-        return <AlertCircle className="h-4 w-4 text-amber-500" />
+        return <AlertCircle className="h-4 w-4" style={{ color }} />
       case 'FAIL':
-        return <XCircle className="h-4 w-4 text-rose-500" />
+        return <XCircle className="h-4 w-4" style={{ color }} />
       case 'SKIPPED':
-        return <Circle className="h-4 w-4 text-slate-400" />
+        return <Circle className="h-4 w-4" style={{ color }} />
       default:
         return <Circle className="h-4 w-4 text-slate-300" />
     }

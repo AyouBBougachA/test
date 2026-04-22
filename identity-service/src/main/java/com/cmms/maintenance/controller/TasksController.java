@@ -96,6 +96,26 @@ public class TasksController {
         return taskService.updateApprovalStatus(taskId, status);
     }
 
+    @PatchMapping("/{taskId}/replan-request")
+    @Operation(summary = "Request a task replan (Technician)")
+    public TaskResponse requestReplan(@PathVariable Integer taskId, @RequestParam String reason) {
+        return taskService.requestReplan(taskId, reason);
+    }
+
+    @PatchMapping("/{taskId}/replan-approval")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+    @Operation(summary = "Approve or reject a replan request (Manager)")
+    public TaskResponse updateReplanApproval(@PathVariable Integer taskId, @RequestParam String status) {
+        return taskService.approveReplan(taskId, status);
+    }
+
+    @PatchMapping("/{taskId}/replan")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+    @Operation(summary = "Directly replan a task (Manager)")
+    public TaskResponse replan(@PathVariable Integer taskId, @RequestParam(required = false) String reason) {
+        return taskService.replan(taskId, reason);
+    }
+
     @PostMapping("/{taskId}/photos")
     @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN')")
     @Operation(summary = "Upload photo for a task")

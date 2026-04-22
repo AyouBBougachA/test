@@ -77,7 +77,8 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
 
   if (!response.ok) {
     const payload = await safeParseJson(response)
-    throw new ApiError('Request failed', response.status, payload)
+    const errorMessage = (payload as any)?.message || (payload as any)?.error || 'Request failed'
+    throw new ApiError(`${errorMessage} (${response.status})`, response.status, payload)
   }
 
   if (response.status === 204) {
