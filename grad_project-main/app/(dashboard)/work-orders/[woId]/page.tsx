@@ -81,7 +81,7 @@ export default function WorkOrderDetailPage() {
 
   const [wo, setWo] = useState<WorkOrderResponse | null>(null)
   const [tasks, setTasks] = useState<TaskResponse[]>([])
-  const [technicians, setTechnicians] = useState<UserResponse[]>([])
+  const [technicians, setTechnicians] = useState<import('@/lib/api/types').TechnicianRecommendationDTO[]>([])
   
   const [claimPhotos, setClaimPhotos] = useState<ClaimPhotoResponse[]>([])
   const photoUrlRef = useRef<Record<number, string>>({})
@@ -175,8 +175,12 @@ export default function WorkOrderDetailPage() {
       setPartUsages(rawPartUsages)
       
       if (user?.roleName?.toUpperCase() !== 'TECHNICIAN') {
-        const techs = await usersApi.getAll()
-        setTechnicians(techs.filter(t => t.roleName === 'TECHNICIAN' || t.roleId === 3))
+        try {
+          const techs = await workOrdersApi.getRecommendations(woId)
+          setTechnicians(techs)
+        } catch (e) {
+          console.error("Failed to load technician recommendations", e)
+        }
         
         // Load templates for managers
         const templatesData = await taskTemplatesApi.getAll()
@@ -476,7 +480,7 @@ export default function WorkOrderDetailPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-4 text-rose-800 shadow-sm"
         >
-          <div className="bg-rose-500 p-2 rounded-full text-white">
+          <div className="bg-rose-500 p-2 rounded-full text-primary-foreground">
             <AlertCircle className="h-5 w-5" />
           </div>
           <div className="flex-1">
@@ -556,27 +560,77 @@ export default function WorkOrderDetailPage() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle>Assign Technicians</DialogTitle></DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Primary Technician (Responsible)</Label>
-                        <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={assignUserId} onChange={e => setAssignUserId(e.target.value)}>
-                          <option value="">Select Technician...</option>
-                          {technicians
-                            .filter(t => !t.departmentId || t.departmentId === wo.departmentId)
-                            .map(t => <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>)}
-                        </select>
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      <div className="space-y-3">
+                        <Label>Select Primary Technician (Responsible)</Label>
+                        <div className="grid grid-cols-1 gap-3">
+                          {technicians.map(t => {
+                            const isMismatch = t.badges.includes('Department Mismatch');
+                            return (
+                              <div 
+                                key={t.userId} 
+                                className={`flex flex-col p-3 border rounded-xl transition-all ${
+                                  isMismatch 
+                                    ? 'opacity-50 cursor-not-allowed border-border/50 bg-muted/20 grayscale' 
+                                    : `cursor-pointer ${assignUserId === t.userId.toString() ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/50 hover:bg-muted/30'}`
+                                }`} 
+                                onClick={() => { if (!isMismatch) setAssignUserId(t.userId.toString()) }}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="space-y-1">
+                                    <div className="font-semibold text-sm flex flex-wrap items-center gap-2">
+                                      {t.fullName}
+                                      {t.badges.map(b => (
+                                        <Badge key={b} variant="secondary" className={
+                                          b === 'Available Now' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                          b === 'Best Match' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                                          b === 'Critical Task Active' ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' :
+                                          b === 'Overloaded' || b === 'Department Mismatch' ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' :
+                                          'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                                        }>{b}</Badge>
+                                      ))}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{t.departmentName}</p>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end">
+                                      <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                        t.availabilityStatus === 'Available' ? 'text-emerald-600 dark:text-emerald-400' :
+                                        t.availabilityStatus === 'Partially Available' ? 'text-amber-600 dark:text-amber-400' :
+                                        t.availabilityStatus === 'Busy' ? 'text-orange-600 dark:text-orange-400' :
+                                        'text-rose-600 dark:text-rose-400'
+                                      }`}>{t.availabilityStatus}</span>
+                                      {!isMismatch && <span className="text-[10px] text-muted-foreground">Score: {t.workloadScore} ({t.activeTasksCount} tasks)</span>}
+                                    </div>
+                                    <div className={`h-4 w-4 rounded-full border flex-shrink-0 ${assignUserId === t.userId.toString() ? 'border-[5px] border-primary' : 'border-muted-foreground/30'}`} />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Secondary Technicians (Followers / Assistants)</Label>
-                        <select multiple className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={secondaryAssignedUserIds} onChange={e => {
-                          const options = Array.from(e.target.selectedOptions) as HTMLOptionElement[];
-                          setSecondaryAssignedUserIds(options.map(o => o.value));
-                        }}>
+                      <div className="space-y-3 pt-4 border-t">
+                        <Label>Secondary Technicians (Assistants)</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {technicians
-                            .filter(t => t.userId.toString() !== assignUserId && (!t.departmentId || t.departmentId === wo.departmentId))
-                            .map(t => <option key={t.userId} value={t.userId}>{t.fullName} {t.departmentName ? `(${t.departmentName})` : ''}</option>)}
-                        </select>
-                        <p className="text-xs text-muted-foreground">Hold Ctrl/Cmd to select multiple</p>
+                            .filter(t => t.userId.toString() !== assignUserId && !t.badges.includes('Department Mismatch'))
+                            .map(t => (
+                              <label key={`sec-${t.userId}`} className="flex items-center gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                                <Checkbox 
+                                  checked={secondaryAssignedUserIds.includes(t.userId.toString())} 
+                                  onCheckedChange={(checked) => {
+                                    if (checked) setSecondaryAssignedUserIds([...secondaryAssignedUserIds, t.userId.toString()]);
+                                    else setSecondaryAssignedUserIds(secondaryAssignedUserIds.filter(id => id !== t.userId.toString()));
+                                  }} 
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{t.fullName}</span>
+                                  <span className="text-[10px] text-muted-foreground">{t.availabilityStatus}</span>
+                                </div>
+                              </label>
+                            ))}
+                        </div>
                       </div>
                     </div>
                     <DialogFooter>
@@ -973,7 +1027,7 @@ export default function WorkOrderDetailPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFailureDialogOpen(false)}>Cancel</Button>
             <Button 
-              className="bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-200"
+              className="bg-rose-600 hover:bg-rose-700 text-primary-foreground shadow-lg shadow-rose-200"
               onClick={submitTaskFailure}
               disabled={actionLoading === 'failing-task' || !failureNote.trim()}
             >
@@ -1265,7 +1319,7 @@ export default function WorkOrderDetailPage() {
             <Button
               onClick={handleReschedule}
               disabled={actionLoading === 'reschedule'}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground"
             >
               {actionLoading === 'reschedule' ? 'Saving...' : 'Save Schedule'}
             </Button>

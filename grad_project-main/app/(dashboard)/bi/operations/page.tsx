@@ -10,9 +10,9 @@ export default function BiOperationsPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "BI - Opérations" : "BI - Operations"}</CardTitle>
+          <CardTitle>{t('bIOperations')}</CardTitle>
           <CardDescription>
-            {language === "fr" ? "Module non disponible : aucune API BI." : "Module not available: no BI API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent />

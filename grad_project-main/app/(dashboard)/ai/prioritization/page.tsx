@@ -10,9 +10,9 @@ export default function AiPrioritizationPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "IA - Priorisation" : "AI - Prioritization"}</CardTitle>
+          <CardTitle>{t('aIPrioritization')}</CardTitle>
           <CardDescription>
-            {language === "fr" ? "Module non disponible : aucune API IA." : "Module not available: no AI API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent />

@@ -10,17 +10,13 @@ export default function RulesThresholdsPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "Règles et seuils" : "Rules & Thresholds"}</CardTitle>
+          <CardTitle>{t('rulesThresholds')}</CardTitle>
           <CardDescription>
-            {language === "fr"
-              ? "Module non disponible : aucune API de règles/alertes." 
-              : "Module not available: no rules/alerts API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          {language === "fr"
-            ? "Les seuils des compteurs sont gérés par compteur dans la page Compteurs."
-            : "Meter thresholds are managed per meter in the Meters page."}
+          {t('meterThresholdsAreMa')}
         </CardContent>
       </Card>
     </div>

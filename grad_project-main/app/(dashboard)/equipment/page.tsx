@@ -301,7 +301,7 @@ export default function EquipmentPage() {
         setCategories([])
         setModels([])
         setAuditEntries([])
-        setError(language === "fr" ? "Impossible de charger les équipements" : "Failed to load equipment")
+        setError(t('failedToLoadEquipmen'))
       } finally {
         if (!cancelled) setIsFetching(false)
       }
@@ -427,21 +427,21 @@ export default function EquipmentPage() {
   const stats = useMemo(() => {
     return [
       {
-        label: language === "fr" ? "Total équipements" : "Total Equipment",
+        label: t('totalEquipment'),
         value: uiItems.length,
         icon: Database,
         color: "text-violet-600",
         bgColor: "bg-violet-50 dark:bg-violet-900/20",
       },
       {
-        label: language === "fr" ? "Hors service" : "Out of Service",
+        label: t('outOfService'),
         value: uiItems.filter((e) => e.status === "UNDER_REPAIR" || e.status === "OUT_OF_SERVICE").length,
         icon: Activity,
         color: "text-amber-600",
         bgColor: "bg-amber-50 dark:bg-amber-900/20",
       },
        {
-        label: language === "fr" ? "Critiques" : "Critical",
+        label: t('critical'),
         value: uiItems.filter((e) => e.criticality === "CRITICAL").length,
         icon: AlertTriangle,
         color: "text-rose-600",
@@ -462,7 +462,7 @@ export default function EquipmentPage() {
     const found = equipment.find((e) => e.equipmentId === equipmentId)
     if (!found) {
       toast({
-        title: language === "fr" ? "Équipement introuvable" : "Equipment not found",
+        title: t('equipmentNotFound'),
         variant: "destructive",
       })
       return
@@ -484,7 +484,7 @@ export default function EquipmentPage() {
       setViewing(details)
     } catch (err) {
       toast({
-        title: language === "fr" ? "Échec du chargement" : "Failed to load",
+        title: t('failedToLoad'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -584,7 +584,7 @@ export default function EquipmentPage() {
     if (!equipmentId) return
     if (!selectedDocumentFile || isDocumentSaving) {
       toast({
-        title: language === "fr" ? "Fichier requis" : "File required",
+        title: t('fileRequired'),
         variant: "destructive",
       })
       return
@@ -592,13 +592,13 @@ export default function EquipmentPage() {
     setIsDocumentSaving(true)
     try {
       await equipmentApi.uploadDocument(equipmentId, selectedDocumentFile)
-      toast({ title: language === "fr" ? "Document importé" : "Document uploaded" })
+      toast({ title: t('documentUploaded') })
       setSelectedDocumentFile(null)
       setDocumentInputKey((k) => k + 1)
       await refreshViewingExtras()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Import impossible" : "Upload failed",
+        title: t('uploadFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -621,7 +621,7 @@ export default function EquipmentPage() {
       setTimeout(() => URL.revokeObjectURL(url), 500)
     } catch (err) {
       toast({
-        title: language === "fr" ? "Téléchargement impossible" : "Download failed",
+        title: t('downloadFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -638,7 +638,7 @@ export default function EquipmentPage() {
     if (!deletingDocument) return
     try {
       await equipmentApi.deleteDocument(deletingDocument.id)
-      toast({ title: language === "fr" ? "Document supprimé" : "Document deleted" })
+      toast({ title: t('documentDeleted') })
       setConfirmDeleteDocumentOpen(false)
       setDeletingDocument(null)
       const equipmentId = deletingDocumentEquipmentId
@@ -663,7 +663,7 @@ export default function EquipmentPage() {
       }
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -675,7 +675,7 @@ export default function EquipmentPage() {
     if (!equipmentId) return
     if (!docsSelectedFile || isDocsSaving) {
       toast({
-        title: language === "fr" ? "Fichier requis" : "File required",
+        title: t('fileRequired'),
         variant: "destructive",
       })
       return
@@ -683,13 +683,13 @@ export default function EquipmentPage() {
     setIsDocsSaving(true)
     try {
       await equipmentApi.uploadDocument(equipmentId, docsSelectedFile)
-      toast({ title: language === "fr" ? "Document importé" : "Document uploaded" })
+      toast({ title: t('documentUploaded') })
       setDocsSelectedFile(null)
       setDocsInputKey((k) => k + 1)
       await refreshDocsDocuments(equipmentId)
     } catch (err) {
       toast({
-        title: language === "fr" ? "Import impossible" : "Upload failed",
+        title: t('uploadFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -701,11 +701,11 @@ export default function EquipmentPage() {
   const onArchive = async (equipmentId: number) => {
     try {
       await equipmentApi.archive(equipmentId)
-      toast({ title: language === "fr" ? "Équipement archivé" : "Equipment archived" })
+      toast({ title: t('equipmentArchived') })
       await refreshEquipment()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Archivage impossible" : "Archive failed",
+        title: t('archiveFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -715,11 +715,11 @@ export default function EquipmentPage() {
   const onRestore = async (equipmentId: number) => {
     try {
       await equipmentApi.updateStatus(equipmentId, "OPERATIONAL")
-      toast({ title: language === "fr" ? "Équipement restauré" : "Equipment restored" })
+      toast({ title: t('equipmentRestored') })
       await refreshEquipment()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Restauration impossible" : "Restore failed",
+        title: t('restoreFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -737,8 +737,8 @@ export default function EquipmentPage() {
     const status = (form.status ?? "").toUpperCase()
     if (!name || !location || !Number.isFinite(departmentId) || departmentId <= 0 || !status) {
       toast({
-        title: language === "fr" ? "Champs obligatoires manquants" : "Missing required fields",
-        description: language === "fr" ? "Nom, emplacement, service et statut sont requis." : "Name, location, department, and status are required.",
+        title: t('missingRequiredField'),
+        description: t('nameLocationDepartme'),
         variant: "destructive",
       })
       return
@@ -792,13 +792,13 @@ export default function EquipmentPage() {
       if (formMode === "create") {
         await equipmentApi.create(payload)
         toast({
-          title: language === "fr" ? "Équipement créé" : "Equipment created",
+          title: t('equipmentCreated'),
         })
       } else {
         if (!editingId) throw new Error("Missing equipment id")
         await equipmentApi.update(editingId, payload)
         toast({
-          title: language === "fr" ? "Équipement mis à jour" : "Equipment updated",
+          title: t('equipmentUpdated'),
         })
       }
 
@@ -806,7 +806,7 @@ export default function EquipmentPage() {
       await refreshEquipment()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Échec de l’enregistrement" : "Save failed",
+        title: t('saveFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -840,13 +840,11 @@ export default function EquipmentPage() {
             {t("equipmentList")}
           </h1>
           <p className="text-muted-foreground">
-            {language === "fr" 
-              ? "Gérez et surveillez tous vos équipements hospitaliers"
-              : "Manage and monitor all your hospital equipment"
+            {t('manageAndMonitorAllY')
             }
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <Button variant="outline" className="gap-2" onClick={onExport} disabled={filteredEquipment.length === 0}>
             <Download className="h-4 w-4" />
             {t("export")}
@@ -865,25 +863,23 @@ export default function EquipmentPage() {
           <DialogHeader>
             <DialogTitle>
               {formMode === "create"
-                ? (language === "fr" ? "Ajouter un équipement" : "Add Equipment")
-                : (language === "fr" ? "Modifier l’équipement" : "Edit Equipment")}
+                ? (t('addEquipment'))
+                : (t('editEquipment'))}
             </DialogTitle>
             <DialogDescription>
-              {language === "fr"
-                ? "Les champs et statuts suivent la logique de l’API."
-                : "Fields and statuses follow the backend API."}
+              {t('fieldsAndStatusesFol')}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={onSubmitForm} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="eq-name">{language === "fr" ? "Nom" : "Name"}</Label>
+                <Label htmlFor="eq-name">{t('name')}</Label>
                 <Input
                   id="eq-name"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: Ventilateur" : "e.g., Ventilator"}
+                  placeholder={t('eGVentilator')}
                 />
               </div>
 
@@ -893,7 +889,7 @@ export default function EquipmentPage() {
                   id="eq-serial"
                   value={form.serialNumber}
                   onChange={(e) => setForm((p) => ({ ...p, serialNumber: e.target.value }))}
-                  placeholder={language === "fr" ? "Numéro de série" : "Serial number"}
+                  placeholder={t('serialNumber')}
                 />
               </div>
 
@@ -903,7 +899,7 @@ export default function EquipmentPage() {
                   id="eq-location"
                   value={form.location}
                   onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: Salle 12" : "e.g., Room 12"}
+                  placeholder={t('eGRoom12')}
                 />
               </div>
 
@@ -911,7 +907,7 @@ export default function EquipmentPage() {
                 <Label>{t("department")}</Label>
                 <Select value={form.departmentId} onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                    <SelectValue placeholder={t('select')} />
                   </SelectTrigger>
                   <SelectContent>
                     {departments.map((d) => (
@@ -944,7 +940,7 @@ export default function EquipmentPage() {
                     <SelectValue placeholder={t("criticality")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucune" : "None"}</SelectItem>
+                    <SelectItem value={NONE_SELECT_VALUE}>{t('none')}</SelectItem>
                     <SelectItem value="LOW">{t("low")}</SelectItem>
                     <SelectItem value="MEDIUM">{t("medium")}</SelectItem>
                     <SelectItem value="CRITICAL">{t("critical")}</SelectItem>
@@ -953,13 +949,13 @@ export default function EquipmentPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Classification" : "Classification"}</Label>
+                <Label>{t('classification')}</Label>
                 <Select 
                   value={form.classification} 
                   onValueChange={(v) => setForm((p) => ({ ...p, classification: v, category: NONE_SELECT_VALUE }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                    <SelectValue placeholder={t('select')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="BIOMEDICAL">BIOMEDICAL</SelectItem>
@@ -970,17 +966,17 @@ export default function EquipmentPage() {
               </div>
     
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Catégorie" : "Category"}</Label>
+                <Label>{t('category')}</Label>
                 <Select 
                   value={form.category} 
                   onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}
                   disabled={!form.classification}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                    <SelectValue placeholder={t('select')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucune" : "None"}</SelectItem>
+                    <SelectItem value={NONE_SELECT_VALUE}>{t('none')}</SelectItem>
                     {form.classification && CLASSIFICATION_MAPPINGS[form.classification]?.map((cat) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -989,34 +985,34 @@ export default function EquipmentPage() {
               </div>
     
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Modèle" : "Model"}</Label>
+                <Label>{t('model')}</Label>
                 <Input
                   value={form.model}
                   onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: Magnetom" : "e.g., Magnetom"}
+                  placeholder={t('eGMagnetom')}
                 />
               </div>
     
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Fabricant" : "Manufacturer"}</Label>
+                <Label>{t('manufacturer')}</Label>
                 <Input
                   value={form.manufacturer}
                   onChange={(e) => setForm((p) => ({ ...p, manufacturer: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: Siemens" : "e.g., Siemens"}
+                  placeholder={t('eGSiemens')}
                 />
               </div>
     
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Unité compteur" : "Meter unit"}</Label>
+                <Label>{t('meterUnit')}</Label>
                 <Input
                   value={form.meterUnit}
                   onChange={(e) => setForm((p) => ({ ...p, meterUnit: e.target.value }))}
-                  placeholder={language === "fr" ? "Ex: heures" : "e.g., hours"}
+                  placeholder={t('eGHours')}
                 />
               </div>
     
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Valeur initiale" : "Start meter value"}</Label>
+                <Label>{t('startMeterValue')}</Label>
                 <Input
                   type="number"
                   value={form.startMeterValue}
@@ -1028,7 +1024,7 @@ export default function EquipmentPage() {
 
             <div className="space-y-2 md:col-span-3">
               <div className="flex items-center justify-between">
-                <Label>{language === "fr" ? "Seuils de maintenance" : "Maintenance Thresholds"}</Label>
+                <Label>{t('maintenanceThreshold')}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -1036,13 +1032,13 @@ export default function EquipmentPage() {
                   onClick={() => setForm((p) => ({ ...p, thresholds: [...p.thresholds, { value: "", label: "" }] }))}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  {language === "fr" ? "Ajouter" : "Add"}
+                  {t('add')}
                 </Button>
               </div>
 
               {form.thresholds.length === 0 ? (
                 <div className="text-sm text-muted-foreground italic">
-                  {language === "fr" ? "Aucun seuil configuré" : "No thresholds configured"}
+                  {t('noThresholdsConfigur')}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1057,7 +1053,7 @@ export default function EquipmentPage() {
                             thresholds: p.thresholds.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)),
                           }))
                         }
-                        placeholder={language === "fr" ? "Nom (ex: Vidange)" : "Label (e.g. Oil Change)"}
+                        placeholder={t('labelEGOilChange')}
                       />
                       <Input
                         type="number"
@@ -1115,7 +1111,7 @@ export default function EquipmentPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{language === "fr" ? "Supprimer le document" : "Delete document"}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDocument')}</AlertDialogTitle>
             <AlertDialogDescription>
               {language === "fr"
                 ? `Supprimer ${deletingDocument?.documentName ?? ""} ?`
@@ -1144,19 +1140,17 @@ export default function EquipmentPage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {language === "fr" ? "Documents" : "Documents"}
+              {t('documents')}
               {docsEquipment ? ` — ${docsEquipment.name}` : ""}
             </DialogTitle>
             <DialogDescription>
-              {language === "fr"
-                ? "Télécharger, ajouter ou supprimer des documents."
-                : "Download, upload, or delete equipment documents."}
+              {t('downloadUploadOrDele')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{language === "fr" ? "Importer" : "Upload"}</Label>
+              <Label>{t('upload')}</Label>
               <div className="flex items-center gap-2">
                 <Input
                   key={docsInputKey}
@@ -1171,7 +1165,7 @@ export default function EquipmentPage() {
                   disabled={isDocsSaving || !docsSelectedFile}
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  {language === "fr" ? "Importer" : "Upload"}
+                  {t('upload')}
                 </Button>
               </div>
             </div>
@@ -1179,7 +1173,7 @@ export default function EquipmentPage() {
             {isDocsLoading ? (
               <div className="text-sm text-muted-foreground">{t("loading")}</div>
             ) : docsDocuments.length === 0 ? (
-              <div className="text-sm text-muted-foreground">{language === "fr" ? "Aucun document" : "No documents"}</div>
+              <div className="text-sm text-muted-foreground">{t('noDocuments')}</div>
             ) : (
               <div className="space-y-2">
                 {docsDocuments.map((doc) => (
@@ -1218,7 +1212,7 @@ export default function EquipmentPage() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDocsOpen(false)}>
-                {language === "fr" ? "Fermer" : "Close"}
+                {t('close')}
               </Button>
             </DialogFooter>
           </div>
@@ -1228,9 +1222,9 @@ export default function EquipmentPage() {
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{language === "fr" ? "Détails équipement" : "Equipment details"}</DialogTitle>
+            <DialogTitle>{t('equipmentDetails')}</DialogTitle>
             <DialogDescription>
-              {language === "fr" ? "Données lues depuis l’API." : "Data loaded from the backend API."}
+              {t('dataLoadedFromTheBac')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1242,7 +1236,7 @@ export default function EquipmentPage() {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Nom" : "Name"}</div>
+                  <div className="text-sm text-muted-foreground">{t('name')}</div>
                   <div className="font-medium text-foreground">{viewing.name}</div>
                 </div>
                 <div>
@@ -1270,13 +1264,13 @@ export default function EquipmentPage() {
                   </Badge>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Catégorie" : "Category"}</div>
+                  <div className="text-sm text-muted-foreground">{t('category')}</div>
                   <div className="text-foreground">
                     {viewing.categoryId ? (categoryNameById[viewing.categoryId] ?? `#${viewing.categoryId}`) : "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">{language === "fr" ? "Modèle" : "Model"}</div>
+                  <div className="text-sm text-muted-foreground">{t('model')}</div>
                   <div className="text-foreground">
                     {viewing.modelId ? (modelNameById[viewing.modelId] ?? `#${viewing.modelId}`) : "—"}
                   </div>
@@ -1286,11 +1280,11 @@ export default function EquipmentPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{language === "fr" ? "Documents" : "Documents"}</CardTitle>
+                    <CardTitle className="text-base">{t('documents')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="space-y-2">
-                      <Label>{language === "fr" ? "Importer" : "Upload"}</Label>
+                      <Label>{t('upload')}</Label>
                       <div className="flex items-center gap-2">
                         <Input
                           key={documentInputKey}
@@ -1305,7 +1299,7 @@ export default function EquipmentPage() {
                           disabled={isDocumentSaving || !selectedDocumentFile}
                         >
                           <Upload className="mr-2 h-4 w-4" />
-                          {language === "fr" ? "Importer" : "Upload"}
+                          {t('upload')}
                         </Button>
                       </div>
                     </div>
@@ -1313,7 +1307,7 @@ export default function EquipmentPage() {
                     {isDocumentsLoading ? (
                       <div className="text-sm text-muted-foreground">{t("loading")}</div>
                     ) : documents.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">{language === "fr" ? "Aucun document" : "No documents"}</div>
+                      <div className="text-sm text-muted-foreground">{t('noDocuments')}</div>
                     ) : (
                       <div className="space-y-2">
                         {documents.map((doc) => (
@@ -1351,13 +1345,13 @@ export default function EquipmentPage() {
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{language === "fr" ? "Historique" : "History"}</CardTitle>
+                    <CardTitle className="text-base">{t('history')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {isHistoryLoading ? (
                       <div className="text-sm text-muted-foreground">{t("loading")}</div>
                     ) : history.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">{language === "fr" ? "Aucune activité" : "No activity"}</div>
+                      <div className="text-sm text-muted-foreground">{t('noActivity')}</div>
                     ) : (
                       <div className="space-y-2">
                         {history
@@ -1380,7 +1374,7 @@ export default function EquipmentPage() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setViewOpen(false)}>
-                  {language === "fr" ? "Fermer" : "Close"}
+                  {t('close')}
                 </Button>
               </DialogFooter>
             </div>
@@ -1393,11 +1387,11 @@ export default function EquipmentPage() {
         <TabsList>
           <TabsTrigger value="list" className="gap-2">
             <Database className="h-4 w-4" />
-            {language === "fr" ? "Liste" : "List"}
+            {t('list')}
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <Clock className="h-4 w-4" />
-            {language === "fr" ? "Audit" : "Audit"}
+            {t('audit')}
           </TabsTrigger>
         </TabsList>
 
@@ -1432,19 +1426,19 @@ export default function EquipmentPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder={language === "fr" ? "Rechercher équipements..." : "Search equipment..."}
+                placeholder={t('searchEquipment')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               <Select value={classificationFilter} onValueChange={setClassificationFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder={t("classification")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{language === "fr" ? "Toutes" : "All"}</SelectItem>
+                  <SelectItem value="all">{t('all')}</SelectItem>
                   {classificationOptions.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
@@ -1457,7 +1451,7 @@ export default function EquipmentPage() {
                   <SelectValue placeholder={t("status")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                  <SelectItem value="all">{t('all')}</SelectItem>
                   <SelectItem value="OPERATIONAL">{t("operational")}</SelectItem>
                   <SelectItem value="UNDER_REPAIR">{t("underRepair")}</SelectItem>
                   <SelectItem value="ARCHIVED">{t("archived")}</SelectItem>
@@ -1475,7 +1469,7 @@ export default function EquipmentPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{language === "fr" ? "Équipement" : "Equipment"}</TableHead>
+                  <TableHead>{t('equipment')}</TableHead>
                   <TableHead className="hidden md:table-cell">{t("serialNumber")}</TableHead>
                   <TableHead className="hidden lg:table-cell">{t("location")}</TableHead>
                   <TableHead className="hidden xl:table-cell">{t("department")}</TableHead>
@@ -1489,7 +1483,7 @@ export default function EquipmentPage() {
                 {isFetching ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-6 text-muted-foreground">
-                      {language === "fr" ? "Chargement..." : "Loading..."}
+                      {t('loading')}
                     </TableCell>
                   </TableRow>
                 ) : error ? (
@@ -1501,7 +1495,7 @@ export default function EquipmentPage() {
                 ) : paginatedEquipment.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-6 text-muted-foreground">
-                      {language === "fr" ? "Aucun équipement" : "No equipment"}
+                      {t('noEquipment')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1553,7 +1547,7 @@ export default function EquipmentPage() {
                                   }}
                                 >
                                   <FileText className="mr-2 h-4 w-4" />
-                                  {language === "fr" ? "Documents" : "Documents"}
+                                  {t('documents')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
@@ -1575,8 +1569,8 @@ export default function EquipmentPage() {
                                   }}
                                 >
                                   {(eq.status ?? "").toUpperCase() === "ARCHIVED"
-                                    ? language === "fr" ? "Restaurer" : "Restore"
-                                    : language === "fr" ? "Archiver" : "Archive"}
+                                    ? t('restore')
+                                    : t('archive')}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -1592,16 +1586,16 @@ export default function EquipmentPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t p-4">
               <p className="text-sm text-muted-foreground">
-                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEquipment.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredEquipment.length}</span> {language === "fr" ? "résultats" : "results"}
+                {t('showing')} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {t('to')} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEquipment.length)}</span> {t('of')} <span className="font-medium">{filteredEquipment.length}</span> {t('results')}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 min-w-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  {language === "fr" ? "Précédent" : "Previous"}
+                  {t('previous')}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -1609,7 +1603,7 @@ export default function EquipmentPage() {
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
-                  {language === "fr" ? "Suivant" : "Next"}
+                  {t('next')}
                 </Button>
               </div>
             </div>
@@ -1621,8 +1615,8 @@ export default function EquipmentPage() {
         <TabsContent value="audit">
           <AuditTrail
             entries={auditEntries}
-            title={language === "fr" ? "Historique des équipements" : "Equipment History"}
-            description={language === "fr" ? "Suivi des modifications et actions" : "Track changes and actions"}
+            title={t('equipmentHistory')}
+            description={t('trackChangesAndActio')}
           />
         </TabsContent>
       </Tabs>

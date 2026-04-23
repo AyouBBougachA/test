@@ -72,6 +72,11 @@ public class MeterController {
         return meterService.getThresholds(id);
     }
 
+    @PostMapping("/{id}/reset")
+    public MeterResponse reset(@PathVariable Integer id) {
+        return mapToResponse(meterService.resetMeter(id));
+    }
+
     private MeterResponse mapToResponse(Meter meter) {
         String equipmentName = equipmentRepository.findById(meter.getEquipmentId())
                 .map(equipment -> equipment.getName())

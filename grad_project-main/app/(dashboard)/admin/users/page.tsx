@@ -176,7 +176,7 @@ export default function UsersPage() {
         if (cancelled) return
         setItems([])
         setAuditLogs([])
-        setError(language === "fr" ? "Impossible de charger les utilisateurs" : "Failed to load users")
+        setError(t('failedToLoadUsers'))
       } finally {
         if (!cancelled) setIsFetching(false)
       }
@@ -229,11 +229,9 @@ export default function UsersPage() {
     const roleId = Number(form.roleId)
     if (!fullName || !email || !Number.isFinite(roleId) || roleId <= 0) {
       toast({
-        title: language === "fr" ? "Champs obligatoires manquants" : "Missing required fields",
+        title: t('missingRequiredField'),
         description:
-          language === "fr"
-            ? "Nom complet, email et rôle sont requis."
-            : "Full name, email, and role are required.",
+          t('fullNameEmailAndRole'),
         variant: "destructive",
       })
       return
@@ -247,11 +245,9 @@ export default function UsersPage() {
       if (editorMode === "create") {
         if (!password || password.length < 8) {
           toast({
-            title: language === "fr" ? "Mot de passe invalide" : "Invalid password",
+            title: t('invalidPassword'),
             description:
-              language === "fr"
-                ? "Le mot de passe doit contenir au moins 8 caractères."
-                : "Password must be at least 8 characters.",
+              t('passwordMustBeAtLeas'),
             variant: "destructive",
           })
           return
@@ -262,13 +258,13 @@ export default function UsersPage() {
           email,
           phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
           password,
-          roleId,
+          roleIds: [roleId],
           departmentId,
           isActive: form.isActive,
-        }
+        } as unknown as CreateUserRequest
 
         await usersApi.create(payload)
-        toast({ title: language === "fr" ? "Utilisateur créé" : "User created" })
+        toast({ title: t('userCreated') })
       } else {
         if (!editingUserId) throw new Error("Missing user id")
 
@@ -276,22 +272,22 @@ export default function UsersPage() {
           fullName: fullName || undefined,
           email: email || undefined,
           phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
-          roleId,
+          roleIds: [roleId],
           departmentId,
-        }
+        } as unknown as UpdateUserRequest
         if (password && password.trim().length > 0) {
           payload.password = password
         }
 
         await usersApi.update(editingUserId, payload)
-        toast({ title: language === "fr" ? "Utilisateur mis à jour" : "User updated" })
+        toast({ title: t('userUpdated') })
       }
 
       setEditorOpen(false)
       await refreshUsers()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Échec de l’enregistrement" : "Save failed",
+        title: t('saveFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -303,8 +299,8 @@ export default function UsersPage() {
   const onToggleActive = async (u: UserResponse, nextActive: boolean) => {
     if (user && u.userId === user.id) {
       toast({
-        title: language === "fr" ? "Action non autorisée" : "Action not allowed",
-        description: language === "fr" ? "Vous ne pouvez pas désactiver votre compte." : "You can't deactivate your own account.",
+        title: t('actionNotAllowed'),
+        description: "You cannot deactivate your own account.",
         variant: "destructive",
       })
       return
@@ -312,11 +308,11 @@ export default function UsersPage() {
 
     try {
       await usersApi.updateStatus(u.userId, nextActive)
-      toast({ title: nextActive ? (language === "fr" ? "Utilisateur activé" : "User activated") : (language === "fr" ? "Utilisateur désactivé" : "User deactivated") })
+      toast({ title: nextActive ? (t('userActivated')) : (t('userDeactivated')) })
       await refreshUsers()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        title: t('updateFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -326,8 +322,8 @@ export default function UsersPage() {
   const askDelete = (u: UserResponse) => {
     if (user && u.userId === user.id) {
       toast({
-        title: language === "fr" ? "Action non autorisée" : "Action not allowed",
-        description: language === "fr" ? "Vous ne pouvez pas supprimer votre compte." : "You can't delete your own account.",
+        title: t('actionNotAllowed'),
+        description: "You cannot delete your own account.",
         variant: "destructive",
       })
       return
@@ -340,13 +336,13 @@ export default function UsersPage() {
     if (!deletingUser) return
     try {
       await usersApi.delete(deletingUser.userId)
-      toast({ title: language === "fr" ? "Utilisateur supprimé" : "User deleted" })
+      toast({ title: t('userDeleted') })
       setConfirmDeleteOpen(false)
       setDeletingUser(null)
       await refreshUsers()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -367,7 +363,7 @@ export default function UsersPage() {
     if (Number.isNaN(date.getTime())) return "—"
     const diffMs = Date.now() - date.getTime()
     const diffMin = Math.floor(diffMs / 60000)
-    if (diffMin < 1) return language === "fr" ? "à l’instant" : "just now"
+    if (diffMin < 1) return t('justNow')
     if (diffMin < 60) return language === "fr" ? `il y a ${diffMin} min` : `${diffMin} min ago`
     const diffHr = Math.floor(diffMin / 60)
     if (diffHr < 24) return language === "fr" ? `il y a ${diffHr} h` : `${diffHr}h ago`
@@ -413,41 +409,41 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>
               {editorMode === "create"
-                ? (language === "fr" ? "Ajouter un utilisateur" : "Add user")
-                : (language === "fr" ? "Modifier l’utilisateur" : "Edit user")}
+                ? (t('addUser'))
+                : (t('editUser'))}
             </DialogTitle>
             <DialogDescription>
-              {language === "fr" ? "Sauvegarde via l’API /users." : "Saves via the /users API."}
+              {t('savesViaTheUsersAPI')}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={onSaveUser} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="u-fullName">{language === "fr" ? "Nom complet" : "Full name"}</Label>
+                <Label htmlFor="u-fullName">{t('fullName')}</Label>
                 <Input id="u-fullName" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="u-email">{language === "fr" ? "Email" : "Email"}</Label>
+                <Label htmlFor="u-email">{t('email')}</Label>
                 <Input id="u-email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="u-phone">{language === "fr" ? "Téléphone" : "Phone"}</Label>
+                <Label htmlFor="u-phone">{t('phone')}</Label>
                 <Input id="u-phone" value={form.phoneNumber} onChange={(e) => setForm((p) => ({ ...p, phoneNumber: e.target.value }))} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="u-password">{language === "fr" ? "Mot de passe" : "Password"}</Label>
-                <Input id="u-password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder={editorMode === "edit" ? (language === "fr" ? "Laisser vide pour ne pas changer" : "Leave empty to keep") : ""} />
+                <Label htmlFor="u-password">{t('password')}</Label>
+                <Input id="u-password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder={editorMode === "edit" ? (t('leaveEmptyToKeep')) : ""} />
               </div>
 
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Rôle" : "Role"}</Label>
+                <Label>{t('role')}</Label>
                 <Select value={form.roleId} onValueChange={(v) => setForm((p) => ({ ...p, roleId: v }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionner" : "Select"} />
+                    <SelectValue placeholder={t('select')} />
                   </SelectTrigger>
                   <SelectContent>
                     {roles.map((r) => (
@@ -460,13 +456,13 @@ export default function UsersPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>{language === "fr" ? "Département" : "Department"}</Label>
+                <Label>{t('department')}</Label>
                 <Select value={form.departmentId} onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Aucun" : "None"} />
+                    <SelectValue placeholder={t('none')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE_SELECT_VALUE}>{language === "fr" ? "Aucun" : "None"}</SelectItem>
+                    <SelectItem value={NONE_SELECT_VALUE}>{t('none')}</SelectItem>
                     {departments.map((d) => (
                       <SelectItem key={d.departmentId} value={String(d.departmentId)}>
                         {d.departmentName}
@@ -479,8 +475,8 @@ export default function UsersPage() {
               {editorMode === "create" && (
                 <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
                   <div>
-                    <div className="text-sm font-medium text-foreground">{language === "fr" ? "Actif" : "Active"}</div>
-                    <div className="text-xs text-muted-foreground">{language === "fr" ? "Compte activé à la création" : "Account enabled on creation"}</div>
+                    <div className="text-sm font-medium text-foreground">{t('active')}</div>
+                    <div className="text-xs text-muted-foreground">{t('accountEnabledOnCrea')}</div>
                   </div>
                   <Switch checked={form.isActive} onCheckedChange={(checked) => setForm((p) => ({ ...p, isActive: checked }))} />
                 </div>
@@ -502,18 +498,18 @@ export default function UsersPage() {
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{language === "fr" ? "Filtres" : "Filters"}</DialogTitle>
-            <DialogDescription>{language === "fr" ? "Recherche via /users/search." : "Search via /users/search."}</DialogDescription>
+            <DialogTitle>{t('filters')}</DialogTitle>
+            <DialogDescription>{t('searchViaUsersSearch')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{language === "fr" ? "Rôle" : "Role"}</Label>
+              <Label>{t('role')}</Label>
               <Select value={roleFilterId} onValueChange={setRoleFilterId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={language === "fr" ? "Tous" : "All"} />
+                  <SelectValue placeholder={t('all')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                  <SelectItem value="all">{t('all')}</SelectItem>
                   {roles.map((r) => (
                     <SelectItem key={r.roleId} value={String(r.roleId)}>
                       {r.roleName}
@@ -523,13 +519,13 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{language === "fr" ? "Département" : "Department"}</Label>
+              <Label>{t('department')}</Label>
               <Select value={departmentFilterId} onValueChange={setDepartmentFilterId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={language === "fr" ? "Tous" : "All"} />
+                  <SelectValue placeholder={t('all')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                  <SelectItem value="all">{t('all')}</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.departmentId} value={String(d.departmentId)}>
                       {d.departmentName}
@@ -548,10 +544,10 @@ export default function UsersPage() {
                 setDepartmentFilterId("all")
               }}
             >
-              {language === "fr" ? "Réinitialiser" : "Reset"}
+              {t('reset')}
             </Button>
             <Button type="button" onClick={() => setFiltersOpen(false)}>
-              {language === "fr" ? "Appliquer" : "Apply"}
+              {t('apply')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -560,7 +556,7 @@ export default function UsersPage() {
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{language === "fr" ? "Supprimer l’utilisateur" : "Delete user"}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteUser')}</AlertDialogTitle>
             <AlertDialogDescription>
               {language === "fr"
                 ? `Cette action va supprimer l’utilisateur (suppression permanente). ${deletingUser?.fullName ?? ""}`
@@ -575,7 +571,7 @@ export default function UsersPage() {
       </AlertDialog>
 
       {/* Filters & Search */}
-      <motion.div variants={fadeInUp} className="flex gap-2">
+      <motion.div variants={fadeInUp} className="flex flex-wrap gap-2 min-w-0">
         <div className="flex-1">
           <Input
             placeholder="Search users..."
@@ -615,7 +611,7 @@ export default function UsersPage() {
                   {isFetching ? (
                     <tr>
                       <td className="py-6 px-6 text-muted-foreground" colSpan={7}>
-                        {language === "fr" ? "Chargement..." : "Loading..."}
+                        {t('loading')}
                       </td>
                     </tr>
                   ) : error ? (
@@ -627,7 +623,7 @@ export default function UsersPage() {
                   ) : items.length === 0 ? (
                     <tr>
                       <td className="py-6 px-6 text-muted-foreground" colSpan={7}>
-                        {language === "fr" ? "Aucun utilisateur" : "No users"}
+                        {t('noUsers')}
                       </td>
                     </tr>
                   ) : (
@@ -646,7 +642,7 @@ export default function UsersPage() {
                                 : "bg-muted text-muted-foreground border-border"
                             }
                           >
-                            {u.isActive ? (language === "fr" ? "Actif" : "Active") : (language === "fr" ? "Inactif" : "Inactive")}
+                            {u.isActive ? (t('active')) : (t('inactive'))}
                           </Badge>
                         </td>
                         <td className="py-4 px-6 text-muted-foreground text-xs">
@@ -701,7 +697,7 @@ export default function UsersPage() {
             <div className="space-y-3">
               {recentUserLogs.length === 0 ? (
                 <div className="py-2 px-3 text-sm text-muted-foreground">
-                  {language === "fr" ? "Aucune activité" : "No recent activity"}
+                  {t('noRecentActivity')}
                 </div>
               ) : (
                 recentUserLogs.map((log) => (
@@ -709,7 +705,7 @@ export default function UsersPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{log.actionType || "—"}</p>
                       <p className="text-xs text-muted-foreground">
-                        {language === "fr" ? "par" : "by"} {log.userId ? `User #${log.userId}` : "System"}
+                        {t('by')} {log.userId ? `User #${log.userId}` : "System"}
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">{timeAgo(log.createdAt)}</span>

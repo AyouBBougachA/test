@@ -176,6 +176,7 @@ com\cmms\inventory\repository\RestockRequestRepository.class
 com\cmms\maintenance\controller\WoChecklistController.class
 com\cmms\inventory\entity\SparePart.class
 com\cmms\claims\entity\Claim.class
+com\cmms\maintenance\service\TechnicianAvailabilityService.class
 com\cmms\claims\service\ClaimPhotoService$Actor.class
 com\cmms\maintenance\dto\SubTaskResponse.class
 com\cmms\equipment\entity\EquipmentCriticality.class
@@ -198,6 +199,7 @@ com\cmms\maintenance\dto\ValidateWorkOrderRequest.class
 com\cmms\equipment\dto\MeterThresholdRequest.class
 com\cmms\inventory\entity\RestockRequest.class
 com\cmms\equipment\service\EquipmentCategoryService.class
+com\cmms\maintenance\dto\TechnicianRecommendationDTO$TechnicianRecommendationDTOBuilder.class
 com\cmms\maintenance\entity\TaskTemplate$TaskTemplateBuilder.class
 com\cmms\identity\repository\AuditLogRepository.class
 com\cmms\identity\dto\LoginResponse$LoginResponseBuilder.class
@@ -225,6 +227,7 @@ com\cmms\maintenance\service\TaskTemplateService.class
 com\cmms\claims\dto\ClaimHistoryEntryResponse$ClaimHistoryEntryResponseBuilder.class
 com\cmms\bi\service\KpiService.class
 com\cmms\identity\entity\User$UserBuilder.class
+com\cmms\maintenance\service\TechnicianAvailabilityService$1.class
 com\cmms\maintenance\entity\SubTask.class
 com\cmms\claims\dto\RejectClaimRequest$RejectClaimRequestBuilder.class
 com\cmms\equipment\dto\MeterResponse.class
@@ -263,6 +266,7 @@ com\cmms\maintenance\entity\WorkOrderLabor$WorkOrderLaborBuilder.class
 com\cmms\maintenance\dto\CompleteWorkOrderRequest$CompleteWorkOrderRequestBuilder.class
 com\cmms\equipment\entity\MeterLog.class
 com\cmms\equipment\dto\MeterThresholdRequest$MeterThresholdRequestBuilder.class
+com\cmms\maintenance\dto\TechnicianRecommendationDTO.class
 com\cmms\bi\dto\KpiResponse.class
 com\cmms\claims\repository\ClaimRepository.class
 com\cmms\claims\service\ClaimService.class

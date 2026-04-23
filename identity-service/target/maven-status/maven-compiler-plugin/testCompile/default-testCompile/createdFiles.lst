@@ -1,12 +1,6 @@
 com\cmms\equipment\service\EquipmentServiceValidationTest.class
-com\cmms\identity\controller\UserControllerTest$TestApplication.class
 com\cmms\equipment\controller\EquipmentControllerTest.class
-com\cmms\identity\security\JwtTokenProviderTest.class
 com\cmms\identity\controller\RoleControllerTest$TestApplication.class
-com\cmms\identity\controller\AuthControllerTest$TestApplication.class
-com\cmms\identity\controller\AuthControllerTest.class
-com\cmms\identity\controller\UserControllerTest.class
-com\cmms\identity\security\JwtAuthenticationFilterTest.class
 com\cmms\identity\controller\RoleControllerTest.class
 com\cmms\claims\controller\ClaimsControllerTest.class
 com\cmms\security\SecurityAccessTest$TestApplication.class

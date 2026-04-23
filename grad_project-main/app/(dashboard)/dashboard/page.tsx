@@ -162,9 +162,9 @@ export default function DashboardPage() {
             <span className="text-xs opacity-60">• {format(lastUpdated, 'HH:mm:ss')}</span>
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           {(isManager || isTechnician) && (
-            <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20" asChild>
+            <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-primary-foreground shadow-lg shadow-violet-500/20" asChild>
               <Link href="/claims/new"><Plus className="h-4 w-4" /> New Claim</Link>
             </Button>
           )}

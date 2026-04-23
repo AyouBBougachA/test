@@ -10,11 +10,9 @@ export default function AiAssistantPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "IA - Assistant" : "AI - Assistant"}</CardTitle>
+          <CardTitle>{t('aIAssistant')}</CardTitle>
           <CardDescription>
-            {language === "fr"
-              ? "Module non disponible : aucune API IA." 
-              : "Module not available: no AI API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent />

@@ -45,7 +45,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void setsAuthenticationFromValidToken() throws Exception {
-        String token = jwtTokenProvider.generateToken(10, "user@example.com", "ADMIN");
+        String token = jwtTokenProvider.generateToken(10, "user@example.com", List.of("ADMIN"));
         UserDetails userDetails = new User(
                 "user@example.com",
                 "password",

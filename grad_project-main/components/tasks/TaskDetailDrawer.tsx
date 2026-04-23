@@ -29,6 +29,13 @@ import {
   SheetHeader,
   SheetTitle
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -58,8 +65,10 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
   const [isSaving, setIsSaving] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [isReasonDialogOpen, setIsReasonDialogOpen] = useState(false)
+  const [stopReason, setStopReason] = useState("")
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
-  // Sync state with task prop
   useEffect(() => {
     if (task) {
       setActualDuration(task.actualDuration?.toString() || "")
@@ -68,29 +77,22 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
     }
   }, [task])
 
-  // Timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-
     if (task?.status === 'IN_PROGRESS' && task.currentTimerStartedAt) {
       const startTime = new Date(task.currentTimerStartedAt).getTime();
       const baseSeconds = task.totalTimerDuration || 0;
-
       const updateTimer = () => {
         const now = new Date().getTime();
         const sessionSeconds = Math.floor((now - startTime) / 1000);
         setElapsedSeconds(baseSeconds + sessionSeconds);
       };
-
       updateTimer();
       interval = setInterval(updateTimer, 1000);
     } else if (task) {
       setElapsedSeconds(task.totalTimerDuration || 0);
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [task?.status, task?.currentTimerStartedAt, task?.totalTimerDuration]);
 
   if (!task) return null
@@ -127,14 +129,26 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
     }
   }
 
-  const handleUpdateStatus = async (status: string) => {
+  const handleUpdateStatus = async (status: string, reason?: string) => {
     try {
-      if (status === 'BLOCKED' && !blockedReason) {
+      // If stopping timer (moving away from IN_PROGRESS) and not finishing
+      const isStopping = task.status === 'IN_PROGRESS' && !['DONE', 'PASS', 'FAIL'].includes(status)
+      
+      if (isStopping && !reason) {
+        setPendingStatus(status)
+        setIsReasonDialogOpen(true)
+        return
+      }
+
+      if (status === 'BLOCKED' && !blockedReason && !reason) {
         setActiveTab('execution')
         alert("Please provide a blocking reason in the Execution Notes.")
         return
       }
-      await tasksApi.updateStatus(task.taskId, status)
+      
+      await tasksApi.updateStatus(task.taskId, status, reason)
+      setIsReasonDialogOpen(false)
+      setStopReason("")
       onUpdate()
     } catch (error) {
       console.error("Failed to update status", error)
@@ -155,378 +169,265 @@ export function TaskDetailDrawer({ task, isOpen, onClose, onUpdate }: TaskDetail
     }
   };
 
-  const getStatusConfig = (status: string) => {
-    const hexColor = getStatusColorVar(status, 'DRAWER')
-    let baseConfig = { text: 'Pending', icon: <Clock className="h-4 w-4" /> }
-    switch (status.toUpperCase()) {
-      case 'DONE':
-      case 'PASS':
-        baseConfig = { text: 'Completed', icon: <CheckCircle2 className="h-4 w-4" /> }
-        break
-      case 'IN_PROGRESS':
-        baseConfig = { text: 'Executing...', icon: <Timer className="h-4 w-4 animate-spin-slow" /> }
-        break
-      case 'BLOCKED':
-        baseConfig = { text: 'Blocked', icon: <AlertTriangle className="h-4 w-4" /> }
-        break
-      case 'FAIL':
-        baseConfig = { text: 'Failed', icon: <X className="h-4 w-4" /> }
-        break
-    }
-    return { ...baseConfig, hexColor }
-  }
-
-  const config = getStatusConfig(task.status)
-
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-2xl overflow-hidden p-0 border-l border-border/40 shadow-2xl">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Task Execution Details</SheetTitle>
-        </SheetHeader>
-        <div className="flex flex-col h-full bg-slate-50/50">
-          
-          {/* PREMIUM HEADER SECTION */}
-          <div className="relative overflow-hidden bg-white border-b shadow-sm z-10">
-            <div className={`h-1.5 w-full`} style={{ backgroundColor: config.hexColor }} />
-            
-            <div className="p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 mt-1">
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      className="text-white uppercase text-[10px] tracking-widest px-2 py-0.5 rounded-sm border-none shadow-sm"
-                      style={{ backgroundColor: config.hexColor }}
-                    >
-                      {config.icon}
-                      <span className="ml-1.5">{config.text}</span>
-                    </Badge>
-                    <span className="text-[10px] font-bold text-slate-400 tracking-tighter uppercase flex items-center gap-1">
-                      <Lock className="h-3 w-3" /> WO-#{task.woId}
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-black tracking-tight text-slate-900 leading-none py-1">
-                     {task.title || task.description}
-                  </h2>
-                  <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
-                     <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Due {task.dueDate ? format(new Date(task.dueDate), 'MMM d, yyyy') : 'No deadline'}</span>
-                     <span className="flex items-center gap-1.5"><Wrench className="h-3.5 w-3.5" /> {task.priority || 'NORMAL'} PRIORITY</span>
-                  </div>
+      <SheetContent className="sm:max-w-2xl overflow-hidden p-0 flex flex-col">
+        <SheetHeader className="p-6 border-b">
+           <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={task.status} />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> WO-#{task.woId}
+                  </span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-slate-100 h-10 w-10">
-                  <X className="h-5 w-5" />
-                </Button>
+                <SheetTitle className="text-xl font-bold tracking-tight">
+                   {task.title || task.description}
+                </SheetTitle>
+              </div>
+           </div>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto bg-muted/30">
+          <div className="p-6 space-y-6">
+            {/* KPIS */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-card p-4 rounded-xl border border-border space-y-3">
+                 <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <span>Progress</span>
+                    <span className="text-primary">{Math.round(task.progress || 0)}%</span>
+                 </div>
+                 <Progress value={task.progress || 0} className="h-2" />
               </div>
 
-              {/* DASHBOARD KPIS */}
-              <div className="grid grid-cols-2 gap-4">
-                 {/* PROGRESS MODULE */}
-                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col justify-between h-20">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                       <span>Execution Progress</span>
-                       <span className="text-indigo-600 font-black">{Math.round(task.progress || 0)}%</span>
-                    </div>
-                    <Progress value={task.progress || 0} className="h-2 bg-white shadow-inner" />
+              <div className={cn(
+                "p-4 rounded-xl border flex flex-col justify-between h-20",
+                task.status === 'IN_PROGRESS' ? 'bg-info text-info-foreground border-info shadow-lg shadow-info/20' : 'bg-card text-foreground border-border'
+              )}>
+                 <div className="flex justify-between items-center text-[10px] font-bold opacity-70 uppercase tracking-wider">
+                    <span>Duration</span>
+                    {task.status === 'IN_PROGRESS' && <Timer className="h-3 w-3 animate-spin" />}
                  </div>
-
-                 {/* TIMER MODULE */}
-                 <div className={`p-3 rounded-xl border flex flex-col justify-between h-20 transition-all ${task.status === 'IN_PROGRESS' ? 'bg-blue-600 border-blue-700 shadow-lg shadow-blue-100' : 'bg-slate-900 border-slate-950 text-white'}`}>
-                    <div className="flex justify-between items-center text-[10px] font-bold opacity-70 uppercase tracking-widest">
-                       <span>Total Duration</span>
-                       {task.status === 'IN_PROGRESS' && <span className="flex h-1.5 w-1.5 rounded-full bg-white animate-pulse" />}
-                    </div>
-                    <div className="flex items-end gap-2 leading-none">
-                       <span className="text-2xl font-black font-mono tracking-tighter">
-                          {formatElapsedTime(elapsedSeconds)}
-                       </span>
-                       <span className="text-[10px] font-bold pb-1 opacity-60">HH:MM:SS</span>
-                    </div>
+                 <div className="flex items-end gap-2 leading-none">
+                    <span className="text-2xl font-bold font-mono tracking-tighter">
+                       {formatElapsedTime(elapsedSeconds)}
+                    </span>
+                    <span className="text-[10px] font-bold pb-1 opacity-60">HH:MM:SS</span>
                  </div>
               </div>
             </div>
-          </div>
 
-          {/* SOP NAVIGATION */}
-          <div className="flex items-center gap-4 px-6 py-3 bg-white border-b">
-            <TabButton active={activeTab === 'steps'} label="Steps" onClick={() => setActiveTab('steps')} icon={<CheckSquare />} />
-            <TabButton active={activeTab === 'docs'} label="Proof" onClick={() => setActiveTab('docs')} icon={<Camera />} />
-            <TabButton active={activeTab === 'execution'} label="Data" onClick={() => setActiveTab('execution')} icon={<MessageSquare />} />
-            <TabButton active={activeTab === 'history'} label="Logs" onClick={() => setActiveTab('history')} icon={<History />} />
-          </div>
+            {/* TABS */}
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-xl">
+               <button onClick={() => setActiveTab('steps')} className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'steps' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                  <CheckSquare className="h-3.5 w-3.5" /> Steps
+               </button>
+               <button onClick={() => setActiveTab('docs')} className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'docs' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                  <Camera className="h-3.5 w-3.5" /> Proof
+               </button>
+               <button onClick={() => setActiveTab('execution')} className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'execution' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                  <MessageSquare className="h-3.5 w-3.5" /> Data
+               </button>
+               <button onClick={() => setActiveTab('history')} className={cn("flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'history' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                  <History className="h-3.5 w-3.5" /> Logs
+               </button>
+            </div>
 
-          {/* MAIN EXECUTION AREA */}
-          <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+            {/* CONTENT */}
             <AnimatePresence mode="wait">
               {activeTab === 'steps' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
-                >
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                       <Wrench className="h-4 w-4 text-indigo-600" />
-                       Step-By-Step Instructions
-                    </h3>
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
-                      {task.subTasks && task.subTasks.length > 0 ? (
-                        task.subTasks.map(st => (
-                          <div key={st.id} className={`flex items-center gap-4 p-5 transition-colors hover:bg-slate-50/50 ${st.isCompleted ? 'bg-slate-50/30' : ''}`}>
-                             <div className="flex items-center justify-center">
-                               <Checkbox 
-                                 id={`st-${st.id}`} 
-                                 checked={st.isCompleted} 
-                                 onCheckedChange={(checked) => handleToggleSubTask(st.id, !!checked)}
-                                 className="h-5 w-5 rounded-md border-slate-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
-                               />
-                             </div>
-                             <label htmlFor={`st-${st.id}`} className={`text-sm font-medium leading-relaxed transition-all cursor-pointer ${st.isCompleted ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                {st.description}
-                             </label>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-12 text-center text-slate-400 italic text-sm">No checklist subtasks defined for this step.</div>
-                      )}
-                    </div>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                  <div className="bg-card rounded-xl border border-border divide-y divide-border overflow-hidden">
+                    {task.subTasks && task.subTasks.length > 0 ? (
+                      task.subTasks.map(st => (
+                        <div key={st.id} className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors">
+                           <Checkbox 
+                             id={`st-${st.id}`} 
+                             checked={st.isCompleted} 
+                             onCheckedChange={(checked) => handleToggleSubTask(st.id, !!checked)}
+                           />
+                           <label htmlFor={`st-${st.id}`} className={cn("text-sm font-medium transition-all cursor-pointer", st.isCompleted ? "text-muted-foreground line-through" : "text-foreground")}>
+                              {st.description}
+                           </label>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-muted-foreground italic text-sm">No checklist subtasks defined.</div>
+                    )}
                   </div>
 
                   {task.childTasks && task.childTasks.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Derived Secondary Tasks</h3>
-                      <div className="space-y-2">
-                        {task.childTasks.map(ct => (
-                          <div key={ct.taskId} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm group hover:ring-2 hover:ring-indigo-600/10 transition-all">
-                             <div className="flex flex-col">
-                               <span className="text-sm font-bold text-slate-800">{ct.title || ct.description}</span>
-                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{ct.status}</span>
-                             </div>
-                             <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-                          </div>
-                        ))}
-                      </div>
+                    <div className="space-y-2">
+                       <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Derived Tasks</h4>
+                       <div className="space-y-2">
+                          {task.childTasks.map(ct => (
+                            <div key={ct.taskId} className="bg-card p-3 rounded-lg border border-border flex items-center justify-between group cursor-pointer hover:border-primary/50 transition-colors">
+                               <div className="flex flex-col">
+                                 <span className="text-sm font-bold">{ct.title || ct.description}</span>
+                                 <StatusBadge status={ct.status} />
+                               </div>
+                               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                            </div>
+                          ))}
+                       </div>
                     </div>
                   )}
                 </motion.div>
               )}
 
               {activeTab === 'docs' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
-                >
-                  <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex gap-4">
-                     <div className="bg-indigo-600 h-10 w-10 min-w-[40px] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                        <Camera className="h-5 w-5" />
-                     </div>
-                     <div className="space-y-1">
-                        <h4 className="text-sm font-black text-indigo-900 leading-none">Proof of Performance</h4>
-                        <p className="text-[11px] text-indigo-700/80 leading-relaxed">Before and after visual documentation is required for specialized equipment maintenance auditing.</p>
-                     </div>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex gap-4">
+                     <Info className="h-5 w-5 text-primary" />
+                     <p className="text-xs text-muted-foreground leading-relaxed">Before and after visual documentation is required for specialized equipment maintenance auditing.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Before Photo Slot */}
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Initial State (Before)</Label>
-                      {task.photos?.find(p => p.type === 'BEFORE') ? (
-                        <div className="relative group aspect-square rounded-2xl overflow-hidden border-2 border-white shadow-xl">
-                          <img 
-                            src={tasksApi.getPhotoUrl(task.taskId, task.photos.find(p => p.type === 'BEFORE')!.photoId)} 
-                            alt="Before" 
-                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                             <Button size="sm" variant="outline" className="text-white border-white hover:bg-white/20">View Large</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center bg-white hover:border-indigo-400 hover:bg-slate-50 transition-all group relative">
-                           <input 
-                             type="file" 
-                             id={`photo-before-${task.taskId}`} 
-                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                             onChange={(e) => handlePhotoUpload(e, 'BEFORE')}
-                             disabled={isUploading}
-                           />
-                           <div className="flex flex-col items-center pointer-events-none">
-                             <div className="p-4 bg-slate-50 rounded-full mb-3 group-hover:bg-indigo-50 transition-colors">
-                                <ImageIcon className="h-8 w-8 text-slate-300 group-hover:text-indigo-400" />
-                             </div>
-                             <span className="text-[10px] font-black text-slate-400 group-hover:text-indigo-600 tracking-widest uppercase">Select Photo</span>
-                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* After Photo Slot */}
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Resulting State (After)</Label>
-                      {task.photos?.find(p => p.type === 'AFTER') ? (
-                        <div className="relative group aspect-square rounded-2xl overflow-hidden border-2 border-white shadow-xl">
-                          <img 
-                            src={tasksApi.getPhotoUrl(task.taskId, task.photos.find(p => p.type === 'AFTER')!.photoId)} 
-                            alt="After" 
-                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                             <Button size="sm" variant="outline" className="text-white border-white hover:bg-white/20">View Large</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center bg-white hover:border-emerald-400 hover:bg-slate-50 transition-all group relative">
-                           <input 
-                             type="file" 
-                             id={`photo-after-${task.taskId}`} 
-                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                             onChange={(e) => handlePhotoUpload(e, 'AFTER')}
-                             disabled={isUploading}
-                           />
-                           <div className="flex flex-col items-center pointer-events-none">
-                             <div className="p-4 bg-slate-50 rounded-full mb-3 group-hover:bg-emerald-50 transition-colors">
-                                <Camera className="h-8 w-8 text-slate-300 group-hover:text-emerald-400" />
-                             </div>
-                             <span className="text-[10px] font-black text-slate-400 group-hover:text-emerald-600 tracking-widest uppercase">Capture Result</span>
-                           </div>
-                        </div>
-                      )}
-                    </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {(['BEFORE', 'AFTER'] as const).map(type => {
+                       const photo = task.photos?.find(p => p.type === type)
+                       return (
+                         <div key={type} className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider ml-1">{type} Intervention</Label>
+                            {photo ? (
+                              <div className="relative group aspect-square rounded-xl overflow-hidden border border-border">
+                                <img src={tasksApi.getPhotoUrl(task.taskId, photo.photoId)} alt={type} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                   <Button variant="secondary" size="sm">View</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="aspect-square rounded-xl border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-2 group relative cursor-pointer hover:border-primary/40 transition-colors">
+                                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePhotoUpload(e, type)} disabled={isUploading} />
+                                 {type === 'BEFORE' ? <ImageIcon className="h-6 w-6 text-muted-foreground" /> : <Camera className="h-6 w-6 text-muted-foreground" />}
+                                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Upload</span>
+                              </div>
+                            )}
+                         </div>
+                       )
+                    })}
                   </div>
                 </motion.div>
               )}
 
               {activeTab === 'execution' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6 pb-20"
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                         <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Scheduled Hours</Label>
-                         <div className="bg-white p-4 rounded-2xl border border-slate-200 font-mono font-bold text-slate-700 shadow-sm flex items-center justify-between">
-                            {task.estimatedDuration || '--'}
-                            <span className="text-[10px] text-slate-400">HRS</span>
+                         <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Estimated</Label>
+                         <div className="bg-card p-3 rounded-xl border border-border font-mono font-bold text-sm">
+                            {task.estimatedDuration || '--'} HRS
                          </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Manual Labor Adjust.</Label>
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Actual (Manual)</Label>
                         <div className="relative">
                           <Input 
                             type="number" 
                             step="0.1" 
                             value={actualDuration} 
-                            placeholder="e.g. 1.5"
+                            placeholder="1.5"
                             onChange={(e) => setActualDuration(e.target.value)}
-                            className="h-14 bg-white border-slate-200 rounded-2xl font-mono text-lg font-bold shadow-sm focus:ring-indigo-600/20"
+                            className="h-10 bg-card border-border font-mono font-bold"
                           />
-                          <span className="absolute right-4 top-4.5 text-xs text-indigo-400 font-bold">HRS</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">HRS</span>
                         </div>
                       </div>
                    </div>
 
                    <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Blocking Issues (If any)</Label>
-                      <Input 
-                        placeholder="Ex: Missing specific gasket, Waiting for power shutdown..."
-                        value={blockedReason}
-                        onChange={(e) => setBlockedReason(e.target.value)}
-                        className="h-12 bg-white border-slate-200 rounded-xl shadow-sm focus:ring-rose-500/20"
-                      />
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Blocking Reason</Label>
+                      <Input placeholder="None" value={blockedReason} onChange={(e) => setBlockedReason(e.target.value)} className="bg-card border-border" />
                    </div>
 
                    <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Technical Findings & Action Notes</Label>
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Technical Notes</Label>
                       <Textarea 
-                        placeholder="Detail the work performed, observations, and recommendations..."
-                        className="min-h-[200px] bg-white border-slate-200 rounded-2xl p-4 shadow-sm resize-none focus:ring-indigo-600/20 text-slate-700 leading-relaxed"
+                        placeholder="Detail work performed..."
+                        className="min-h-[150px] bg-card border-border resize-none"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                       />
                    </div>
 
-                   <Button 
-                     className="w-full h-14 bg-slate-900 hover:bg-black text-white rounded-2xl shadow-xl shadow-slate-200 flex items-center justify-center gap-3 transition-all" 
-                     onClick={handleSaveDetails}
-                     disabled={isSaving}
-                   >
-                     {isSaving ? (
-                       <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                     ) : (
-                       <Save className="h-5 w-5" />
-                     )}
-                     <span className="font-black uppercase tracking-widest text-xs">Save Execution Record</span>
+                   <Button className="w-full h-11 font-bold uppercase tracking-widest text-xs" onClick={handleSaveDetails} disabled={isSaving}>
+                     {isSaving ? <Timer className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                     Save Execution Data
                    </Button>
                 </motion.div>
               )}
 
               {activeTab === 'history' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
-                     <History className="h-5 w-5 text-slate-400" />
-                     <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">Detailed Audit Trail</h3>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                     <History className="h-4 w-4 text-muted-foreground" />
+                     <h4 className="text-xs font-bold uppercase tracking-wider">Audit Log</h4>
                   </div>
                   <TaskTimeline logs={task.auditLogs || []} />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+        </div>
 
-          {/* DYNAMIC FOOTER ACTIONS */}
-          <div className="p-6 bg-white border-t flex items-center justify-between gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-10">
-             <div className="flex items-center gap-2">
-                {task.status !== 'IN_PROGRESS' && task.status !== 'DONE' && (
-                  <Button 
-                    className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-100 font-bold flex items-center gap-2" 
-                    onClick={() => handleUpdateStatus('IN_PROGRESS')}
-                  >
-                    <Play className="h-4 w-4 fill-current" />
-                    Start Timer
-                  </Button>
-                )}
-                {task.status !== 'BLOCKED' && task.status !== 'DONE' && (
-                  <Button 
-                    variant="outline" 
-                    className="h-12 px-4 border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl font-bold flex items-center gap-2" 
-                    onClick={() => handleUpdateStatus('BLOCKED')}
-                  >
-                    <AlertCircle className="h-4 w-4" />
-                    Block
-                  </Button>
-                )}
-             </div>
+        {/* FOOTER */}
+        <div className="p-6 bg-background border-t flex items-center justify-between gap-4">
+           <div className="flex items-center gap-2">
+              {task.status !== 'IN_PROGRESS' && task.status !== 'DONE' && (
+                <Button className="bg-info hover:bg-info/90 text-info-foreground font-bold" onClick={() => handleUpdateStatus('IN_PROGRESS')}>
+                  <Play className="h-4 w-4 mr-2 fill-current" /> Start
+                </Button>
+              )}
+              {task.status !== 'BLOCKED' && task.status !== 'DONE' && (
+                <Button variant="outline" className="border-danger/30 text-danger hover:bg-danger/5 font-bold" onClick={() => handleUpdateStatus('BLOCKED')}>
+                  <AlertCircle className="h-4 w-4 mr-2" /> Block
+                </Button>
+              )}
+           </div>
 
-             {task.status !== 'DONE' && (
-               <Button 
-                 className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-100 flex-1 font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2" 
-                 onClick={() => handleUpdateStatus('DONE')}
-               >
-                 <CheckCircle2 className="h-5 w-5" />
-                 Complete Step
-               </Button>
-             )}
-          </div>
+           {task.status !== 'DONE' && (
+             <Button className="bg-success hover:bg-success/90 text-success-foreground font-bold flex-1" onClick={() => handleUpdateStatus('DONE')}>
+               <CheckCircle2 className="h-4 w-4 mr-2" /> Complete Step
+             </Button>
+           )}
         </div>
       </SheetContent>
+
+      <Dialog open={isReasonDialogOpen} onOpenChange={setIsReasonDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
+              Stopping Task Timer
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground leading-relaxed">
+              You are stopping the active timer for this task. Please provide a brief explanation for auditing purposes.
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reason" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason for stopping</Label>
+              <Textarea 
+                id="reason"
+                placeholder="e.g., Waiting for parts, End of shift, Blocked by other task..."
+                value={stopReason}
+                onChange={(e) => setStopReason(e.target.value)}
+                className="min-h-[100px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReasonDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-primary font-bold" 
+              onClick={() => handleUpdateStatus(pendingStatus || 'TODO', stopReason)}
+              disabled={!stopReason.trim()}
+            >
+              Confirm & Stop Timer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   )
 }
 
-function TabButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-        active 
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105' 
-          : 'text-slate-400 hover:text-slate-900 hover:bg-slate-50'
-      }`}
-    >
-      <span className={`transition-colors ${active ? 'text-white' : 'text-slate-300 group-hover:text-indigo-600'}`}>
-        {icon}
-      </span>
-      <span className="uppercase tracking-widest">{label}</span>
-    </button>
-  )
-}

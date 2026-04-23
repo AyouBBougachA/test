@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import React from "react"
 import { cn } from "@/lib/utils"
+import { StatusBadge } from "@/components/status-badge"
 import { 
   Table, 
   TableBody, 
@@ -63,27 +64,11 @@ export function TaskHierarchyTable({ tasks, onSelectTask, onUpdateStatus, onDele
     setExpandedRows(next)
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'DONE':
-      case 'PASS':
-        return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-      case 'IN_PROGRESS':
-        return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-      case 'BLOCKED':
-        return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-      case 'FAIL':
-        return 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-      default:
-        return 'bg-slate-500/10 text-slate-500 border-slate-500/20'
-    }
-  }
-
   const getPriorityColor = (priority: string) => {
     switch (priority?.toUpperCase()) {
-      case 'CRITICAL': return 'text-rose-600 bg-rose-500/10 border-rose-500/20'
-      case 'HIGH': return 'text-orange-600 bg-orange-500/10 border-orange-500/20'
-      case 'MEDIUM': return 'text-blue-600 bg-blue-500/10 border-blue-500/20'
+      case 'CRITICAL': return 'text-danger bg-danger/10 border-danger/20'
+      case 'HIGH': return 'text-warning bg-warning/10 border-warning/20'
+      case 'MEDIUM': return 'text-info bg-info/10 border-info/20'
       default: return 'text-muted-foreground bg-muted border-border'
     }
   }
@@ -128,7 +113,7 @@ export function TaskHierarchyTable({ tasks, onSelectTask, onUpdateStatus, onDele
                    {task.title || task.description}
                  </span>
                  {task.isAdHoc && (
-                   <Badge variant="outline" className="text-[10px] scale-90 border-indigo-200 text-indigo-700 bg-indigo-50 px-1 py-0">AD HOC</Badge>
+                   <Badge variant="outline" className="text-[10px] scale-90 border-info/20 text-info bg-info/5 px-1 py-0 font-bold uppercase">AD HOC</Badge>
                  )}
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -161,13 +146,11 @@ export function TaskHierarchyTable({ tasks, onSelectTask, onUpdateStatus, onDele
              </Badge>
           </TableCell>
           <TableCell>
-            <Badge variant="outline" className={`font-bold text-[10px] tracking-tight ${getStatusBadge(task.status)} uppercase`}>
-              {task.status.replace('_', ' ')}
-            </Badge>
+            <StatusBadge status={task.status} />
           </TableCell>
           <TableCell>
             <div className="flex items-center gap-2">
-               <div className={`p-1.5 rounded-lg ${isOverdue ? 'bg-rose-500/10 text-rose-500' : 'bg-muted text-muted-foreground'}`}>
+               <div className={cn("p-1.5 rounded-lg", isOverdue ? 'bg-danger/10 text-danger' : 'bg-muted text-muted-foreground')}>
                   <Calendar className="h-4 w-4" />
                </div>
                <div className="flex flex-col">

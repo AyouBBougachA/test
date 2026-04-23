@@ -98,7 +98,7 @@ export default function AssetDetailPage() {
         setModels(mods)
       } catch (err) {
         toast({
-          title: language === "fr" ? "Erreur" : "Error",
+          title: t('error'),
           description: language === "fr" ? "Impossible de charger l'équipement." : "Failed to load equipment.",
           variant: "destructive"
         })
@@ -189,27 +189,27 @@ export default function AssetDetailPage() {
             disabled={isUpdatingStatus || equipment.status === "ARCHIVED"}
           >
             {equipment.status === "OPERATIONAL" ? (
-              <><EyeOff className="mr-2 h-4 w-4"/> {language === "fr" ? "Hors service" : "Out of Service"}</>
+              <><EyeOff className="mr-2 h-4 w-4"/> {t('outOfService')}</>
             ) : (
-              <><CheckCircle className="mr-2 h-4 w-4"/> {language === "fr" ? "En service" : "In Service"}</>
+              <><CheckCircle className="mr-2 h-4 w-4"/> {t('inService')}</>
             )}
           </Button>
           
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline"><Settings className="mr-2 h-4 w-4"/> {language === "fr" ? "Imprimer QR" : "Print QR"}</Button>
+              <Button variant="outline"><Settings className="mr-2 h-4 w-4"/> {t('printQR')}</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md text-center">
               <DialogHeader>
                 <DialogTitle>{language === "fr" ? "Code QR de l'équipement" : "Equipment QR Code"}</DialogTitle>
-                <DialogDescription>{language === "fr" ? "Scannez pour accéder rapidement à cette page." : "Scan to quickly access this page."}</DialogDescription>
+                <DialogDescription>{t('scanToQuicklyAccessT')}</DialogDescription>
               </DialogHeader>
               <div className="flex justify-center p-6 bg-white rounded-lg">
                 <QRCodeSVG value={qrUrl} size={250} level="H" includeMargin />
               </div>
               <p className="font-mono text-sm">{equipment.serialNumber}</p>
               <div className="flex justify-center mt-4">
-                 <Button onClick={() => window.print()}>{language === "fr" ? "Imprimer" : "Print"}</Button>
+                 <Button onClick={() => window.print()}>{t('print')}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -222,7 +222,7 @@ export default function AssetDetailPage() {
         <div className="space-y-6 md:col-span-1">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">{language === "fr" ? "Informations" : "Information"}</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('information')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div>
@@ -230,11 +230,11 @@ export default function AssetDetailPage() {
                 <span className="font-medium">{equipment.location || "—"}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block text-xs">{language === "fr" ? "Catégorie" : "Category"}</span>
+                <span className="text-muted-foreground block text-xs">{t('category')}</span>
                 <span className="font-medium">{catName}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block text-xs">{language === "fr" ? "Modèle" : "Model"}</span>
+                <span className="text-muted-foreground block text-xs">{t('model')}</span>
                 <span className="font-medium">{modName}</span>
               </div>
               <div>
@@ -242,11 +242,11 @@ export default function AssetDetailPage() {
                 <span className="font-medium">{equipment.criticality || "—"}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block text-xs">{language === "fr" ? "Achat" : "Purchase"}</span>
+                <span className="text-muted-foreground block text-xs">{t('purchase')}</span>
                 <span className="font-medium">{equipment.purchaseDate ? new Date(equipment.purchaseDate).toLocaleDateString() : "—"}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block text-xs">{language === "fr" ? "Garantie" : "Warranty"}</span>
+                <span className="text-muted-foreground block text-xs">{t('warranty')}</span>
                 <span className="font-medium">{equipment.warrantyEndDate ? new Date(equipment.warrantyEndDate).toLocaleDateString() : "—"}</span>
               </div>
             </CardContent>
@@ -254,11 +254,11 @@ export default function AssetDetailPage() {
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">{language === "fr" ? "Compteur" : "Meter"}</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('meter')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {equipment.startMeterValue || 0} <span className="text-sm text-muted-foreground">{equipment.meterUnit || (language === "fr" ? "unités" : "units")}</span>
+                {equipment.startMeterValue || 0} <span className="text-sm text-muted-foreground">{equipment.meterUnit || (t('units'))}</span>
               </div>
               {equipment.thresholds && equipment.thresholds.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -279,20 +279,20 @@ export default function AssetDetailPage() {
         <div className="md:col-span-3">
           <Tabs defaultValue="wos" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="wos">{language === "fr" ? "Interventions" : "Work Orders"} ({workOrders.length})</TabsTrigger>
-              <TabsTrigger value="history">{language === "fr" ? "Historique" : "History"}</TabsTrigger>
-              <TabsTrigger value="docs">{language === "fr" ? "Documents" : "Documents"} ({documents.length})</TabsTrigger>
+              <TabsTrigger value="wos">{t('workOrders')} ({workOrders.length})</TabsTrigger>
+              <TabsTrigger value="history">{t('history')}</TabsTrigger>
+              <TabsTrigger value="docs">{t('documents')} ({documents.length})</TabsTrigger>
             </TabsList>
             
             <TabsContent value="wos" className="mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>{language === "fr" ? "Bons de travail ouverts" : "Open Work Orders"}</CardTitle>
-                  <CardDescription>{language === "fr" ? "Interventions liées à cet équipement." : "Work orders linked to this equipment."}</CardDescription>
+                  <CardTitle>{t('openWorkOrders')}</CardTitle>
+                  <CardDescription>{t('workOrdersLinkedToTh')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {workOrders.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">{language === "fr" ? "Aucune intervention." : "No work orders."}</div>
+                    <div className="text-center py-8 text-muted-foreground">{t('noWorkOrders')}</div>
                   ) : (
                     <div className="space-y-4">
                       {workOrders.map(wo => (
@@ -318,13 +318,13 @@ export default function AssetDetailPage() {
               {/* Maintenance Plans Placeholder */}
               <Card className="mt-6">
                 <CardHeader>
-                  <CardTitle>{language === "fr" ? "Plans de maintenance" : "Maintenance Plans"}</CardTitle>
+                  <CardTitle>{t('maintenancePlans')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
                     <Clock className="mx-auto h-8 w-8 text-muted-foreground mb-2 opacity-50" />
                     <p className="text-sm text-muted-foreground">
-                      {language === "fr" ? "Aucun plan de maintenance configuré pour cet équipement." : "No maintenance plans configured for this equipment."}
+                      {t('noMaintenancePlansCo')}
                     </p>
                   </div>
                 </CardContent>
@@ -337,7 +337,7 @@ export default function AssetDetailPage() {
                 </CardHeader>
                 <CardContent>
                   {!equipment.thresholds || equipment.thresholds.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{language === "fr" ? "Aucun seuil défini." : "No thresholds defined."}</p>
+                    <p className="text-sm text-muted-foreground">{t('noThresholdsDefined')}</p>
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {equipment.thresholds.map((t, i) => (
@@ -360,12 +360,12 @@ export default function AssetDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>{language === "fr" ? "Journal d'activité" : "Activity Log"}</CardTitle>
-                  <CardDescription>{language === "fr" ? "Traçabilité des changements de statuts et alertes." : "Traceability of status changes and alerts."}</CardDescription>
+                  <CardDescription>{t('traceabilityOfStatus')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="relative border-l border-muted ml-3 space-y-6 pb-4">
                     {history.length === 0 ? (
-                      <p className="text-sm text-muted-foreground ml-6">{language === "fr" ? "Aucun historique récent." : "No recent history."}</p>
+                      <p className="text-sm text-muted-foreground ml-6">{t('noRecentHistory')}</p>
                     ) : history.map((h) => (
                       <div key={h.id} className="mb-6 ml-6">
                         <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-background border ring-4 ring-background">
@@ -388,13 +388,13 @@ export default function AssetDetailPage() {
             <TabsContent value="docs" className="mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>{language === "fr" ? "Documentation technique" : "Technical Documentation"}</CardTitle>
+                  <CardTitle>{t('technicalDocumentati')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 mb-6">
                     <Input type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                     <Button onClick={handleDocumentUpload} disabled={!selectedFile || isUploading}>
-                      <Upload className="h-4 w-4 mr-2" /> {language === "fr" ? "Uploader" : "Upload"}
+                      <Upload className="h-4 w-4 mr-2" /> {t('upload')}
                     </Button>
                   </div>
                   <div className="space-y-3">
@@ -407,7 +407,7 @@ export default function AssetDetailPage() {
                             <p className="text-xs text-muted-foreground">{new Date(doc.uploadedAt).toLocaleDateString()}</p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 min-w-0">
                           <Button variant="ghost" size="icon" onClick={() => window.open(`/api/equipment/documents/${doc.id}/download`)}>
                             <Download className="h-4 w-4" />
                           </Button>

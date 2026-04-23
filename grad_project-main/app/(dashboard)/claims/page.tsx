@@ -164,7 +164,7 @@ export default function ClaimsPage() {
           setError(`Request failed (${err.status})`)
           return
         }
-        setError(language === "fr" ? "Échec du chargement" : "Failed to load")
+        setError(t('failedToLoad'))
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -268,28 +268,28 @@ export default function ClaimsPage() {
 
   const statCards = [
     {
-      label: language === "fr" ? "Total réclamations" : "Total Claims",
+      label: t('totalClaims'),
       value: kpi.total,
       icon: AlertTriangle,
       color: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-900/20",
     },
     {
-      label: language === "fr" ? "Nouveaux" : "New",
+      label: t('new'),
       value: kpi.pending,
       icon: Clock,
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
-      label: language === "fr" ? "En cours" : "In Progress",
+      label: t('inProgress'),
       value: kpi.inProgress,
       icon: AlertTriangle,
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
-      label: language === "fr" ? "Fermées" : "Closed",
+      label: t('closed'),
       value: kpi.closed,
       icon: CheckCircle,
       color: "text-emerald-600",
@@ -306,12 +306,10 @@ export default function ClaimsPage() {
             {t("claimsList")}
           </h1>
           <p className="text-muted-foreground">
-            {language === "fr"
-              ? "Gérez les réclamations et les incidents"
-              : "Manage claims and incidents"}
+            {t('manageClaimsAndIncid')}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <Button variant="outline" className="gap-2" type="button">
             <Download className="h-4 w-4" />
             {t("export")}
@@ -330,11 +328,11 @@ export default function ClaimsPage() {
         <TabsList>
           <TabsTrigger value="list" className="gap-2">
             <AlertTriangle className="h-4 w-4" />
-            {language === "fr" ? "Liste" : "List"}
+            {t('list')}
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <Clock className="h-4 w-4" />
-            {language === "fr" ? "Audit" : "Audit"}
+            {t('audit')}
           </TabsTrigger>
         </TabsList>
 
@@ -369,19 +367,19 @@ export default function ClaimsPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder={language === "fr" ? "Rechercher réclamations..." : "Search claims..."}
+                    placeholder={t('searchClaims')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 min-w-0">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-36">
                       <SelectValue placeholder={t("status")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{language === "fr" ? "Tous" : "All"}</SelectItem>
+                      <SelectItem value="all">{t('all')}</SelectItem>
                       <SelectItem value="New">New</SelectItem>
                       <SelectItem value="Qualified">Qualified</SelectItem>
                       <SelectItem value="Assigned">Assigned</SelectItem>
@@ -397,7 +395,7 @@ export default function ClaimsPage() {
                       <SelectValue placeholder={t("priority")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{language === "fr" ? "Toutes" : "All"}</SelectItem>
+                      <SelectItem value="all">{t('all')}</SelectItem>
                       <SelectItem value="Critical">{t("critical")}</SelectItem>
                       <SelectItem value="High">{t("high")}</SelectItem>
                       <SelectItem value="Medium">{t("medium")}</SelectItem>
@@ -419,7 +417,7 @@ export default function ClaimsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>ID</TableHead>
-                      <TableHead>{language === "fr" ? "Titre" : "Title"}</TableHead>
+                      <TableHead>{t('title')}</TableHead>
                       <TableHead className="hidden md:table-cell">{t("equipment")}</TableHead>
                       <TableHead>{t("priority")}</TableHead>
                       <TableHead>{t("status")}</TableHead>
@@ -509,16 +507,16 @@ export default function ClaimsPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t p-4">
                   <p className="text-sm text-muted-foreground">
-                    {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredClaims.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredClaims.length}</span> {language === "fr" ? "résultats" : "results"}
+                    {t('showing')} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {t('to')} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredClaims.length)}</span> {t('of')} <span className="font-medium">{filteredClaims.length}</span> {t('results')}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 min-w-0">
                     <Button 
                       variant="outline" 
                       size="sm" 
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
-                      {language === "fr" ? "Précédent" : "Previous"}
+                      {t('previous')}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -526,7 +524,7 @@ export default function ClaimsPage() {
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                     >
-                      {language === "fr" ? "Suivant" : "Next"}
+                      {t('next')}
                     </Button>
                   </div>
                 </div>
@@ -538,8 +536,8 @@ export default function ClaimsPage() {
         <TabsContent value="audit">
           <AuditTrail
             entries={auditEntries}
-            title={language === "fr" ? "Historique des réclamations" : "Claims History"}
-            description={language === "fr" ? "Suivi des modifications et actions" : "Track changes and actions"}
+            title={t('claimsHistory')}
+            description={t('trackChangesAndActio')}
           />
         </TabsContent>
       </Tabs>

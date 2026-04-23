@@ -127,9 +127,9 @@ export default function MaintenanceDashboard(){
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <div className="p-2 rounded-xl bg-violet-100 dark:bg-violet-900/30"><Wrench className="h-6 w-6 text-violet-600"/></div>
-            {language==="fr"?"Tableau de bord maintenance":"Maintenance Dashboard"}
+            {t('maintenanceDashboard')}
           </h1>
-          <p className="text-muted-foreground ml-14">{language==="fr"?"Indicateurs opérationnels et performance des équipes.":"Operational indicators and team performance."}</p>
+          <p className="text-muted-foreground ml-14">{t('operationalIndicator')}</p>
         </div>
         <Button variant="outline" className="gap-2" onClick={()=>load(true)} disabled={refreshing}>
           <RefreshCw className={cn("h-4 w-4",refreshing&&"animate-spin")}/>Refresh
@@ -141,9 +141,9 @@ export default function MaintenanceDashboard(){
         <CardContent className="py-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Search className="h-3 w-3"/>{language==="fr"?"Nom équipement":"Equipment Name"}</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Search className="h-3 w-3"/>{t('equipmentName')}</label>
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
-                <Input placeholder={language==="fr"?"Rechercher...":"Search..."} value={nameQ} onChange={e=>setNameQ(e.target.value)} className="pl-9"/>
+                <Input placeholder={t('search')} value={nameQ} onChange={e=>setNameQ(e.target.value)} className="pl-9"/>
               </div>
             </div>
             <div className="flex flex-col gap-1.5 min-w-[180px]">
@@ -178,16 +178,16 @@ export default function MaintenanceDashboard(){
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="MTBF" sub="Mean Time Between Failures" value={`${kpi?.mtbf?.toFixed(0)??"—"}h`} icon={<Activity className="h-5 w-5"/>} trend={kpi?.mtbfTrend} colorClass="text-emerald-600" bgClass="bg-emerald-50 dark:bg-emerald-900/20" higherIsBetter/>
         <KpiCard label="MTTR" sub="Mean Time To Repair" value={`${kpi?.mttr?.toFixed(1)??"—"}h`} icon={<Clock className="h-5 w-5"/>} trend={kpi?.mttrTrend} colorClass="text-indigo-600" bgClass="bg-indigo-50 dark:bg-indigo-900/20" higherIsBetter={false}/>
-        <KpiCard label={language==="fr"?"Disponibilité":"Availability"} sub="Operational uptime" value={`${kpi?.availabilityRate?.toFixed(1)??"—"}%`} icon={<CheckCircle2 className="h-5 w-5"/>} colorClass="text-cyan-600" bgClass="bg-cyan-50 dark:bg-cyan-900/20" higherIsBetter/>
+        <KpiCard label={t('availability')} sub="Operational uptime" value={`${kpi?.availabilityRate?.toFixed(1)??"—"}%`} icon={<CheckCircle2 className="h-5 w-5"/>} colorClass="text-cyan-600" bgClass="bg-cyan-50 dark:bg-cyan-900/20" higherIsBetter/>
         <KpiCard label="Corrective %" sub={hasFilter?"Filtered WOs":"From filtered work orders"} value={`${cpRatio}%`} icon={<Wrench className="h-5 w-5"/>} colorClass="text-amber-600" bgClass="bg-amber-50 dark:bg-amber-900/20" higherIsBetter={false}/>
         <KpiCard label="Preventive %" sub={hasFilter?"Filtered WOs":"From filtered work orders"} value={`${preventivePct}%`} icon={<CheckCircle2 className="h-5 w-5"/>} colorClass="text-violet-600" bgClass="bg-violet-50 dark:bg-violet-900/20" higherIsBetter/>
-        <KpiCard label={language==="fr"?"Coût total":"Total Cost"} sub="Sum of WO actual costs" value={totalCost>=1000?`$${(totalCost/1000).toFixed(1)}k`:`$${totalCost.toFixed(0)}`} icon={<AlertTriangle className="h-5 w-5"/>} colorClass="text-rose-600" bgClass="bg-rose-50 dark:bg-rose-900/20" higherIsBetter={false}/>
+        <KpiCard label={t('totalCost')} sub="Sum of WO actual costs" value={totalCost>=1000?`$${(totalCost/1000).toFixed(1)}k`:`$${totalCost.toFixed(0)}`} icon={<AlertTriangle className="h-5 w-5"/>} colorClass="text-rose-600" bgClass="bg-rose-50 dark:bg-rose-900/20" higherIsBetter={false}/>
       </div>
 
       {/* Row 1: WO Trends + Type Pie */}
       <div className="grid gap-6 lg:grid-cols-7">
         <Card className="lg:col-span-4 border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Tendance des ordres de travail":"Work Order Trends"}</CardTitle><CardDescription>Completed, planned and emergency WOs over time</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('workOrderTrends')}</CardTitle><CardDescription>Completed, planned and emergency WOs over time</CardDescription></CardHeader>
           <CardContent className="h-[300px]">
             {woTrends.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -206,7 +206,7 @@ export default function MaintenanceDashboard(){
           </CardContent>
         </Card>
         <Card className="lg:col-span-3 border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Répartition par type":"WO Type Distribution"}</CardTitle><CardDescription>Corrective, preventive, predictive {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('wOTypeDistribution')}</CardTitle><CardDescription>Corrective, preventive, predictive {hasFilter&&"· filtered"}</CardDescription></CardHeader>
           <CardContent className="h-[300px]">
             {typeData.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -226,7 +226,7 @@ export default function MaintenanceDashboard(){
       {/* Row 2: Cost trend + Status breakdown */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Coûts mensuels":"Monthly Cost Curve"}</CardTitle><CardDescription>Monthly maintenance spend trend</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('monthlyCostCurve')}</CardTitle><CardDescription>Monthly maintenance spend trend</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             {costTrend.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -243,7 +243,7 @@ export default function MaintenanceDashboard(){
           </CardContent>
         </Card>
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Statut des OTs":"WO Status Breakdown"}</CardTitle><CardDescription>Current status distribution {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('wOStatusBreakdown')}</CardTitle><CardDescription>Current status distribution {hasFilter&&"· filtered"}</CardDescription></CardHeader>
           <CardContent className="space-y-4 pt-2">
             {statusData.length===0?<Empty/>:statusData.map((item,i)=>{
               const pct=totalFiltered>0?Math.round(item.value/totalFiltered*100):0
@@ -266,7 +266,7 @@ export default function MaintenanceDashboard(){
       {/* Cost per dept */}
       {costPerDept.length>0&&(
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Coût de maintenance / service":"Maintenance Cost / Department"}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('maintenanceCostDepar')}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered"}</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={costPerDept} layout="vertical" margin={{top:10,right:30,left:10,bottom:10}}>
@@ -283,7 +283,7 @@ export default function MaintenanceDashboard(){
 
       {/* Recent Work Orders */}
       <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-        <CardHeader><CardTitle className="text-base">{language==="fr"?"Derniers ordres de travail":"Recent Work Orders"}</CardTitle><CardDescription>Latest maintenance activities {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t('recentWorkOrders')}</CardTitle><CardDescription>Latest maintenance activities {hasFilter&&"· filtered"}</CardDescription></CardHeader>
         <CardContent>
           <div className="space-y-3">
             {filteredWos.length===0?(
@@ -294,7 +294,7 @@ export default function MaintenanceDashboard(){
                   <h3 className="font-semibold">{wo.equipmentName??"—"}</h3>
                   <p className="text-sm text-muted-foreground">{wo.woCode} · {wo.woType} · {wo.departmentName??"—"}</p>
                 </div>
-                <Badge className={cn("border-none text-white text-xs",
+                <Badge className={cn("border-none text-primary-foreground text-xs",
                   ["COMPLETED","CLOSED","VALIDATED"].includes(wo.status??"")?"bg-emerald-500":
                   wo.status==="IN_PROGRESS"?"bg-amber-500":"bg-blue-500"
                 )}>{(wo.status??"").replace(/_/g," ")}</Badge>

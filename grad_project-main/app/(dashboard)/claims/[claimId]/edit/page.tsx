@@ -47,7 +47,7 @@ export default function EditClaimPage() {
 
   useEffect(() => {
     if (!Number.isFinite(claimId)) {
-      setError(language === "fr" ? "ID invalide" : "Invalid claim ID")
+      setError(t('invalidClaimID'))
       setIsLoading(false)
       return
     }
@@ -75,7 +75,7 @@ export default function EditClaimPage() {
           setError(`Request failed (${err.status})`)
           return
         }
-        setError(language === "fr" ? "Échec du chargement" : "Failed to load")
+        setError(t('failedToLoad'))
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -97,7 +97,7 @@ export default function EditClaimPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !description.trim() || !departmentId) {
-      setError(language === "fr" ? "Veuillez remplir les champs requis." : "Please fill in required fields.")
+      setError(t('pleaseFillInRequired'))
       return
     }
 
@@ -118,7 +118,7 @@ export default function EditClaimPage() {
         const failed = results.filter((r) => r.status === "rejected")
         if (failed.length > 0) {
           toast({
-            title: language === "fr" ? "Photos partiellement importées" : "Photos partially uploaded",
+            title: t('photosPartiallyUploa'),
             description: language === "fr"
               ? "Certaines photos n'ont pas pu être importées."
               : "Some photos failed to upload.",
@@ -127,7 +127,7 @@ export default function EditClaimPage() {
       }
 
       toast({
-        title: language === "fr" ? "Réclamation mise à jour" : "Claim updated",
+        title: t('claimUpdated'),
         description: updated.claimCode,
       })
       router.push(`/claims/${claimId}`)
@@ -144,7 +144,7 @@ export default function EditClaimPage() {
         setError(`Request failed (${err.status})`)
         return
       }
-      setError(language === "fr" ? "Échec de mise à jour" : "Failed to update")
+      setError(t('failedToUpdate'))
     } finally {
       setIsSaving(false)
     }
@@ -160,7 +160,7 @@ export default function EditClaimPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            {language === "fr" ? "Modifier la réclamation" : "Edit Claim"}
+            {t('editClaim')}
           </h1>
           <p className="text-muted-foreground">
             {claim?.claimCode ?? ""}
@@ -173,7 +173,7 @@ export default function EditClaimPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              {language === "fr" ? "Détails de la réclamation" : "Claim Details"}
+              {t('claimDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -182,13 +182,11 @@ export default function EditClaimPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  {language === "fr" ? "Titre" : "Title"} *
+                  {t('title')} *
                 </label>
                 <Input
                   placeholder={
-                    language === "fr"
-                      ? "Décrivez brièvement le problème..."
-                      : "Briefly describe the issue..."
+                    t('brieflyDescribeTheIs')
                   }
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -210,7 +208,7 @@ export default function EditClaimPage() {
                 <label className="text-sm font-medium">{t("priority")} *</label>
                 <Select value={priority} onValueChange={setPriority} required>
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionnez la priorité..." : "Select priority..."} />
+                    <SelectValue placeholder={t('selectPriority')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CRITICAL">
@@ -245,9 +243,7 @@ export default function EditClaimPage() {
                 <label className="text-sm font-medium">{t("description")} *</label>
                 <Textarea
                   placeholder={
-                    language === "fr"
-                      ? "Décrivez le problème en détail: symptômes observés, circonstances, impact sur le service..."
-                      : "Describe the issue in detail: observed symptoms, circumstances, impact on service..."
+                    t('describeTheIssueInDe')
                   }
                   rows={5}
                   value={description}
@@ -258,7 +254,7 @@ export default function EditClaimPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  {language === "fr" ? "Photos (optionnel)" : "Photos (optional)"}
+                  {t('photosOptional')}
                 </label>
                 <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50">
                   <div className="text-center">
@@ -266,9 +262,7 @@ export default function EditClaimPage() {
                       <Camera className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {language === "fr"
-                        ? "Glissez des photos ou cliquez pour télécharger"
-                        : "Drag photos or click to upload"}
+                      {t('dragPhotosOrClickToU')}
                     </p>
                     <Button
                       variant="outline"
@@ -278,7 +272,7 @@ export default function EditClaimPage() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="h-4 w-4" />
-                      {language === "fr" ? "Télécharger" : "Upload"}
+                      {t('upload')}
                     </Button>
                     {photos.length > 0 && (
                       <p className="mt-2 text-xs text-muted-foreground">
@@ -308,12 +302,12 @@ export default function EditClaimPage() {
                 <Button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+                  className="flex-1 gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-primary-foreground hover:from-violet-700 hover:to-purple-700"
                 >
                   <Save className="h-4 w-4" />
                   {isSaving
-                    ? language === "fr" ? "Enregistrement..." : "Saving..."
-                    : language === "fr" ? "Enregistrer" : "Save"}
+                    ? t('saving')
+                    : t('save')}
                 </Button>
               </div>
             </form>

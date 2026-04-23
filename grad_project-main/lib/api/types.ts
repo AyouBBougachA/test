@@ -401,6 +401,17 @@ export interface WorkloadResponse {
   overdue: number
 }
 
+export interface TechnicianRecommendationDTO {
+  userId: number
+  fullName: string
+  departmentName: string
+  availabilityStatus: string
+  workloadScore: number
+  activeTasksCount: number
+  badges: string[]
+  finalRankScore?: number
+}
+
 export interface UpdateWorkOrderRequest {
   title: string
   description?: string | null

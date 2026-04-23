@@ -18,7 +18,7 @@ class JwtTokenProviderTest {
         String base64Secret = "ZmFsbGJhY2stc2VjcmV0LWtleS1mb3ItY21tcy1pZGVudGl0eS1zZXJ2aWNlLTI1Ng==";
         JwtTokenProvider provider = new JwtTokenProvider(base64Secret, 3600000L, "cmms-test");
 
-        String token = provider.generateToken(42, "user@example.com", "ADMIN");
+        String token = provider.generateToken(42, "user@example.com", java.util.List.of("ADMIN"));
 
         assertTrue(provider.validateToken(token));
         assertEquals("user@example.com", provider.getEmailFromToken(token));
@@ -31,7 +31,7 @@ class JwtTokenProviderTest {
                 .getPayload();
 
         assertEquals(42, claims.get("userId", Integer.class));
-        assertEquals("ADMIN", claims.get("role", String.class));
+        assertTrue(((java.util.List<?>) claims.get("roles")).contains("ADMIN"));
         assertEquals("cmms-test", claims.getIssuer());
     }
 }

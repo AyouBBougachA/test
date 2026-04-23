@@ -202,20 +202,18 @@ export default function InventoryPage() {
       <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {language === 'fr' ? 'Inventaire des Pièces' : 'Spare Parts Inventory'}
+            {t('sparePartsInventory')}
           </h1>
           <p className="text-muted-foreground">
-            {language === 'fr' 
-              ? 'Gérez votre stock de pièces de rechange et les niveaux de réapprovisionnement.' 
-              : 'Manage your spare parts stock and replenishment levels.'}
+            {t('manageYourSpareParts')}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                 <Plus className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Ajouter une Pièce' : 'Add Spare Part'}
+                {t('addSparePart')}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] bg-card/95 backdrop-blur-xl border-border shadow-2xl text-foreground">
@@ -367,7 +365,7 @@ export default function InventoryPage() {
                           <p className="text-xs text-muted-foreground">Requested {new Date(req.createdAt).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 min-w-0">
                         <Button size="sm" variant="outline" className="h-8 shadow-sm">Details</Button>
                         <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20" onClick={() => handleApproveRestock(req.requestId)}>Approve Arrival</Button>
                       </div>
@@ -381,17 +379,17 @@ export default function InventoryPage() {
       )}
 
       {/* Filters */}
-      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center">
+      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center flex-wrap min-w-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={language === 'fr' ? "Rechercher par nom ou SKU..." : "Search by name or SKU..."} 
+            placeholder={t('searchByNameOrSKU')} 
             className="pl-9 bg-card border-border shadow-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="bg-card border-border shadow-sm">
@@ -486,16 +484,16 @@ export default function InventoryPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-border p-4">
               <p className="text-sm text-muted-foreground">
-                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredParts.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredParts.length}</span> {language === "fr" ? "résultats" : "results"}
+                {t('showing')} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {t('to')} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredParts.length)}</span> {t('of')} <span className="font-medium">{filteredParts.length}</span> {t('results')}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 min-w-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  {language === "fr" ? "Précédent" : "Previous"}
+                  {t('previous')}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -503,7 +501,7 @@ export default function InventoryPage() {
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
-                  {language === "fr" ? "Suivant" : "Next"}
+                  {t('next')}
                 </Button>
               </div>
             </div>

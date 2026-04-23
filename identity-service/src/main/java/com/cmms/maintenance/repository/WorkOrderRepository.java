@@ -14,6 +14,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Integer>, 
     List<WorkOrder> findByAssignedToUserIdAndStatusIn(Integer userId, List<WorkOrder.WorkOrderStatus> statuses);
     List<WorkOrder> findAllByCreatedAtAfter(java.time.LocalDateTime time);
     boolean existsByClaimId(Integer claimId);
+    boolean existsByRegulatoryPlanIdAndStatusNotIn(Integer regulatoryPlanId, List<WorkOrder.WorkOrderStatus> statuses);
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE WorkOrder w SET w.assignedToUserId = NULL WHERE w.assignedToUserId = :userId")

@@ -120,9 +120,9 @@ export default function ExecutiveDashboard(){
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/30"><BarChart2 className="h-6 w-6 text-indigo-600"/></div>
-            {language==="fr"?"Tableau de bord direction":"Management Dashboard"}
+            {t('managementDashboard')}
           </h1>
-          <p className="text-muted-foreground ml-14">{language==="fr"?"KPIs stratégiques, projections et analyse Pareto.":"Strategic KPIs, projections and pareto analysis."}</p>
+          <p className="text-muted-foreground ml-14">{t('strategicKPIsProject')}</p>
         </div>
         <Button variant="outline" className="gap-2" onClick={()=>load(true)} disabled={refreshing}>
           <RefreshCw className={cn("h-4 w-4",refreshing&&"animate-spin")}/>Refresh
@@ -134,13 +134,13 @@ export default function ExecutiveDashboard(){
         <CardContent className="py-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Search className="h-3 w-3"/>{language==="fr"?"Nom équipement":"Equipment Name"}</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Search className="h-3 w-3"/>{t('equipmentName')}</label>
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
-                <Input placeholder={language==="fr"?"Rechercher...":"Search..."} value={nameQ} onChange={e=>setNameQ(e.target.value)} className="pl-9"/>
+                <Input placeholder={t('search')} value={nameQ} onChange={e=>setNameQ(e.target.value)} className="pl-9"/>
               </div>
             </div>
             <div className="flex flex-col gap-1.5 min-w-[180px]">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Settings2 className="h-3 w-3"/>{language==="fr"?"Catégorie":"Category"}</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Settings2 className="h-3 w-3"/>{t('category')}</label>
               <Select value={catF} onValueChange={setCatF}>
                 <SelectTrigger><SelectValue placeholder="All Categories"/></SelectTrigger>
                 <SelectContent>
@@ -150,7 +150,7 @@ export default function ExecutiveDashboard(){
               </Select>
             </div>
             <div className="flex flex-col gap-1.5 min-w-[180px]">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Filter className="h-3 w-3"/>{language==="fr"?"Département":"Department"}</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Filter className="h-3 w-3"/>{t('department')}</label>
               <Select value={deptF} onValueChange={setDeptF}>
                 <SelectTrigger><SelectValue placeholder="All Departments"/></SelectTrigger>
                 <SelectContent>
@@ -171,16 +171,16 @@ export default function ExecutiveDashboard(){
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="MTBF" sub="Mean Time Between Failures" value={`${kpi?.mtbf?.toFixed(0)??"—"}h`} icon={<Activity className="h-5 w-5"/>} trend={kpi?.mtbfTrend} colorClass="text-emerald-600" bgClass="bg-emerald-50 dark:bg-emerald-900/20" higherIsBetter/>
         <KpiCard label="MTTR" sub="Mean Time To Repair" value={`${kpi?.mttr?.toFixed(1)??"—"}h`} icon={<Clock className="h-5 w-5"/>} trend={kpi?.mttrTrend} colorClass="text-indigo-600" bgClass="bg-indigo-50 dark:bg-indigo-900/20" higherIsBetter={false}/>
-        <KpiCard label={language==="fr"?"Disponibilité":"Availability"} sub="Equipment availability rate" value={`${kpi?.availabilityRate?.toFixed(1)??"—"}%`} icon={<Activity className="h-5 w-5"/>} colorClass="text-cyan-600" bgClass="bg-cyan-50 dark:bg-cyan-900/20" higherIsBetter/>
+        <KpiCard label={t('availability')} sub="Equipment availability rate" value={`${kpi?.availabilityRate?.toFixed(1)??"—"}%`} icon={<Activity className="h-5 w-5"/>} colorClass="text-cyan-600" bgClass="bg-cyan-50 dark:bg-cyan-900/20" higherIsBetter/>
         <KpiCard label="Corrective/Preventive" sub="Corrective ratio" value={`${kpi?.correctivePreventiveRatio?.toFixed(0)??"—"}%`} icon={<Wrench className="h-5 w-5"/>} colorVar={getMaintenanceColorVar('CORRECTIVE')} bgColorVar={`rgba(var(--color-maintenance-type-corrective-rgb, 239, 68, 68), 0.1)`} higherIsBetter={false}/>
-        <KpiCard label={language==="fr"?"Coût / Équip.":"Cost / Equipment"} sub={hasFilter?"Filtered avg from WOs":"Avg cost per asset"} value={fmt$(avgCostEq)} icon={<DollarSign className="h-5 w-5"/>} colorClass="text-violet-600" bgClass="bg-violet-50 dark:bg-violet-900/20" higherIsBetter={false}/>
-        <KpiCard label={language==="fr"?"Coût / Service":"Cost / Dept"} sub={hasFilter?"Filtered avg from WOs":"Avg cost per department"} value={fmt$(avgCostDept)} icon={<DollarSign className="h-5 w-5"/>} colorClass="text-rose-600" bgClass="bg-rose-50 dark:bg-rose-900/20" higherIsBetter={false}/>
+        <KpiCard label={t('costEquipment')} sub={hasFilter?"Filtered avg from WOs":"Avg cost per asset"} value={fmt$(avgCostEq)} icon={<DollarSign className="h-5 w-5"/>} colorClass="text-violet-600" bgClass="bg-violet-50 dark:bg-violet-900/20" higherIsBetter={false}/>
+        <KpiCard label={t('costDept')} sub={hasFilter?"Filtered avg from WOs":"Avg cost per department"} value={fmt$(avgCostDept)} icon={<DollarSign className="h-5 w-5"/>} colorClass="text-rose-600" bgClass="bg-rose-50 dark:bg-rose-900/20" higherIsBetter={false}/>
       </div>
 
       {/* Row 1: Cost trend + Pareto */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Tendance des coûts mensuels":"Monthly Cost Trend"}</CardTitle><CardDescription>12-month maintenance cost trend curve</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('monthlyCostTrend')}</CardTitle><CardDescription>12-month maintenance cost trend curve</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             {costTrends.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -197,7 +197,7 @@ export default function ExecutiveDashboard(){
           </CardContent>
         </Card>
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Analyse Pareto":"Pareto Chart — Equipment Cost"}</CardTitle><CardDescription>80% of costs driven by 20% of equipment {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('paretoChartEquipment')}</CardTitle><CardDescription>80% of costs driven by 20% of equipment {hasFilter&&"· filtered"}</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             {paretoData.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -219,7 +219,7 @@ export default function ExecutiveDashboard(){
       {/* Row 2: Cost distribution by dept + Annual projection */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Répartition des coûts par service":"Cost Distribution by Department"}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered"}</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('costDistributionByDe')}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered"}</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             {costPerDept.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -235,7 +235,7 @@ export default function ExecutiveDashboard(){
           </CardContent>
         </Card>
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Projection annuelle":"Annual Cost Projection"}</CardTitle><CardDescription>End-of-year budget forecast</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('annualCostProjection')}</CardTitle><CardDescription>End-of-year budget forecast</CardDescription></CardHeader>
           <CardContent className="h-[280px]">
             {annualData.length===0?<Empty/>:(
               <ResponsiveContainer width="100%" height="100%">
@@ -254,7 +254,7 @@ export default function ExecutiveDashboard(){
 
       {/* Maintenance cost per equipment top 8 */}
       <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-        <CardHeader><CardTitle className="text-base">{language==="fr"?"Coût de maintenance par équipement":"Maintenance Cost / Equipment (Top 8)"}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered by selected criteria"}</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t('maintenanceCostEquip')}</CardTitle><CardDescription>Derived from work order actual costs {hasFilter&&"· filtered by selected criteria"}</CardDescription></CardHeader>
         <CardContent className="h-[300px]">
           {costPerEq.length===0?<Empty/>:(
             <ResponsiveContainer width="100%" height="100%">
@@ -273,7 +273,7 @@ export default function ExecutiveDashboard(){
       {/* Costly equipment table from KPI API */}
       {(kpi?.costlyEquipments?.length??0)>0&&(
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
-          <CardHeader><CardTitle className="text-base">{language==="fr"?"Équipements les plus coûteux":"Top Costly Equipment"}</CardTitle><CardDescription>Assets with highest cumulative maintenance spend</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('topCostlyEquipment')}</CardTitle><CardDescription>Assets with highest cumulative maintenance spend</CardDescription></CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

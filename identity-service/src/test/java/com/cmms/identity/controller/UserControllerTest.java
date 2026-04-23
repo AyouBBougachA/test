@@ -44,8 +44,7 @@ class UserControllerTest {
                 .userId(1)
                 .fullName("Test User")
                 .email("user@example.com")
-                .roleName("ADMIN")
-                .roleId(1)
+                .roles(List.of(com.cmms.identity.dto.RoleResponse.builder().roleId(1).roleName("ADMIN").build()))
                 .departmentId(2)
                 .departmentName("Engineering")
                 .isActive(true)
@@ -56,7 +55,7 @@ class UserControllerTest {
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].email").value("user@example.com"))
-                .andExpect(jsonPath("$[0].roleName").value("ADMIN"));
+                .andExpect(jsonPath("$[0].roles[0].roleName").value("ADMIN"));
     }
 
     @Test

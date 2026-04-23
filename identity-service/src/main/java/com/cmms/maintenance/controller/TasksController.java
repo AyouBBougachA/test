@@ -66,13 +66,17 @@ public class TasksController {
     @PatchMapping("/{taskId}/complete")
     @Operation(summary = "Mark a task as DONE")
     public TaskResponse complete(@PathVariable Integer taskId, Principal principal) {
-        return taskService.updateStatus(taskId, "DONE", principal.getName());
+        return taskService.updateStatus(taskId, "DONE", null, principal.getName());
     }
     
     @PatchMapping("/{taskId}/status")
     @Operation(summary = "Update task status")
-    public TaskResponse updateStatus(@PathVariable Integer taskId, @RequestParam String status, Principal principal) {
-        return taskService.updateStatus(taskId, status, principal.getName());
+    public TaskResponse updateStatus(
+            @PathVariable Integer taskId, 
+            @RequestParam String status, 
+            @RequestParam(required = false) String reason,
+            Principal principal) {
+        return taskService.updateStatus(taskId, status, reason, principal.getName());
     }
 
     @PatchMapping("/sub-tasks/{subTaskId}")

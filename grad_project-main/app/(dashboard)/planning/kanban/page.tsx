@@ -488,7 +488,7 @@ export default function KanbanPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsOnHoldDialogOpen(false)}>Cancel</Button>
-            <Button onClick={confirmHold} disabled={!holdNote || actionLoading} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button onClick={confirmHold} disabled={!holdNote || actionLoading} className="bg-rose-600 hover:bg-rose-700 text-primary-foreground">
               {actionLoading ? "Pausing..." : "Put on Hold"}
             </Button>
           </DialogFooter>

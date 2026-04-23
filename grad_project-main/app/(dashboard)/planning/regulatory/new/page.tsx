@@ -124,7 +124,7 @@ export default function NewRegulatoryPlanPage() {
       }
 
       await regulatoryApi.create(payload)
-      toast({ title: language === 'fr' ? 'Succès' : 'Success', description: 'Regulatory plan created successfully' })
+      toast({ title: t('success'), description: 'Regulatory plan created successfully' })
       router.push('/planning/regulatory')
     } catch (err) {
       console.error(err)
@@ -142,7 +142,7 @@ export default function NewRegulatoryPlanPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold tracking-tight">
-            {language === 'fr' ? 'Nouveau Plan Réglementaire' : 'Create Regulatory Plan'}
+            {t('createRegulatoryPlan')}
           </h1>
         </div>
         <Button 
@@ -151,7 +151,7 @@ export default function NewRegulatoryPlanPage() {
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 rounded-xl px-6"
         >
           {isLoading ? <Clock className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          {language === 'fr' ? 'Enregistrer le Plan' : 'Save Plan'}
+          {t('savePlan')}
         </Button>
       </div>
 
@@ -162,12 +162,12 @@ export default function NewRegulatoryPlanPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ShieldCheck className="h-5 w-5 text-primary" />
-                {language === 'fr' ? 'Général' : 'General Information'}
+                {t('generalInformation')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="title">{language === 'fr' ? 'Titre du Plan' : 'Plan Title'}</Label>
+                <Label htmlFor="title">{t('planTitle')}</Label>
                 <Input 
                   id="title" 
                   placeholder="e.g. Annual Fire Safety Inspection" 
@@ -178,7 +178,7 @@ export default function NewRegulatoryPlanPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="desc">{language === 'fr' ? 'Description / Objectif' : 'Description / Objective'}</Label>
+                <Label htmlFor="desc">{t('descriptionObjective')}</Label>
                 <Textarea 
                   id="desc" 
                   placeholder="Describe the regulatory requirement..." 
@@ -189,7 +189,7 @@ export default function NewRegulatoryPlanPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>{language === 'fr' ? 'Équipement' : 'Equipment'}</Label>
+                  <Label>{t('equipment')}</Label>
                   <Select 
                     onValueChange={v => setFormData({...formData, equipmentId: v})}
                   >
@@ -206,7 +206,7 @@ export default function NewRegulatoryPlanPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>{language === 'fr' ? 'Priorité' : 'Priority'}</Label>
+                  <Label>{t('priority')}</Label>
                   <Select 
                      defaultValue="MEDIUM"
                      onValueChange={v => setFormData({...formData, priority: v})}
@@ -231,10 +231,10 @@ export default function NewRegulatoryPlanPage() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ListTodo className="h-5 w-5 text-indigo-500" />
-                {language === 'fr' ? 'Liste de Contrôle' : 'Checklist Template'}
+                {t('checklistTemplate')}
               </CardTitle>
               <Button type="button" variant="outline" size="sm" onClick={addStep} className="rounded-lg h-8">
-                <Plus className="h-4 w-4 mr-1" /> {language === 'fr' ? 'Ajouter' : 'Add Step'}
+                <Plus className="h-4 w-4 mr-1" /> {t('addStep')}
               </Button>
             </CardHeader>
             <CardDescription className="px-6 mb-2">
@@ -282,12 +282,12 @@ export default function NewRegulatoryPlanPage() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                {language === 'fr' ? 'Périodicité' : 'Recurrence'}
+                {t('recurrence')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <Label>{language === 'fr' ? 'Fréquence' : 'Recurrence Unit'}</Label>
+                <Label>{t('recurrenceUnit')}</Label>
                 <Select 
                      defaultValue="MONTHLY"
                      onValueChange={v => setFormData({...formData, recurrenceUnit: v})}
@@ -304,7 +304,7 @@ export default function NewRegulatoryPlanPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>{language === 'fr' ? 'Valeur' : 'Every (Value)'}</Label>
+                <Label>{t('everyValue')}</Label>
                 <Input 
                    type="number" 
                    className="rounded-xl" 
@@ -313,7 +313,7 @@ export default function NewRegulatoryPlanPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>{language === 'fr' ? 'Date de Début' : 'Start Date'}</Label>
+                <Label>{t('startDate')}</Label>
                 <Input 
                     type="date" 
                     className="rounded-xl" 
@@ -322,7 +322,7 @@ export default function NewRegulatoryPlanPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>{language === 'fr' ? 'Durée Estimée (hrs)' : 'Est. Duration (hrs)'}</Label>
+                <Label>{t('estDurationHrs')}</Label>
                 <Input 
                     type="number" 
                     step="0.5" 

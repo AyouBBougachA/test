@@ -10,11 +10,9 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "Rapports" : "Reports"}</CardTitle>
+          <CardTitle>{t('reports')}</CardTitle>
           <CardDescription>
-            {language === "fr"
-              ? "Module non disponible : aucune API de rapports."
-              : "Module not available: no reports API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent />

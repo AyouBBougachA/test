@@ -127,6 +127,26 @@ public class MeterService {
     }
 
     @Transactional
+    public Meter resetMeter(Integer meterId) {
+        Meter meter = getMeterById(meterId);
+        BigDecimal oldValue = meter.getValue();
+        meter.setValue(BigDecimal.ZERO);
+        meter.setLastReadingAt(java.time.LocalDateTime.now());
+        
+        Actor actor = getCurrentActor();
+        auditLogService.log(
+                actor.userId(),
+                actor.displayName(),
+                "RESET_METER",
+                ENTITY_NAME,
+                meterId,
+                "Reset meter " + meter.getName() + " from " + oldValue + " to 0 " + meter.getUnit()
+        );
+        
+        return meterRepository.save(meter);
+    }
+
+    @Transactional
     public Meter updateMeter(Integer id, Meter meterDetails) {
         Meter meter = getMeterById(id);
         if (meterDetails.getName() != null)

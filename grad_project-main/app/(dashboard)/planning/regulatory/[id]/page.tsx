@@ -138,19 +138,19 @@ export default function RegulatoryPlanDetailPage() {
             <p className="text-muted-foreground">{plan.title}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
            <Dialog>
              <DialogTrigger asChild>
               {plan.status === 'UPCOMING' && (
                 <Button variant="outline" className="rounded-xl border-dashed">
                     <FastForward className="h-4 w-4 mr-2" />
-                    {language === 'fr' ? 'Reporter / Modifier' : 'Reschedule'}
+                    {t('reschedule')}
                 </Button>
               )}
              </DialogTrigger>
              <DialogContent className="rounded-2xl border-border bg-card/95 backdrop-blur-xl">
                 <DialogHeader>
-                    <DialogTitle>{language === 'fr' ? 'Reporter la Maintenance' : 'Reschedule Maintenance'}</DialogTitle>
+                    <DialogTitle>{t('rescheduleMaintenanc')}</DialogTitle>
                     <DialogDescription>
                         Regulatory traceability requires a mandatory reason for any date modification.
                     </DialogDescription>
@@ -188,30 +188,30 @@ export default function RegulatoryPlanDetailPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" />
-                {language === 'fr' ? 'Configuration' : 'Configuration'}
+                {t('configuration')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                 <div>
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{language === 'fr' ? 'Récurrence' : 'Recurrence'}</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{t('recurrence')}</Label>
                     <p className="text-sm font-bold flex items-center gap-1.5 mt-1">
                         <Clock className="h-3.5 w-3.5 text-primary" />
                         Every {plan.recurrenceValue} {plan.recurrenceUnit}
                     </p>
                 </div>
                 <div>
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{language === 'fr' ? 'Priorité' : 'Priority'}</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{t('priority')}</Label>
                     <p className="mt-1">{plan.priority}</p>
                 </div>
                 <div>
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{language === 'fr' ? 'Mandatée' : 'Mandatory'}</Label>
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">{t('mandatory')}</Label>
                     <p className="mt-1 font-bold text-primary">{plan.isMandatory ? 'YES' : 'NO'}</p>
                 </div>
               </div>
 
               <div className="space-y-2 border-t border-border/50 pt-4">
-                <Label className="text-[10px] font-bold text-muted-foreground uppercase">{language === 'fr' ? 'Équipement Lié' : 'Linked Equipment'}</Label>
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase">{t('linkedEquipment')}</Label>
                 <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border border-border/40">
                     <div className="bg-primary/10 p-2 rounded-lg text-primary"><Wrench className="h-5 w-5" /></div>
                     <div>
@@ -252,13 +252,13 @@ export default function RegulatoryPlanDetailPage() {
                                 <span className="text-sm font-bold">{format(new Date(wo.createdAt), 'dd/MM/yyyy')}</span>
                             </div>
                             <div className="hidden sm:flex flex-col text-right">
-                                <span className="text-[10px] text-muted-foreground uppercase">{language === 'fr' ? 'État' : 'Status'}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase">{t('status')}</span>
                                 <Badge variant="outline" className="text-[10px] h-4">{wo.status}</Badge>
                             </div>
                             <Link href={`/work-orders/${wo.woId}`}>
                                 <Button variant="ghost" size="sm" className="rounded-lg h-8">
                                     <Activity className="h-4 w-4 mr-2" />
-                                    {language === 'fr' ? 'Voir OT' : 'View WO'}
+                                    {t('viewWO')}
                                 </Button>
                             </Link>
                         </div>
@@ -302,9 +302,9 @@ export default function RegulatoryPlanDetailPage() {
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{language === 'fr' ? 'Dernière Exécution' : 'Last Execution'}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{t('lastExecution')}</span>
                         <p className="text-sm font-medium">
-                            {plan.lastExecutionDate ? format(new Date(plan.lastExecutionDate), 'dd/MM/yyyy') : (language === 'fr' ? 'Jamais' : 'Never')}
+                            {plan.lastExecutionDate ? format(new Date(plan.lastExecutionDate), 'dd/MM/yyyy') : (t('never'))}
                         </p>
                     </div>
                 </div>
@@ -328,10 +328,10 @@ export default function RegulatoryPlanDetailPage() {
                                 toast({ title: "Error", description: "Failed to generate work order", variant: "destructive" })
                             }
                         }}
-                        className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 text-white mt-4"
+                        className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 text-primary-foreground mt-4"
                     >
                         <Wrench className="h-4 w-4 mr-2" />
-                        {language === 'fr' ? 'Générer OT Maintenant' : 'Generate WO Now'}
+                        {t('generateWONow')}
                     </Button>
                 )}
              </CardContent>

@@ -88,12 +88,10 @@ export default function BiDashboardPage() {
              {language === 'fr' ? 'Intelligence d\'Affaires' : 'Business Intelligence'}
           </h1>
           <p className="text-muted-foreground">
-             {language === 'fr' 
-               ? 'Analyse de performance maintenance et coûts opérationnels sur 12 mois.' 
-               : 'Maintenance performance and operational cost analysis for the last 12 months.'}
+             {t('maintenancePerforman')}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
            <Button variant="outline" className="gap-2 border-border shadow-sm">
              <Calendar className="h-4 w-4" />
              Last 12 Months

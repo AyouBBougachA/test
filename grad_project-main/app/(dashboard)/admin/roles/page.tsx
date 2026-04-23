@@ -113,7 +113,7 @@ export default function RolesPage() {
         setRoles([])
         setUsers([])
         setAuditLogs([])
-        setError(language === "fr" ? "Impossible de charger les rôles" : "Failed to load roles")
+        setError(t('failedToLoadRoles'))
       } finally {
         if (!cancelled) setIsFetching(false)
       }
@@ -130,7 +130,7 @@ export default function RolesPage() {
     const name = roleName.trim()
     if (!name) {
       toast({
-        title: language === "fr" ? "Nom requis" : "Role name is required",
+        title: t('roleNameIsRequired'),
         variant: "destructive",
       })
       return
@@ -139,13 +139,13 @@ export default function RolesPage() {
     try {
       const payload: CreateRoleRequest = { roleName: name }
       await rolesApi.create(payload)
-      toast({ title: language === "fr" ? "Rôle créé" : "Role created" })
+      toast({ title: t('roleCreated') })
       setCreateOpen(false)
       setRoleName("")
       await refresh()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Création impossible" : "Create failed",
+        title: t('createFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -163,13 +163,13 @@ export default function RolesPage() {
     if (!deletingRole) return
     try {
       await rolesApi.delete(deletingRole.roleId)
-      toast({ title: language === "fr" ? "Rôle supprimé" : "Role deleted" })
+      toast({ title: t('roleDeleted') })
       setConfirmDeleteOpen(false)
       setDeletingRole(null)
       await refresh()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -199,7 +199,7 @@ export default function RolesPage() {
     if (Number.isNaN(date.getTime())) return "—"
     const diffMs = Date.now() - date.getTime()
     const diffMin = Math.floor(diffMs / 60000)
-    if (diffMin < 1) return language === "fr" ? "à l’instant" : "just now"
+    if (diffMin < 1) return t('justNow')
     if (diffMin < 60) return language === "fr" ? `il y a ${diffMin} min` : `${diffMin} min ago`
     const diffHr = Math.floor(diffMin / 60)
     if (diffHr < 24) return language === "fr" ? `il y a ${diffHr} h` : `${diffHr}h ago`
@@ -228,12 +228,12 @@ export default function RolesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{language === "fr" ? "Créer un rôle" : "Create role"}</DialogTitle>
-            <DialogDescription>{language === "fr" ? "Création via /roles." : "Creates via /roles."}</DialogDescription>
+            <DialogTitle>{t('createRole')}</DialogTitle>
+            <DialogDescription>{t('createsViaRoles')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={onCreateRole} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="role-name">{language === "fr" ? "Nom du rôle" : "Role name"}</Label>
+              <Label htmlFor="role-name">{t('roleName')}</Label>
               <Input id="role-name" value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="ADMIN" />
             </div>
             <DialogFooter>
@@ -251,7 +251,7 @@ export default function RolesPage() {
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{language === "fr" ? "Supprimer le rôle" : "Delete role"}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteRole')}</AlertDialogTitle>
             <AlertDialogDescription>
               {language === "fr"
                 ? `Supprimer le rôle ${deletingRole?.roleName ?? ""}.`
@@ -273,7 +273,7 @@ export default function RolesPage() {
           <motion.div variants={fadeInUp}>
             <Card>
               <CardContent className="py-6 text-muted-foreground">
-                {language === "fr" ? "Chargement..." : "Loading..."}
+                {t('loading')}
               </CardContent>
             </Card>
           </motion.div>
@@ -287,7 +287,7 @@ export default function RolesPage() {
           <motion.div variants={fadeInUp}>
             <Card>
               <CardContent className="py-6 text-muted-foreground">
-                {language === "fr" ? "Aucun rôle" : "No roles"}
+                {t('noRoles')}
               </CardContent>
             </Card>
           </motion.div>
@@ -300,7 +300,7 @@ export default function RolesPage() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg">{role.roleName}</CardTitle>
                     <CardDescription>
-                      {language === "fr" ? "Description non disponible" : "Description not available"}
+                      {t('descriptionNotAvaila')}
                     </CardDescription>
                   </div>
                   <div className="flex gap-1">
@@ -310,11 +310,9 @@ export default function RolesPage() {
                       className="h-8 w-8 p-0"
                       onClick={() =>
                         toast({
-                          title: language === "fr" ? "Non disponible" : "Not available",
+                          title: t('notAvailable'),
                           description:
-                            language === "fr"
-                              ? "La modification des rôles n’est pas supportée par le backend."
-                              : "Role editing is not supported by the backend.",
+                            t('roleEditingIsNotSupp'),
                           variant: "destructive",
                         })
                       }
@@ -343,9 +341,7 @@ export default function RolesPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Permissions:</p>
                   <div className="text-sm text-muted-foreground">
-                    {language === "fr"
-                      ? "La liste des permissions n’est pas exposée par l’API."
-                      : "Permissions are not exposed by the API."}
+                    {t('permissionsAreNotExp')}
                   </div>
                 </div>
               </CardContent>
@@ -366,7 +362,7 @@ export default function RolesPage() {
             <div className="space-y-3">
               {recentRoleLogs.length === 0 ? (
                 <div className="py-2 px-3 text-sm text-muted-foreground">
-                  {language === "fr" ? "Aucune activité" : "No recent activity"}
+                  {t('noRecentActivity')}
                 </div>
               ) : (
                 recentRoleLogs.map((log) => (

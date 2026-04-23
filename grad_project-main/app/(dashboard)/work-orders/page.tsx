@@ -51,6 +51,7 @@ import { format, formatDistanceToNow } from "date-fns"
 import { fr, enUS, ar } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { WorkOrderTypeBadge } from "@/components/work-order-type-badge"
+import { StatusBadge } from "@/components/status-badge"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -162,41 +163,12 @@ export default function WorkOrdersPage() {
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toUpperCase()) {
-      case "COMPLETED":
-        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">Completed</Badge>
-      case "VALIDATED":
-        return <Badge className="bg-teal-500/10 text-teal-500 border-teal-500/20 hover:bg-teal-500/20">Validated</Badge>
-      case "CLOSED":
-        return <Badge className="bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20">Closed</Badge>
-      case "IN_PROGRESS":
-        return <Badge className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20 hover:bg-cyan-500/20">In Progress</Badge>
-      case "ON_HOLD":
-        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20">On Hold</Badge>
-      case "CANCELLED":
-        return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20">Cancelled</Badge>
-      case "ASSIGNED":
-        return <Badge className="bg-violet-500/10 text-violet-500 border-violet-500/20 hover:bg-violet-500/20">Assigned</Badge>
-      case "SCHEDULED":
-        return <Badge className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20 hover:bg-indigo-500/20">Scheduled</Badge>
-      case "CREATED":
-      default:
-        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">Created</Badge>
-    }
-  }
-
   const getPriorityBadge = (priority: string) => {
-    switch (priority.toUpperCase()) {
-      case "CRITICAL":
-        return <Badge variant="destructive">Critical</Badge>
-      case "HIGH":
-        return <Badge className="bg-orange-500 hover:bg-orange-600 border-none text-white">High</Badge>
-      case "MEDIUM":
-        return <Badge className="bg-amber-500 hover:bg-amber-600 border-none text-white">Medium</Badge>
-      default:
-        return <Badge className="bg-blue-500 hover:bg-blue-600 border-none text-white">Low</Badge>
-    }
+    const p = priority.toUpperCase()
+    if (p === 'CRITICAL') return <Badge variant="destructive">Critical</Badge>
+    if (p === 'HIGH') return <Badge className="bg-warning/10 text-warning border-warning/20 hover:bg-warning/20">High</Badge>
+    if (p === 'MEDIUM') return <Badge className="bg-info/10 text-info border-info/20 hover:bg-info/20">Medium</Badge>
+    return <Badge variant="secondary">Low</Badge>
   }
 
   return (
@@ -209,15 +181,13 @@ export default function WorkOrdersPage() {
       <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {language === 'fr' ? 'Ordres de Travail' : 'Work Orders'}
+            {t('workOrders')}
           </h1>
           <p className="text-muted-foreground">
-            {language === 'fr' 
-              ? 'Gérez vos interventions de maintenance et suivez leur progression.' 
-              : 'Manage your maintenance interventions and track their progress.'}
+            {t('manageYourMaintenanc')}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           {!user?.hasRole('TECHNICIAN') && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -309,28 +279,28 @@ export default function WorkOrdersPage() {
       <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
           { 
-            title: language === 'fr' ? 'En Cours' : 'In Progress', 
+            title: t('inProgress'), 
             count: workOrders.filter(wo => wo.status === 'IN_PROGRESS').length, 
             icon: Clock, 
             color: "text-blue-500",
             bg: "bg-blue-500/10"
           },
           { 
-            title: language === 'fr' ? 'Ouverts' : 'Created', 
+            title: t('created'), 
             count: workOrders.filter(wo => wo.status === 'CREATED').length, 
             icon: AlertCircle, 
             color: "text-blue-500",
             bg: "bg-blue-500/10"
           },
           { 
-            title: language === 'fr' ? 'Terminés' : 'Completed', 
+            title: t('completed'), 
             count: workOrders.filter(wo => wo.status === 'COMPLETED').length, 
             icon: CheckCircle2, 
             color: "text-emerald-500",
             bg: "bg-emerald-500/10"
           },
           { 
-            title: language === 'fr' ? 'Urgents' : 'Urgent', 
+            title: t('urgent'), 
             count: workOrders.filter(wo => wo.priority === 'CRITICAL').length, 
             icon: AlertCircle, 
             color: "text-rose-500",
@@ -352,17 +322,17 @@ export default function WorkOrdersPage() {
       </motion.div>
 
       {/* Filters & Search */}
-      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center">
+      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center flex-wrap min-w-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={language === 'fr' ? "Rechercher un ordre..." : "Search work orders..."} 
+            placeholder={t('searchWorkOrders')} 
             className="pl-9 bg-card border-border shadow-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <Button 
             variant="outline" 
             onClick={() => setShowArchived(!showArchived)}
@@ -371,13 +341,13 @@ export default function WorkOrdersPage() {
               showArchived && "bg-primary/10 border-primary text-primary"
             )}
           >
-            {showArchived ? (language === 'fr' ? 'Masquer Archivés' : 'Hide Archived') : (language === 'fr' ? 'Afficher Archivés' : 'Show Archived')}
+            {showArchived ? (t('hideArchived')) : (t('showArchived'))}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="bg-card border-border shadow-sm">
                 <Filter className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Filtrer' : 'Filter'}: {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {t('filter')}: {filter.charAt(0).toUpperCase() + filter.slice(1)}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-xl border-border">
@@ -412,10 +382,10 @@ export default function WorkOrdersPage() {
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between mb-2">
               <CardTitle className="text-xl">
-                {showArchived ? (language === 'fr' ? 'Toutes les interventions' : 'All Interventions') : (language === 'fr' ? 'Interventions Actives' : 'Active Interventions')}
+                {showArchived ? (t('allInterventions')) : (t('activeInterventions'))}
               </CardTitle>
               <Badge variant="outline" className="font-normal text-muted-foreground">
-                {filteredOrders.length} {language === 'fr' ? 'résultats' : 'results'}
+                {filteredOrders.length} {t('results')}
               </Badge>
             </div>
           </CardHeader>
@@ -479,9 +449,9 @@ export default function WorkOrdersPage() {
                         <TableCell>
                           <WorkOrderTypeBadge type={wo.woType} lang={language as any} size="sm" />
                         </TableCell>
-                        <TableCell>
+                         <TableCell>
                           <div className="flex flex-col gap-1.5">
-                            {getStatusBadge(wo.status)}
+                            <StatusBadge status={wo.status} />
                             {wo.hasPendingAdHocTasks && (
                               <Badge variant="outline" className="w-fit text-[9px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50/50 flex items-center gap-1">
                                 <AlertCircle className="h-2.5 w-2.5" />
@@ -503,7 +473,7 @@ export default function WorkOrdersPage() {
                         <TableCell className="text-right">
                           <Link href={`/work-orders/${wo.woId}`}>
                             <Button variant="ghost" size="sm" className="h-8 p-2 text-primary hover:bg-primary/10 rounded-lg">
-                              {language === 'fr' ? 'Gérer' : 'Manage'}
+                              {t('manage')}
                             </Button>
                           </Link>
                         </TableCell>
@@ -517,16 +487,16 @@ export default function WorkOrdersPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-border p-4">
               <p className="text-sm text-muted-foreground">
-                {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredOrders.length}</span> {language === "fr" ? "résultats" : "results"}
+                {t('showing')} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {t('to')} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> {t('of')} <span className="font-medium">{filteredOrders.length}</span> {t('results')}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 min-w-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  {language === "fr" ? "Précédent" : "Previous"}
+                  {t('previous')}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -534,7 +504,7 @@ export default function WorkOrdersPage() {
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
-                  {language === "fr" ? "Suivant" : "Next"}
+                  {t('next')}
                 </Button>
               </div>
             </div>

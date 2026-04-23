@@ -79,7 +79,7 @@ function toDisplayStatusLabel(value: string) {
 }
 
 export default function ClaimDetailsPage() {
-  const { language } = useI18n()
+  const { t, language } = useI18n()
   const { user } = useAuth()
   const params = useParams<{ claimId: string }>()
   const claimId = Number(params?.claimId)
@@ -104,7 +104,7 @@ export default function ClaimDetailsPage() {
 
   useEffect(() => {
     if (!Number.isFinite(claimId)) {
-      setError(language === "fr" ? "ID invalide" : "Invalid claim ID")
+      setError(t('invalidClaimID'))
       setIsLoading(false)
       return
     }
@@ -135,7 +135,7 @@ export default function ClaimDetailsPage() {
         if (err instanceof ApiError) {
           setError(`Request failed (${err.status})`)
         } else {
-          setError(language === "fr" ? "Échec du chargement" : "Failed to load")
+          setError(t('failedToLoad'))
         }
       }
 
@@ -147,7 +147,7 @@ export default function ClaimDetailsPage() {
         if (err instanceof ApiError) {
           setPhotosError(`Request failed (${err.status})`)
         } else {
-          setPhotosError(language === "fr" ? "Échec du chargement" : "Failed to load")
+          setPhotosError(t('failedToLoad'))
         }
         setPhotos([])
       } finally {
@@ -232,7 +232,7 @@ export default function ClaimDetailsPage() {
         setError(`Request failed (${err.status})`)
         return
       }
-      setError(language === "fr" ? "Échec de suppression" : "Failed to delete")
+      setError(t('failedToDelete'))
     } finally {
       setIsDeleting(null)
     }
@@ -246,7 +246,7 @@ export default function ClaimDetailsPage() {
       const claimRes = await claimsApi.getById(claimId)
       setClaim(claimRes)
     } catch (err) {
-      setError(language === "fr" ? "Échec de la conversion" : "Conversion failed")
+      setError(t('conversionFailed'))
     } finally {
       setIsConverting(false)
     }
@@ -260,7 +260,7 @@ export default function ClaimDetailsPage() {
       const claimRes = await claimsApi.getById(claimId)
       setClaim(claimRes)
     } catch (err) {
-      setError(language === "fr" ? "Échec de la qualification" : "Qualification failed")
+      setError(t('qualificationFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -288,7 +288,7 @@ export default function ClaimDetailsPage() {
       const claimRes = await claimsApi.getById(claimId)
       setClaim(claimRes)
     } catch (err) {
-      setError(language === "fr" ? "Échec de la fermeture" : "Closure failed")
+      setError(t('closureFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -305,7 +305,7 @@ export default function ClaimDetailsPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-              {language === "fr" ? "Détails de la réclamation" : "Claim Details"}
+              {t('claimDetails')}
             </h1>
             <p className="text-muted-foreground">
               {claim?.claimCode ?? ""}
@@ -320,7 +320,7 @@ export default function ClaimDetailsPage() {
               <Link href={`/work-orders/${claim.linkedWoId}`}>
                 <Button variant="outline" className="gap-2 border-primary/50 text-primary">
                    <Wrench className="h-4 w-4" />
-                   {language === "fr" ? "Voir le BM lié" : "View Linked WO"}
+                   {t('viewLinkedWO')}
                 </Button>
               </Link>
             )}
@@ -333,7 +333,7 @@ export default function ClaimDetailsPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline" className="gap-2 text-indigo-600 border-indigo-200">
                          <CheckCircle className="h-4 w-4" />
-                         {language === "fr" ? "Qualifier" : "Qualify"}
+                         {t('qualify')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -356,7 +356,7 @@ export default function ClaimDetailsPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline" className="gap-2 text-violet-600 border-violet-200">
                          <UserPlus className="h-4 w-4" />
-                         {language === "fr" ? "Assigner" : "Assign"}
+                         {t('assign')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -385,7 +385,7 @@ export default function ClaimDetailsPage() {
                     disabled={isConverting}
                   >
                     <Wrench className={`h-4 w-4 ${isConverting ? 'animate-spin' : ''}`} />
-                    {language === "fr" ? "Convertir en BM" : "Convert to WO"}
+                    {t('convertToWO')}
                   </Button>
                 )}
 
@@ -395,7 +395,7 @@ export default function ClaimDetailsPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline" className="gap-2 text-rose-600 border-rose-200">
                          <XCircle className="h-4 w-4" />
-                         {language === "fr" ? "Fermer" : "Close"}
+                         {t('close')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -415,7 +415,7 @@ export default function ClaimDetailsPage() {
             <Link href={`/claims/${claim.claimId}/edit`}>
               <Button className="gap-2" type="button">
                 <Pencil className="h-4 w-4" />
-                {language === "fr" ? "Modifier" : "Edit"}
+                {t('edit')}
               </Button>
             </Link>
           </div>
@@ -428,25 +428,25 @@ export default function ClaimDetailsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-orange-500" />
-            {language === "fr" ? "Résumé" : "Summary"}
+            {t('summary')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">
-              {language === "fr" ? "Chargement..." : "Loading..."}
+              {t('loading')}
             </p>
           ) : claim ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Titre" : "Title"}
+                  {t('title')}
                 </p>
                 <p className="font-medium text-foreground">{claim.title}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Équipement" : "Equipment"}
+                  {t('equipment')}
                 </p>
                 <p className="font-medium text-foreground">
                   {claim.equipmentName ?? `#${claim.equipmentId}`}
@@ -454,7 +454,7 @@ export default function ClaimDetailsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Priorité" : "Priority"}
+                  {t('priority')}
                 </p>
                 <Badge variant="outline" className={getPriorityColor(priorityLabel)}>
                   {priorityLabel}
@@ -462,7 +462,7 @@ export default function ClaimDetailsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Statut" : "Status"}
+                  {t('status')}
                 </p>
                 <Badge variant="outline" className={getStatusColor(statusLabel)}>
                   {statusLabel}
@@ -470,13 +470,13 @@ export default function ClaimDetailsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Département" : "Department"}
+                  {t('department')}
                 </p>
                 <p className="font-medium text-foreground">{claim.departmentName ?? "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === "fr" ? "Technicien assigné" : "Assigned Tech"}
+                  {t('assignedTech')}
                 </p>
                 <p className="font-medium text-foreground">{claim.assignedToName ?? "-"}</p>
               </div>
@@ -503,7 +503,7 @@ export default function ClaimDetailsPage() {
       <div className="grid gap-6 md:grid-cols-2">
          <Card>
            <CardHeader>
-             <CardTitle>{language === "fr" ? "Description" : "Description"}</CardTitle>
+             <CardTitle>{t('description')}</CardTitle>
            </CardHeader>
            <CardContent>
              {claim ? (
@@ -516,7 +516,7 @@ export default function ClaimDetailsPage() {
 
          <Card>
            <CardHeader>
-             <CardTitle>{language === "fr" ? "Notes de traitement" : "Processing Notes"}</CardTitle>
+             <CardTitle>{t('processingNotes')}</CardTitle>
            </CardHeader>
            <CardContent>
              {claim?.qualificationNotes || claim?.rejectionNotes ? (
@@ -543,13 +543,13 @@ export default function ClaimDetailsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "Photos" : "Photos"}</CardTitle>
+          <CardTitle>{t('photos')}</CardTitle>
         </CardHeader>
         <CardContent>
           {photosError && <p className="text-sm text-destructive">{photosError}</p>}
           {isPhotosLoading ? (
             <p className="text-sm text-muted-foreground">
-              {language === "fr" ? "Chargement..." : "Loading..."}
+              {t('loading')}
             </p>
           ) : photos.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -568,7 +568,7 @@ export default function ClaimDetailsPage() {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                          {language === "fr" ? "Aperçu indisponible" : "Preview unavailable"}
+                          {t('previewUnavailable')}
                         </div>
                       )}
                     </div>
@@ -581,7 +581,7 @@ export default function ClaimDetailsPage() {
                         disabled={isDeleting === photo.photoId}
                         onClick={() => handleDeletePhoto(photo.photoId)}
                       >
-                        {language === "fr" ? "Supprimer" : "Delete"}
+                        {t('delete')}
                       </Button>
                     </div>
                   </div>
@@ -590,7 +590,7 @@ export default function ClaimDetailsPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {language === "fr" ? "Aucune photo" : "No photos"}
+              {t('noPhotos')}
             </p>
           )}
         </CardContent>

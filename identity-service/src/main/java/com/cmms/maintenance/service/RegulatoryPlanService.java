@@ -13,6 +13,7 @@ import com.cmms.maintenance.entity.RecurrenceUnit;
 import com.cmms.maintenance.entity.RegulatoryPlan;
 import com.cmms.maintenance.entity.WorkOrder;
 import com.cmms.maintenance.repository.RegulatoryPlanRepository;
+import com.cmms.maintenance.repository.WorkOrderRepository;
 import com.cmms.claims.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class RegulatoryPlanService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
+    private final WorkOrderRepository workOrderRepository;
 
     @Transactional(readOnly = true)
     public List<RegulatoryPlanResponse> list() {
@@ -131,8 +133,17 @@ public class RegulatoryPlanService {
 
         String status = "ACTIVE";
         LocalDateTime now = LocalDateTime.now();
+        
+        // Check if there is already an active Work Order for this plan
+        boolean hasActiveWO = workOrderRepository.existsByRegulatoryPlanIdAndStatusNotIn(
+                plan.getPlanId(),
+                List.of(WorkOrder.WorkOrderStatus.CLOSED, WorkOrder.WorkOrderStatus.VALIDATED, WorkOrder.WorkOrderStatus.CANCELLED)
+        );
+
         if (!Boolean.TRUE.equals(plan.getIsActive())) {
             status = "INACTIVE";
+        } else if (hasActiveWO) {
+            status = "IN_PROGRESS";
         } else if (plan.getNextDueDate().isBefore(now)) {
             status = "OVERDUE";
         } else if (plan.getNextDueDate().isBefore(now.plusDays(plan.getReminderDays()))) {

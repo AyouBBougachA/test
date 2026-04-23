@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useI18n } from "@/lib/i18n";
 import { 
   format, 
   addMonths, 
@@ -46,6 +47,8 @@ import {
 } from "@/components/ui/select"
 
 export default function CalendarPage() {
+  const { t } = useI18n();
+
   const [currentDate, setCurrentDate] = useState(new Date())
   const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
   const [equipments, setEquipments] = useState<EquipmentResponse[]>([])
@@ -227,7 +230,7 @@ export default function CalendarPage() {
                 <div className="flex justify-between p-1.5 items-start">
                   <span className={cn(
                     "text-xs font-semibold h-7 w-7 flex items-center justify-center rounded-full",
-                    isTodayDay && "bg-primary text-white shadow-md shadow-primary/30",
+                    isTodayDay && "bg-primary text-primary-foreground shadow-md shadow-primary/30",
                     !isTodayDay && isCurrentMonth && "text-foreground",
                     !isTodayDay && !isCurrentMonth && "text-muted-foreground"
                   )}>

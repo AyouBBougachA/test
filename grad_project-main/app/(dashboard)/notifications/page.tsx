@@ -124,12 +124,10 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <Bell className="h-8 w-8 text-primary" />
-            {language === 'fr' ? 'Centre de Notifications' : 'Notification Center'}
+            {t('notificationCenter')}
           </h1>
           <p className="text-muted-foreground">
-            {language === 'fr' 
-              ? 'Consultez vos alertes historiques et les recommandations de maintenance.' 
-              : 'Review your historic alerts and maintenance recommendations.'}
+            {t('reviewYourHistoricAl')}
           </p>
         </div>
         <Button 
@@ -138,22 +136,22 @@ export default function NotificationsPage() {
           className="gap-2 border-border/60 hover:bg-primary/5 transition-all"
         >
           <CheckCheck className="h-4 w-4" />
-          {language === 'fr' ? 'Tout marquer comme lu' : 'Mark all as read'}
+          {t('markAllAsRead')}
         </Button>
       </motion.div>
 
       {/* Filters */}
-      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center">
+      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center flex-wrap min-w-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={language === 'fr' ? "Rechercher des alertes..." : "Search alerts..."} 
+            placeholder={t('searchAlerts')} 
             className="pl-9 bg-card/50 backdrop-blur-sm border-border"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
            {['ALL', 'UNREAD', 'WARNING', 'RECOMMENDATION'].map((f) => (
              <Button
                 key={f}

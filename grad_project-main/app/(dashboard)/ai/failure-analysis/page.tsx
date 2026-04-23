@@ -10,11 +10,9 @@ export default function AiFailureAnalysisPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{language === "fr" ? "IA - Analyse de panne" : "AI - Failure Analysis"}</CardTitle>
+          <CardTitle>{t('aIFailureAnalysis')}</CardTitle>
           <CardDescription>
-            {language === "fr"
-              ? "Module non disponible : aucune API IA." 
-              : "Module not available: no AI API."}
+            {t('moduleNotAvailableNo')}
           </CardDescription>
         </CardHeader>
         <CardContent />

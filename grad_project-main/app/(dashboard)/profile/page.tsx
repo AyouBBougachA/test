@@ -122,14 +122,14 @@ export default function ProfilePage() {
 
     if (!fullName) {
       toast({
-        title: language === "fr" ? "Nom requis" : "Name is required",
+        title: t('nameIsRequired'),
         variant: "destructive",
       })
       return
     }
     if (!normalizedEmail) {
       toast({
-        title: language === "fr" ? "Email requis" : "Email is required",
+        title: t('emailIsRequired'),
         variant: "destructive",
       })
       return
@@ -143,11 +143,11 @@ export default function ProfilePage() {
         phoneNumber: normalizedPhone ? normalizedPhone : null,
       })
 
-      toast({ title: language === "fr" ? "Profil mis à jour" : "Profile updated" })
+      toast({ title: t('profileUpdated') })
       await refresh()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        title: t('updateFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -160,14 +160,14 @@ export default function ProfilePage() {
     if (!user || isSavingPassword) return
     if (!newPassword.trim()) {
       toast({
-        title: language === "fr" ? "Nouveau mot de passe requis" : "New password is required",
+        title: t('newPasswordIsRequire'),
         variant: "destructive",
       })
       return
     }
     if (newPassword !== confirmPassword) {
       toast({
-        title: language === "fr" ? "Les mots de passe ne correspondent pas" : "Passwords do not match",
+        title: t('passwordsDoNotMatch'),
         variant: "destructive",
       })
       return
@@ -176,13 +176,13 @@ export default function ProfilePage() {
     setIsSavingPassword(true)
     try {
       await usersApi.update(user.id, { password: newPassword })
-      toast({ title: language === "fr" ? "Mot de passe mis à jour" : "Password updated" })
+      toast({ title: t('passwordUpdated') })
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
     } catch (err) {
       toast({
-        title: language === "fr" ? "Mise à jour impossible" : "Update failed",
+        title: t('updateFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -231,15 +231,15 @@ export default function ProfilePage() {
         <div className="relative flex flex-col items-center gap-6 sm:flex-row">
           <div className="relative">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-              <User className="h-12 w-12 text-white" />
+              <User className="h-12 w-12 text-primary-foreground" />
             </div>
             <button
               type="button"
               onClick={() =>
                 toast({
-                  title: language === "fr" ? "Non disponible" : "Not available",
+                  title: t('notAvailable'),
                   description:
-                    language === "fr" ? "La gestion d’avatar n’est pas supportée." : "Avatar management is not supported.",
+                    t('avatarManagementIsNo'),
                   variant: "destructive",
                 })
               }
@@ -249,11 +249,11 @@ export default function ProfilePage() {
             </button>
           </div>
           <div className="text-center sm:text-left">
-            <h1 className="text-2xl font-bold text-white">{user?.name || "User"}</h1>
-            <p className="text-white/80">{user?.email || "user@hospital.com"}</p>
+            <h1 className="text-2xl font-bold text-primary-foreground">{user?.name || "User"}</h1>
+            <p className="text-primary-foreground/80">{user?.email || "user@hospital.com"}</p>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 backdrop-blur-sm">
-              <Shield className="h-4 w-4 text-white" />
-              <span className="text-sm font-medium text-white">
+              <Shield className="h-4 w-4 text-primary-foreground" />
+              <span className="text-sm font-medium text-primary-foreground">
                 {user ? getRoleLabel(user.roleName, language) : "User"}
               </span>
             </div>
@@ -266,19 +266,19 @@ export default function ProfilePage() {
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="general" className="gap-2">
             <User className="h-4 w-4" />
-            <span className="hidden sm:inline">{language === "fr" ? "Général" : "General"}</span>
+            <span className="hidden sm:inline">{t('general')}</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Key className="h-4 w-4" />
-            <span className="hidden sm:inline">{language === "fr" ? "Sécurité" : "Security"}</span>
+            <span className="hidden sm:inline">{t('security')}</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">{language === "fr" ? "Notifications" : "Notifications"}</span>
+            <span className="hidden sm:inline">{t('notifications')}</span>
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">{language === "fr" ? "Audit" : "Audit"}</span>
+            <span className="hidden sm:inline">{t('audit')}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -286,24 +286,24 @@ export default function ProfilePage() {
         <TabsContent value="general" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>{language === "fr" ? "Informations personnelles" : "Personal Information"}</CardTitle>
+              <CardTitle>{t('personalInformation')}</CardTitle>
               <CardDescription>
-                {language === "fr" ? "Gérez vos informations de profil" : "Manage your profile information"}
+                {t('manageYourProfileInf')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">{language === "fr" ? "Prénom" : "First Name"}</Label>
+                  <Label htmlFor="firstName">{t('firstName')}</Label>
                   <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">{language === "fr" ? "Nom" : "Last Name"}</Label>
+                  <Label htmlFor="lastName">{t('lastName')}</Label>
                   <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">{language === "fr" ? "Email" : "Email"}</Label>
+                <Label htmlFor="email">{t('email')}</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -317,7 +317,7 @@ export default function ProfilePage() {
               </div>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">{language === "fr" ? "Téléphone" : "Phone"}</Label>
+                  <Label htmlFor="phone">{t('phone')}</Label>
                   <div className="relative">
                     <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -325,13 +325,13 @@ export default function ProfilePage() {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder={language === "fr" ? "Optionnel" : "Optional"}
+                      placeholder={t('optional')}
                       className="pl-10 font-mono text-sm"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="language">{language === "fr" ? "Langue" : "Language"}</Label>
+                  <Label htmlFor="language">{t('language')}</Label>
                   <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "fr")}>
                     <SelectTrigger>
                       <Globe className="mr-2 h-4 w-4" />
@@ -345,7 +345,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="userId">{language === "fr" ? "ID Utilisateur" : "User ID"}</Label>
+                <Label htmlFor="userId">{t('userID')}</Label>
                 <Input 
                   id="userId" 
                   value={user ? String(user.id) : "—"} 
@@ -360,12 +360,8 @@ export default function ProfilePage() {
               >
                 <Save className="mr-2 h-4 w-4" />
                 {isSavingProfile
-                  ? language === "fr"
-                    ? "Enregistrement..."
-                    : "Saving..."
-                  : language === "fr"
-                    ? "Enregistrer"
-                    : "Save Changes"}
+                  ? t('saving')
+                  : t('saveChanges')}
               </Button>
             </CardContent>
           </Card>
@@ -375,7 +371,7 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                {language === "fr" ? "Apparence" : "Appearance"}
+                {t('appearance')}
               </CardTitle>
               <CardDescription>
                 {language === "fr" ? "Personnalisez l'apparence de l'application" : "Customize the look and feel of the application"}
@@ -386,9 +382,9 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                   {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   <div>
-                    <p className="font-medium">{language === "fr" ? "Mode sombre" : "Dark Mode"}</p>
+                    <p className="font-medium">{t('darkMode')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {language === "fr" ? "Utiliser le thème sombre" : "Use the dark theme"}
+                      {t('useTheDarkTheme')}
                     </p>
                   </div>
                 </div>
@@ -405,22 +401,22 @@ export default function ProfilePage() {
         <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>{language === "fr" ? "Mot de passe" : "Password"}</CardTitle>
+              <CardTitle>{t('password')}</CardTitle>
               <CardDescription>
-                {language === "fr" ? "Mettez à jour votre mot de passe" : "Update your password"}
+                {t('updateYourPassword')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="currentPassword">{language === "fr" ? "Mot de passe actuel" : "Current Password"}</Label>
+                <Label htmlFor="currentPassword">{t('currentPassword')}</Label>
                 <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="newPassword">{language === "fr" ? "Nouveau mot de passe" : "New Password"}</Label>
+                <Label htmlFor="newPassword">{t('newPassword')}</Label>
                 <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">{language === "fr" ? "Confirmer le mot de passe" : "Confirm Password"}</Label>
+                <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
                 <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
               <Button
@@ -430,21 +426,17 @@ export default function ProfilePage() {
               >
                 <Key className="mr-2 h-4 w-4" />
                 {isSavingPassword
-                  ? language === "fr"
-                    ? "Mise à jour..."
-                    : "Updating..."
-                  : language === "fr"
-                    ? "Mettre à jour"
-                    : "Update Password"}
+                  ? t('updating')
+                  : t('updatePassword')}
               </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>{language === "fr" ? "Authentification à deux facteurs" : "Two-Factor Authentication"}</CardTitle>
+              <CardTitle>{t('twoFactorAuthenticat')}</CardTitle>
               <CardDescription>
-                {language === "fr" ? "Ajoutez une couche de sécurité supplémentaire" : "Add an extra layer of security to your account"}
+                {t('addAnExtraLayerOfSec')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -454,7 +446,7 @@ export default function ProfilePage() {
                   <div>
                     <p className="font-medium">2FA</p>
                     <p className="text-sm text-muted-foreground">
-                      {language === "fr" ? "Protégez votre compte avec 2FA" : "Protect your account with 2FA"}
+                      {t('protectYourAccountWi')}
                     </p>
                   </div>
                 </div>
@@ -468,9 +460,9 @@ export default function ProfilePage() {
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>{language === "fr" ? "Préférences de notification" : "Notification Preferences"}</CardTitle>
+              <CardTitle>{t('notificationPreferen')}</CardTitle>
               <CardDescription>
-                {language === "fr" ? "Gérez vos notifications" : "Manage your notification settings"}
+                {t('manageYourNotificati')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -478,9 +470,9 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                   <Mail className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">{language === "fr" ? "Notifications par email" : "Email Notifications"}</p>
+                    <p className="font-medium">{t('emailNotifications')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {language === "fr" ? "Recevoir des mises à jour par email" : "Receive updates via email"}
+                      {t('receiveUpdatesViaEma')}
                     </p>
                   </div>
                 </div>
@@ -490,9 +482,9 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                   <Bell className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">{language === "fr" ? "Notifications push" : "Push Notifications"}</p>
+                    <p className="font-medium">{t('pushNotifications')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {language === "fr" ? "Recevoir des notifications push" : "Receive push notifications"}
+                      {t('receivePushNotificat')}
                     </p>
                   </div>
                 </div>
@@ -506,19 +498,15 @@ export default function ProfilePage() {
         <TabsContent value="audit">
           <AuditTrail
             entries={auditEntries}
-            title={language === "fr" ? "Historique du profil" : "Profile History"}
+            title={t('profileHistory')}
             description={
               auditLoading
                 ? language === "fr"
                   ? "Chargement de l'audit..."
                   : "Loading audit..."
                 : auditError
-                  ? language === "fr"
-                    ? "Audit non disponible."
-                    : "Audit not available."
-                  : language === "fr"
-                    ? "Historique des modifications de votre profil"
-                    : "History of changes to your profile"
+                  ? t('auditNotAvailable')
+                  : t('historyOfChangesToYo')
             }
           />
         </TabsContent>

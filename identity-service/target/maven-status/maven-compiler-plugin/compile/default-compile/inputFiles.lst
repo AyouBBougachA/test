@@ -111,6 +111,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\repository\ClaimRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\equipment\entity\MeterThreshold.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\bi\dto\DashboardActivityItem.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\service\TechnicianAvailabilityService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\controller\WorkOrderLaborController.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\service\WorkOrderLaborService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\claims\service\ClaimService.java
@@ -146,6 +147,7 @@ C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmm
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\service\DepartmentService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\inventory\dto\SparePartResponse.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\security\UserDetailsServiceImpl.java
+C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\dto\TechnicianRecommendationDTO.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\repository\TaskTemplateRepository.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\maintenance\service\MaintenancePlanService.java
 C:\Users\mohai\OneDrive\Desktop\test\test\identity-service\src\main\java\com\cmms\identity\exception\GlobalExceptionHandler.java

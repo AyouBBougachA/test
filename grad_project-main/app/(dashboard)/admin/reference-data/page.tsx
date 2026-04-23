@@ -108,7 +108,7 @@ export default function ReferenceDataPage() {
       setCategories([])
       setModels([])
       setEquipment([])
-      setError(language === "fr" ? "Impossible de charger les données" : "Failed to load reference data")
+      setError(t('failedToLoadReferenc'))
     } finally {
       if (!keepLoadingState) setIsFetching(false)
     }
@@ -135,7 +135,7 @@ export default function ReferenceDataPage() {
         setCategories([])
         setModels([])
         setEquipment([])
-        setError(language === "fr" ? "Impossible de charger les données" : "Failed to load reference data")
+        setError(t('failedToLoadReferenc'))
       } finally {
         if (!cancelled) setIsFetching(false)
       }
@@ -168,7 +168,7 @@ export default function ReferenceDataPage() {
     const name = addName.trim()
     if (!name) {
       toast({
-        title: language === "fr" ? "Nom requis" : "Name is required",
+        title: t('nameIsRequired'),
         variant: "destructive",
       })
       return
@@ -178,13 +178,13 @@ export default function ReferenceDataPage() {
     try {
       if (addKind === "department") {
         await departmentsApi.create({ departmentName: name })
-        toast({ title: language === "fr" ? "Département créé" : "Department created" })
+        toast({ title: t('departmentCreated') })
       } else if (addKind === "category") {
         await referenceDataApi.createCategory(name)
-        toast({ title: language === "fr" ? "Catégorie créée" : "Category created" })
+        toast({ title: t('categoryCreated') })
       } else if (addKind === "model") {
         await referenceDataApi.createModel(name)
-        toast({ title: language === "fr" ? "Modèle créé" : "Model created" })
+        toast({ title: t('modelCreated') })
       } else if (addKind === "template") {
         const payload = {
           name,
@@ -199,17 +199,17 @@ export default function ReferenceDataPage() {
 
         if (editingTemplateId) {
           await taskTemplatesApi.update(editingTemplateId, payload)
-          toast({ title: language === "fr" ? "Modèle de tâche mis à jour" : "Task template updated" })
+          toast({ title: t('taskTemplateUpdated') })
         } else {
           await taskTemplatesApi.create(payload)
-          toast({ title: language === "fr" ? "Modèle de tâche créé" : "Task template created" })
+          toast({ title: t('taskTemplateCreated') })
         }
       }
       setAddOpen(false)
       await loadAll()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Échec de création" : "Create failed",
+        title: t('createFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -221,11 +221,11 @@ export default function ReferenceDataPage() {
   const onDeleteDepartment = async (id: number) => {
     try {
       await departmentsApi.delete(id)
-      toast({ title: language === "fr" ? "Département supprimé" : "Department deleted" })
+      toast({ title: t('departmentDeleted') })
       await loadAll()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -237,16 +237,16 @@ export default function ReferenceDataPage() {
       if (key.startsWith("cat-")) {
         const id = Number(key.replace("cat-", ""))
         await referenceDataApi.deleteCategory(id)
-        toast({ title: language === "fr" ? "Catégorie supprimée" : "Category deleted" })
+        toast({ title: t('categoryDeleted') })
       } else if (key.startsWith("model-")) {
         const id = Number(key.replace("model-", ""))
         await referenceDataApi.deleteModel(id)
-        toast({ title: language === "fr" ? "Modèle supprimé" : "Model deleted" })
+        toast({ title: t('modelDeleted') })
       }
       await loadAll()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -272,11 +272,11 @@ export default function ReferenceDataPage() {
   const onDeleteTemplate = async (id: number) => {
     try {
       await taskTemplatesApi.delete(id)
-      toast({ title: language === "fr" ? "Modèle de tâche supprimé" : "Task template deleted" })
+      toast({ title: t('taskTemplateDeleted') })
       await loadAll()
     } catch (err) {
       toast({
-        title: language === "fr" ? "Suppression impossible" : "Delete failed",
+        title: t('deleteFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -307,7 +307,7 @@ export default function ReferenceDataPage() {
       rows.push({
         key: `cat-${c.categoryId}`,
         name: c.name,
-        category: language === "fr" ? "Catégorie" : "Category",
+        category: t('category'),
         count: categoryCounts.get(c.categoryId) ?? 0,
       })
     }
@@ -315,7 +315,7 @@ export default function ReferenceDataPage() {
       rows.push({
         key: `model-${m.modelId}`,
         name: m.name,
-        category: language === "fr" ? "Modèle" : "Model",
+        category: t('model'),
         count: modelCounts.get(m.modelId) ?? 0,
       })
     }
@@ -350,22 +350,20 @@ export default function ReferenceDataPage() {
           <DialogHeader className="pb-2">
             <DialogTitle className="text-xl">
               {editingTemplateId 
-                ? (language === "fr" ? "Modifier le modèle" : "Edit Template")
+                ? (t('editTemplate'))
                 : addKind === "department"
-                  ? (language === "fr" ? "Ajouter un département" : "Add Department")
+                  ? (t('addDepartment'))
                   : addKind === "category"
-                    ? (language === "fr" ? "Ajouter une catégorie" : "Add Category")
+                    ? (t('addCategory'))
                     : addKind === "model"
-                      ? (language === "fr" ? "Ajouter un modèle" : "Add Model")
-                      : (language === "fr" ? "Ajouter un modèle de tâche" : "Add Task Template")
+                      ? (t('addModel'))
+                      : (t('addTaskTemplate'))
               }
             </DialogTitle>
             <DialogDescription className="text-xs">
               {editingTemplateId
-                ? (language === "fr" ? "Mettre à jour les détails du modèle et ses étapes." : "Update template details and its steps.")
-                : (language === "fr"
-                  ? "Création selon les endpoints existants du backend."
-                  : "Creates items using the backend endpoints.")
+                ? (t('updateTemplateDetail'))
+                : (t('createsItemsUsingThe'))
               }
             </DialogDescription>
           </DialogHeader>
@@ -373,19 +371,19 @@ export default function ReferenceDataPage() {
           <form onSubmit={onCreate} className="space-y-3 overflow-y-auto max-h-[70vh] pr-1 custom-scrollbar">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
               <div className="space-y-1.5">
-                <Label htmlFor="add-name" className="text-xs font-medium">{language === "fr" ? "Nom" : "Name"}</Label>
+                <Label htmlFor="add-name" className="text-xs font-medium">{t('name')}</Label>
                 <Input
                   id="add-name"
                   value={addName}
                   className="h-9 text-sm"
                   onChange={(e) => setAddName(e.target.value)}
-                  placeholder={language === "fr" ? "Nom" : "Name"}
+                  placeholder={t('name')}
                 />
               </div>
 
               {addKind === "template" && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="tpl-code" className="text-xs font-medium">{language === "fr" ? "Code du modèle" : "Template Code"}</Label>
+                  <Label htmlFor="tpl-code" className="text-xs font-medium">{t('templateCode')}</Label>
                   <Input
                     id="tpl-code"
                     value={tplCode}
@@ -400,18 +398,18 @@ export default function ReferenceDataPage() {
             {addKind === "template" && (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="tpl-desc" className="text-xs font-medium">{language === "fr" ? "Description" : "Description"}</Label>
+                  <Label htmlFor="tpl-desc" className="text-xs font-medium">{t('description')}</Label>
                   <Input
                     id="tpl-desc"
                     value={tplDesc}
                     className="h-9 text-sm"
                     onChange={(e) => setTplDesc(e.target.value)}
-                    placeholder={language === "fr" ? "Description du modèle" : "Template description"}
+                    placeholder={t('templateDescription')}
                   />
                 </div>
                 <div className="space-y-3 pt-3 border-t border-border">
                   <div className="flex items-center justify-between">
-                    <Label className="font-semibold text-sm">{language === "fr" ? "Étapes du modèle" : "Template Steps"}</Label>
+                    <Label className="font-semibold text-sm">{t('templateSteps')}</Label>
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -420,7 +418,7 @@ export default function ReferenceDataPage() {
                       onClick={() => setTplItems([...tplItems, { label: "", description: "", sortOrder: tplItems.length + 1, isRequired: true }])}
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" />
-                      {language === "fr" ? "Ajouter une étape" : "Add Step"}
+                      {t('addStep')}
                     </Button>
                   </div>
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -448,10 +446,10 @@ export default function ReferenceDataPage() {
                             </div>
                             <div className="space-y-1">
                               <Label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-0.5">
-                                {language === "fr" ? "Description (Optionnel)" : "Description (Optional)"}
+                                {t('descriptionOptional')}
                               </Label>
                               <Input
-                                placeholder={language === "fr" ? "Détails..." : "Details..."}
+                                placeholder={t('details')}
                                 className="text-xs h-8 bg-background/50 border-border/50"
                                 value={item.description}
                                 onChange={(e) => {
@@ -485,7 +483,7 @@ export default function ReferenceDataPage() {
                 {t("cancel")}
               </Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? (language === "fr" ? "Enregistrement..." : "Saving...") : t("save")}
+                {isSaving ? (t('saving')) : t("save")}
               </Button>
             </DialogFooter>
           </form>
@@ -518,7 +516,7 @@ export default function ReferenceDataPage() {
                       {isFetching ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={2}>
-                            {language === "fr" ? "Chargement..." : "Loading..."}
+                            {t('loading')}
                           </td>
                         </tr>
                       ) : error ? (
@@ -530,7 +528,7 @@ export default function ReferenceDataPage() {
                       ) : departments.length === 0 ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={2}>
-                            {language === "fr" ? "Aucun département" : "No departments"}
+                            {t('noDepartments')}
                           </td>
                         </tr>
                       ) : (
@@ -564,9 +562,9 @@ export default function ReferenceDataPage() {
           <TabsContent value="categories">
             <Card className="overflow-hidden">
               <CardHeader className="pb-2">
-                <CardTitle>{language === "fr" ? "Catégories" : "Categories"}</CardTitle>
+                <CardTitle>{t('categories')}</CardTitle>
                 <CardDescription>
-                  {language === "fr" ? "Catégories d’équipement" : "Equipment categories"}
+                  {t('equipmentCategories')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -574,16 +572,16 @@ export default function ReferenceDataPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
-                        <th className="text-left py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Nom" : "Name"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Équipements" : "Equipment Count"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Actions" : "Actions"}</th>
+                        <th className="text-left py-4 px-6 font-semibold text-foreground">{t('name')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('equipmentCount')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {isFetching ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={3}>
-                            {language === "fr" ? "Chargement..." : "Loading..."}
+                            {t('loading')}
                           </td>
                         </tr>
                       ) : error ? (
@@ -595,7 +593,7 @@ export default function ReferenceDataPage() {
                       ) : categories.length === 0 ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={3}>
-                            {language === "fr" ? "Aucune catégorie" : "No categories"}
+                            {t('noCategories')}
                           </td>
                         </tr>
                       ) : (
@@ -629,9 +627,9 @@ export default function ReferenceDataPage() {
           <TabsContent value="models">
             <Card className="overflow-hidden">
               <CardHeader className="pb-2">
-                <CardTitle>{language === "fr" ? "Modèles" : "Models"}</CardTitle>
+                <CardTitle>{t('models')}</CardTitle>
                 <CardDescription>
-                  {language === "fr" ? "Modèles d’équipement" : "Equipment models"}
+                  {t('equipmentModels')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -639,16 +637,16 @@ export default function ReferenceDataPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
-                        <th className="text-left py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Nom" : "Name"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Équipements" : "Equipment Count"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Actions" : "Actions"}</th>
+                        <th className="text-left py-4 px-6 font-semibold text-foreground">{t('name')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('equipmentCount')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {isFetching ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={3}>
-                            {language === "fr" ? "Chargement..." : "Loading..."}
+                            {t('loading')}
                           </td>
                         </tr>
                       ) : error ? (
@@ -660,7 +658,7 @@ export default function ReferenceDataPage() {
                       ) : models.length === 0 ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={3}>
-                            {language === "fr" ? "Aucun modèle" : "No models"}
+                            {t('noModels')}
                           </td>
                         </tr>
                       ) : (
@@ -696,14 +694,14 @@ export default function ReferenceDataPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>{language === "fr" ? "Modèles de tâches" : "Task Templates"}</CardTitle>
+                    <CardTitle>{t('taskTemplates')}</CardTitle>
                     <CardDescription>
-                      {language === "fr" ? "Modèles réutilisables pour les bons de travail" : "Reusable task lists for work orders"}
+                      {t('reusableTaskListsFor')}
                     </CardDescription>
                   </div>
                   <Button onClick={openAdd} size="sm" className="bg-primary shadow-lg shadow-primary/20">
                     <Plus className="h-4 w-4 mr-2" />
-                    {language === "fr" ? "Nouveau modèle" : "New Template"}
+                    {t('newTemplate')}
                   </Button>
                 </div>
               </CardHeader>
@@ -712,17 +710,17 @@ export default function ReferenceDataPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
-                        <th className="text-left py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Nom" : "Name"}</th>
-                        <th className="text-left py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Code" : "Code"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Étapes" : "Steps"}</th>
-                        <th className="text-right py-4 px-6 font-semibold text-foreground">{language === "fr" ? "Actions" : "Actions"}</th>
+                        <th className="text-left py-4 px-6 font-semibold text-foreground">{t('name')}</th>
+                        <th className="text-left py-4 px-6 font-semibold text-foreground">{t('code')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('steps')}</th>
+                        <th className="text-right py-4 px-6 font-semibold text-foreground">{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {isFetching ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={4}>
-                            {language === "fr" ? "Chargement..." : "Loading..."}
+                            {t('loading')}
                           </td>
                         </tr>
                       ) : error ? (
@@ -734,7 +732,7 @@ export default function ReferenceDataPage() {
                       ) : templates.length === 0 ? (
                         <tr>
                           <td className="py-6 px-6 text-muted-foreground" colSpan={4}>
-                            {language === "fr" ? "Aucun modèle" : "No templates"}
+                            {t('noTemplates')}
                           </td>
                         </tr>
                       ) : (

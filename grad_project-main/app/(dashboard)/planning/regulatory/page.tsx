@@ -96,14 +96,14 @@ export default function RegulatoryPlansPage() {
   const getStatusBadge = (status: string) => {
     switch (status.toUpperCase()) {
       case "OVERDUE":
-        return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20">{language === 'fr' ? 'En Retard' : 'Overdue'}</Badge>
+        return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20">{t('overdue')}</Badge>
       case "DUE_SOON":
-        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20">{language === 'fr' ? 'Bientôt Échu' : 'Due Soon'}</Badge>
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20">{t('dueSoon')}</Badge>
       case "ACTIVE":
       case "UPCOMING":
-        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">{language === 'fr' ? 'Actif' : 'Active'}</Badge>
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">{t('active')}</Badge>
       case "INACTIVE":
-        return <Badge className="bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20">{language === 'fr' ? 'Inactif' : 'Inactive'}</Badge>
+        return <Badge className="bg-slate-500/10 text-slate-500 border-slate-500/20 hover:bg-slate-500/20">{t('inactive')}</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -112,13 +112,13 @@ export default function RegulatoryPlansPage() {
   const getPriorityBadge = (priority: string) => {
     switch (priority.toUpperCase()) {
       case "CRITICAL":
-        return <Badge variant="destructive">{language === 'fr' ? 'Critique' : 'Critical'}</Badge>
+        return <Badge variant="destructive">{t('critical')}</Badge>
       case "HIGH":
-        return <Badge className="bg-orange-500 border-none text-white">{language === 'fr' ? 'Haute' : 'High'}</Badge>
+        return <Badge className="bg-orange-500 border-none text-primary-foreground">{t('high')}</Badge>
       case "MEDIUM":
-        return <Badge className="bg-amber-500 border-none text-white">{language === 'fr' ? 'Moyenne' : 'Medium'}</Badge>
+        return <Badge className="bg-amber-500 border-none text-primary-foreground">{t('medium')}</Badge>
       default:
-        return <Badge className="bg-blue-500 border-none text-white">{language === 'fr' ? 'Basse' : 'Low'}</Badge>
+        return <Badge className="bg-blue-500 border-none text-primary-foreground">{t('low')}</Badge>
     }
   }
 
@@ -133,20 +133,18 @@ export default function RegulatoryPlansPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <ShieldCheck className="h-8 w-8 text-primary" />
-            {language === 'fr' ? 'Plans Réglementaires' : 'Regulatory Plans'}
+            {t('regulatoryPlans')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {language === 'fr' 
-              ? 'Maintenance planifiée obligatoire et conformité réglementaire.' 
-              : 'Mandatory scheduled maintenance and regulatory compliance.'}
+            {t('mandatoryScheduledMa')}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           {user?.roleName !== 'TECHNICIAN' && (
             <Link href="/planning/regulatory/new">
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                 <Plus className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Nouveau Plan' : 'New Plan'}
+                {t('newPlan')}
               </Button>
             </Link>
           )}
@@ -157,14 +155,14 @@ export default function RegulatoryPlansPage() {
       <motion.div variants={fadeInUp} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
           { 
-            title: language === 'fr' ? 'Total Actifs' : 'Total Active', 
+            title: t('totalActive'), 
             count: plans.filter(p => p.isActive).length, 
             icon: Activity, 
             color: "text-blue-500",
             bg: "bg-blue-500/10"
           },
           { 
-            title: language === 'fr' ? 'Échéance ce Mois' : 'Due This Month', 
+            title: t('dueThisMonth'), 
             count: plans.filter(p => {
                 const due = new Date(p.nextDueDate)
                 const now = new Date()
@@ -175,14 +173,14 @@ export default function RegulatoryPlansPage() {
             bg: "bg-indigo-500/10"
           },
           { 
-            title: language === 'fr' ? 'En Retard' : 'Overdue', 
+            title: t('overdue'), 
             count: plans.filter(p => p.status === 'OVERDUE').length, 
             icon: AlertTriangle, 
             color: "text-rose-500",
             bg: "bg-rose-500/10"
           },
           { 
-            title: language === 'fr' ? 'Conformité' : 'Compliance Rate', 
+            title: t('complianceRate'), 
             count: plans.length > 0 ? Math.round((plans.filter(p => p.status !== 'OVERDUE').length / plans.length) * 100) + '%' : '100%', 
             icon: CheckCircle2, 
             color: "text-emerald-500",
@@ -204,22 +202,22 @@ export default function RegulatoryPlansPage() {
       </motion.div>
 
       {/* Search and Filters */}
-      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center">
+      <motion.div variants={fadeInUp} className="flex flex-col gap-4 md:flex-row md:items-center flex-wrap min-w-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={language === 'fr' ? "Rechercher un plan..." : "Search plans..."} 
+            placeholder={t('searchPlans')} 
             className="pl-9 bg-card border-border shadow-sm rounded-xl h-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 min-w-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="bg-card border-border shadow-sm rounded-xl">
                 <Filter className="h-4 w-4 mr-2" />
-                {language === 'fr' ? 'Filtrer' : 'Filter'}: {filter}
+                {t('filter')}: {filter}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-xl border-border">
@@ -240,13 +238,13 @@ export default function RegulatoryPlansPage() {
             {isLoading ? (
               <div className="py-20 flex flex-col items-center gap-4">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">{language === 'fr' ? 'Chargement des plans...' : 'Loading plans...'}</p>
+                <p className="text-sm text-muted-foreground">{t('loadingPlans')}</p>
               </div>
             ) : filteredPlans.length === 0 ? (
               <div className="py-20 text-center">
                 <Info className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="text-lg font-bold">{language === 'fr' ? 'Aucun plan trouvé' : 'No plans found'}</h3>
-                <p className="text-muted-foreground text-sm">{language === 'fr' ? 'Ajustez votre recherche ou vos filtres.' : 'Try adjusting your search or filters.'}</p>
+                <h3 className="text-lg font-bold">{t('noPlansFound')}</h3>
+                <p className="text-muted-foreground text-sm">{t('tryAdjustingYourSear')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -296,7 +294,7 @@ export default function RegulatoryPlansPage() {
                         <TableCell className="text-right pr-6">
                             <Link href={`/planning/regulatory/${plan.planId}`}>
                                 <Button variant="ghost" size="sm" className="h-8 group-hover:bg-primary group-hover:text-primary-foreground transition-all rounded-lg">
-                                    {language === 'fr' ? 'Détails' : 'Details'}
+                                    {t('details')}
                                     <ChevronRight className="h-4 w-4 ml-1" />
                                 </Button>
                             </Link>

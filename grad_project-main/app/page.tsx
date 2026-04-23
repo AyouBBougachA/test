@@ -202,7 +202,7 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-purple-600">
-              <Heart className="h-5 w-5 text-white" />
+              <Heart className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">
               MedCare <span className="text-primary">GMAO</span>
@@ -274,7 +274,7 @@ export default function LandingPage() {
 
             <motion.div variants={fadeInUp} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/login">
-                <Button size="lg" className="h-12 gap-2 bg-gradient-to-r from-violet-600 to-purple-600 px-8 text-white hover:from-violet-700 hover:to-purple-700">
+                <Button size="lg" className="h-12 gap-2 bg-gradient-to-r from-violet-600 to-purple-600 px-8 text-primary-foreground hover:from-violet-700 hover:to-purple-700">
                   {t("requestDemo")}
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -330,7 +330,7 @@ export default function LandingPage() {
                 <Card className="group h-full cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                   <CardContent className="flex h-full flex-col p-6">
                     <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color}`}>
-                      <feature.icon className="h-6 w-6 text-white" />
+                      <feature.icon className="h-6 w-6 text-primary-foreground" />
                     </div>
                     <h3 className="mb-2 font-semibold text-foreground">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -435,10 +435,10 @@ export default function LandingPage() {
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-purple-600 px-8 py-16 text-center sm:px-16 sm:py-24">
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
             <div className="relative">
-              <h2 className="text-3xl font-bold text-white sm:text-4xl">
+              <h2 className="text-3xl font-bold text-primary-foreground sm:text-4xl">
                 Ready to transform your hospital maintenance?
               </h2>
-              <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
+              <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
                 Join 500+ hospitals using MedCare GMAO to reduce downtime, cut costs, and improve patient safety.
               </p>
               <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -449,7 +449,7 @@ export default function LandingPage() {
                   </Button>
                 </Link>
                 <Link href="/dashboard">
-                  <Button size="lg" variant="outline" className="h-12 gap-2 border-white/30 px-8 text-white hover:bg-white/10">
+                  <Button size="lg" variant="outline" className="h-12 gap-2 border-white/30 px-8 text-primary-foreground hover:bg-white/10">
                     {t("exploreDashboard")}
                   </Button>
                 </Link>
@@ -466,7 +466,7 @@ export default function LandingPage() {
             <div className="lg:col-span-2">
               <div className="flex items-center gap-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-purple-600">
-                  <Heart className="h-5 w-5 text-white" />
+                  <Heart className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <span className="text-xl font-bold text-foreground">
                   MedCare <span className="text-primary">GMAO</span>

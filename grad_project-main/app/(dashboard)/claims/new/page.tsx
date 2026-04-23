@@ -71,7 +71,7 @@ export default function NewClaimPage() {
           setDepartmentId(String(user.departmentId))
         }
       } catch {
-        if (!cancelled) setError(language === "fr" ? "Échec du chargement" : "Failed to load")
+        if (!cancelled) setError(t('failedToLoad'))
       } finally {
         if (!cancelled) setIsLoadingRefs(false)
       }
@@ -108,7 +108,7 @@ export default function NewClaimPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !description.trim() || !equipmentId || !departmentId) {
-      setError(language === "fr" ? "Veuillez remplir les champs requis." : "Please fill in required fields.")
+      setError(t('pleaseFillInRequired'))
       return
     }
 
@@ -130,7 +130,7 @@ export default function NewClaimPage() {
         const failed = results.filter((r) => r.status === "rejected")
         if (failed.length > 0) {
           toast({
-            title: language === "fr" ? "Photos partiellement importées" : "Photos partially uploaded",
+            title: t('photosPartiallyUploa'),
             description: language === "fr"
               ? "Certaines photos n'ont pas pu être importées."
               : "Some photos failed to upload.",
@@ -139,7 +139,7 @@ export default function NewClaimPage() {
       }
 
       toast({
-        title: language === "fr" ? "Réclamation créée" : "Claim created",
+        title: t('claimCreated'),
         description: created.claimCode,
       })
       router.push("/claims")
@@ -156,7 +156,7 @@ export default function NewClaimPage() {
         setError(`Request failed (${err.status})`)
         return
       }
-      setError(language === "fr" ? "Échec de création" : "Failed to create")
+      setError(t('failedToCreate'))
     } finally {
       setIsSaving(false)
     }
@@ -187,7 +187,7 @@ export default function NewClaimPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              {language === "fr" ? "Détails de la réclamation" : "Claim Details"}
+              {t('claimDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -196,13 +196,11 @@ export default function NewClaimPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  {language === "fr" ? "Titre" : "Title"} *
+                  {t('title')} *
                 </label>
                 <Input
                   placeholder={
-                    language === "fr"
-                      ? "Décrivez brièvement le problème..."
-                      : "Briefly describe the issue..."
+                    t('brieflyDescribeTheIs')
                   }
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -217,7 +215,7 @@ export default function NewClaimPage() {
                     <SelectValue
                       placeholder={
                         isLoadingRefs
-                          ? language === "fr" ? "Chargement..." : "Loading..."
+                          ? t('loading')
                           : language === "fr" ? "Sélectionnez l'équipement..." : "Select equipment..."
                       }
                     />
@@ -243,7 +241,7 @@ export default function NewClaimPage() {
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
-                        language === "fr" ? "Sélectionnez le département..." : "Select department..."
+                        t('selectDepartment')
                       }
                     />
                   </SelectTrigger>
@@ -261,7 +259,7 @@ export default function NewClaimPage() {
                 <label className="text-sm font-medium">{t("priority")} *</label>
                 <Select value={priority} onValueChange={setPriority} required>
                   <SelectTrigger>
-                    <SelectValue placeholder={language === "fr" ? "Sélectionnez la priorité..." : "Select priority..."} />
+                    <SelectValue placeholder={t('selectPriority')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CRITICAL">
@@ -296,9 +294,7 @@ export default function NewClaimPage() {
                 <label className="text-sm font-medium">{t("description")} *</label>
                 <Textarea
                   placeholder={
-                    language === "fr"
-                      ? "Décrivez le problème en détail: symptômes observés, circonstances, impact sur le service..."
-                      : "Describe the issue in detail: observed symptoms, circumstances, impact on service..."
+                    t('describeTheIssueInDe')
                   }
                   rows={5}
                   value={description}
@@ -309,7 +305,7 @@ export default function NewClaimPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  {language === "fr" ? "Photos (optionnel)" : "Photos (optional)"}
+                  {t('photosOptional')}
                 </label>
                 <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50">
                   <div className="text-center">
@@ -317,9 +313,7 @@ export default function NewClaimPage() {
                       <Camera className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {language === "fr"
-                        ? "Glissez des photos ou cliquez pour télécharger"
-                        : "Drag photos or click to upload"}
+                      {t('dragPhotosOrClickToU')}
                     </p>
                     <Button
                       variant="outline"
@@ -329,7 +323,7 @@ export default function NewClaimPage() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="h-4 w-4" />
-                      {language === "fr" ? "Télécharger" : "Upload"}
+                      {t('upload')}
                     </Button>
                     {photos.length > 0 && (
                       <p className="mt-2 text-xs text-muted-foreground">
@@ -363,8 +357,8 @@ export default function NewClaimPage() {
                 >
                   <Send className="h-4 w-4" />
                   {isSaving
-                    ? language === "fr" ? "Envoi..." : "Submitting..."
-                    : language === "fr" ? "Soumettre" : "Submit"}
+                    ? t('submitting')
+                    : t('submit')}
                 </Button>
               </div>
             </form>

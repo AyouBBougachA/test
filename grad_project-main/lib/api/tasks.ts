@@ -25,8 +25,8 @@ export const tasksApi = {
       body: JSON.stringify(data),
     }),
 
-  updateStatus: (taskId: number, status: string) =>
-    requestJson<TaskResponse>(withQuery(`/tasks/${taskId}/status`, { status }), {
+  updateStatus: (taskId: number, status: string, reason?: string) =>
+    requestJson<TaskResponse>(withQuery(`/tasks/${taskId}/status`, { status, reason }), {
       method: 'PATCH',
     }),
 
@@ -73,6 +73,11 @@ export const tasksApi = {
       body: formData,
     })
   },
+
+  deletePhoto: (taskId: number, photoId: number) =>
+    requestJson<void>(`/tasks/${taskId}/photos/${photoId}`, {
+      method: 'DELETE',
+    }),
 
   getPhotoUrl: (taskId: number, photoId: number) => {
     return `http://localhost:8081/api/tasks/${taskId}/photos/${photoId}/download`

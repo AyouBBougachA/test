@@ -76,6 +76,9 @@ export const workOrdersApi = {
   getWorkload: () =>
     requestJson<any[]>(`/work-orders/workload`),
 
+  getRecommendations: (woId: number) =>
+    requestJson<import('./types').TechnicianRecommendationDTO[]>(`/work-orders/${woId}/recommend-technicians`),
+
   toggleFollower: (id: number) =>
     requestJson<void>(`/work-orders/${id}/toggle-follower`, {
       method: 'PATCH',

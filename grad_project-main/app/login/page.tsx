@@ -49,17 +49,17 @@ export default function LoginPage() {
       await login(email, password)
       router.replace("/dashboard")
     } catch {
-      setError(language === "fr" ? "Échec de connexion" : "Login failed")
+      setError(t('loginFailed'))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const features = [
-    { icon: Package, text: language === "fr" ? "Gestion des équipements" : "Equipment Management" },
-    { icon: Calendar, text: language === "fr" ? "Planification de maintenance" : "Maintenance Planning" },
-    { icon: Brain, text: language === "fr" ? "IA prédictive" : "Predictive AI" },
-    { icon: BarChart3, text: language === "fr" ? "Tableaux de bord BI" : "BI Dashboards" },
+    { icon: Package, text: t('equipmentManagement') },
+    { icon: Calendar, text: t('maintenancePlanning') },
+    { icon: Brain, text: t('predictiveAI') },
+    { icon: BarChart3, text: t('bIDashboards') },
   ]
 
   return (
@@ -77,9 +77,9 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <Heart className="h-6 w-6 text-white" />
+              <Heart className="h-6 w-6 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold text-white">
+            <span className="text-2xl font-bold text-primary-foreground">
               MedCare GMAO
             </span>
           </div>
@@ -91,13 +91,11 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <h1 className="text-4xl font-bold leading-tight text-white xl:text-5xl">
-                {language === "fr" 
-                  ? "Plateforme de maintenance hospitalière de nouvelle génération"
-                  : "Next-Generation Hospital Maintenance Platform"
+              <h1 className="text-4xl font-bold leading-tight text-primary-foreground xl:text-5xl">
+                {t('nextGenerationHospit')
                 }
               </h1>
-              <p className="mt-4 max-w-md text-lg text-white/80">
+              <p className="mt-4 max-w-md text-lg text-primary-foreground/80">
                 {language === "fr"
                   ? "Centralisez vos équipements, optimisez la maintenance et exploitez l'IA pour des opérations prédictives."
                   : "Centralize your equipment, optimize maintenance, and leverage AI for predictive operations."
@@ -117,8 +115,8 @@ export default function LoginPage() {
                   key={index}
                   className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 backdrop-blur-sm"
                 >
-                  <feature.icon className="h-4 w-4 text-white" />
-                  <span className="text-sm font-medium text-white">{feature.text}</span>
+                  <feature.icon className="h-4 w-4 text-primary-foreground" />
+                  <span className="text-sm font-medium text-primary-foreground">{feature.text}</span>
                 </div>
               ))}
             </motion.div>
@@ -135,8 +133,8 @@ export default function LoginPage() {
                   <div className="flex h-full flex-col justify-between">
                     <CheckCircle2 className="h-8 w-8 text-emerald-300" />
                     <div>
-                      <div className="text-2xl font-bold text-white">98.5%</div>
-                      <div className="text-xs text-white/70">{language === "fr" ? "Disponibilité" : "Availability"}</div>
+                      <div className="text-2xl font-bold text-primary-foreground">98.5%</div>
+                      <div className="text-xs text-primary-foreground/70">{t('availability')}</div>
                     </div>
                   </div>
                 </div>
@@ -144,8 +142,8 @@ export default function LoginPage() {
                   <div className="flex h-full flex-col justify-between">
                     <Activity className="h-8 w-8 text-blue-300" />
                     <div>
-                      <div className="text-2xl font-bold text-white">156</div>
-                      <div className="text-xs text-white/70">{language === "fr" ? "Équipements" : "Equipment"}</div>
+                      <div className="text-2xl font-bold text-primary-foreground">156</div>
+                      <div className="text-xs text-primary-foreground/70">{t('equipment')}</div>
                     </div>
                   </div>
                 </div>
@@ -153,8 +151,8 @@ export default function LoginPage() {
                   <div className="flex h-full flex-col justify-between">
                     <Wrench className="h-8 w-8 text-orange-300" />
                     <div>
-                      <div className="text-2xl font-bold text-white">24</div>
-                      <div className="text-xs text-white/70">{language === "fr" ? "OT Actifs" : "Active WOs"}</div>
+                      <div className="text-2xl font-bold text-primary-foreground">24</div>
+                      <div className="text-xs text-primary-foreground/70">{t('activeWOs')}</div>
                     </div>
                   </div>
                 </div>
@@ -164,8 +162,8 @@ export default function LoginPage() {
 
           {/* Security Badge */}
           <div className="flex items-center gap-3">
-            <Lock className="h-5 w-5 text-white/70" />
-            <span className="text-sm text-white/70">{t("secureLogin")}</span>
+            <Lock className="h-5 w-5 text-primary-foreground/70" />
+            <span className="text-sm text-primary-foreground/70">{t("secureLogin")}</span>
           </div>
         </div>
       </div>
@@ -176,12 +174,12 @@ export default function LoginPage() {
         <div className="flex items-center justify-between p-4 sm:p-6 lg:p-8">
           <Link href="/" className="flex items-center gap-2 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-purple-600">
-              <Heart className="h-5 w-5 text-white" />
+              <Heart className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">MedCare</span>
           </Link>
           <div className="hidden text-sm text-muted-foreground lg:block">
-            {language === "fr" ? "Vous avez déjà un compte?" : "Already have an account?"}
+            {t('alreadyHaveAnAccount')}
           </div>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
@@ -278,7 +276,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="h-12 w-full"
               >
-                {isSubmitting ? (language === "fr" ? "Connexion..." : "Signing in...") : t("login")}
+                {isSubmitting ? (t('signingIn')) : t("login")}
               </Button>
 
               {error && (

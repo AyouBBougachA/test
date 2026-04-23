@@ -73,7 +73,7 @@ export default function AuditLogsPage() {
       } catch {
         if (cancelled) return
         setItems([])
-        setError(language === "fr" ? "Impossible de charger les logs" : "Failed to load logs")
+        setError(t('failedToLoadLogs'))
       } finally {
         if (!cancelled) setIsFetching(false)
       }
@@ -173,17 +173,17 @@ export default function AuditLogsPage() {
         </div>
         <Select value={scope} onValueChange={setScope}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={language === "fr" ? "Périmètre" : "Scope"} />
+            <SelectValue placeholder={t('scope')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{language === "fr" ? "Tous" : "All logs"}</SelectItem>
-            <SelectItem value="security">{language === "fr" ? "Sécurité" : "Security logs"}</SelectItem>
-            <SelectItem value="workorder">{language === "fr" ? "Bons de travail" : "Work Orders"}</SelectItem>
-            <SelectItem value="claim">{language === "fr" ? "Réclamations" : "Claims"}</SelectItem>
-            <SelectItem value="inventory">{language === "fr" ? "Inventaire" : "Inventory"}</SelectItem>
-            <SelectItem value="task">{language === "fr" ? "Tâches" : "Tasks"}</SelectItem>
-            <SelectItem value="meter">{language === "fr" ? "Compteurs" : "Meters"}</SelectItem>
-            <SelectItem value="equipment">{language === "fr" ? "Équipements" : "Equipment logs"}</SelectItem>
+            <SelectItem value="all">{t('allLogs')}</SelectItem>
+            <SelectItem value="security">{t('securityLogs')}</SelectItem>
+            <SelectItem value="workorder">{t('workOrders')}</SelectItem>
+            <SelectItem value="claim">{t('claims')}</SelectItem>
+            <SelectItem value="inventory">{t('inventory')}</SelectItem>
+            <SelectItem value="task">{t('tasks')}</SelectItem>
+            <SelectItem value="meter">{t('meters')}</SelectItem>
+            <SelectItem value="equipment">{t('equipmentLogs')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={actionFilter} onValueChange={setActionFilter}>
@@ -231,7 +231,7 @@ export default function AuditLogsPage() {
                   {isFetching ? (
                     <tr>
                       <td className="py-6 px-6 text-muted-foreground" colSpan={6}>
-                        {language === "fr" ? "Chargement..." : "Loading..."}
+                        {t('loading')}
                       </td>
                     </tr>
                   ) : error ? (
@@ -243,7 +243,7 @@ export default function AuditLogsPage() {
                   ) : filtered.length === 0 ? (
                     <tr>
                       <td className="py-6 px-6 text-muted-foreground" colSpan={6}>
-                        {language === "fr" ? "Aucun log" : "No logs"}
+                        {t('noLogs')}
                       </td>
                     </tr>
                   ) : (

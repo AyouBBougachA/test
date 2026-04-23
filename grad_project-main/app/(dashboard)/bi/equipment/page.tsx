@@ -196,7 +196,7 @@ export default function BiEquipmentPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-muted-foreground text-sm animate-pulse">
-            {language === "fr" ? "Chargement des données..." : "Loading equipment data..."}
+            {t('loadingEquipmentData')}
           </p>
         </div>
       </div>
@@ -217,13 +217,11 @@ export default function BiEquipmentPage() {
             <BarChart2 className="h-6 w-6 text-violet-600 dark:text-violet-400" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {language === "fr" ? "BI — Équipements" : "BI — Equipment KPIs"}
+            {t('bIEquipmentKPIs')}
           </h1>
         </div>
         <p className="text-muted-foreground ml-14">
-          {language === "fr"
-            ? "Indicateurs de performance équipements avec filtres dynamiques."
-            : "Equipment performance indicators with dynamic filters."}
+          {t('equipmentPerformance')}
         </p>
       </div>
 
@@ -235,12 +233,12 @@ export default function BiEquipmentPage() {
             <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <Search className="h-3 w-3" />
-                {language === "fr" ? "Nom équipement" : "Equipment Name"}
+                {t('equipmentName')}
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder={language === "fr" ? "Rechercher..." : "Search..."}
+                  placeholder={t('search')}
                   value={nameQuery}
                   onChange={(e) => setNameQuery(e.target.value)}
                   className="pl-9"
@@ -252,15 +250,15 @@ export default function BiEquipmentPage() {
             <div className="flex flex-col gap-1.5 min-w-[180px]">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <Settings2 className="h-3 w-3" />
-                {language === "fr" ? "Catégorie" : "Category"}
+                {t('category')}
               </label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder={language === "fr" ? "Toutes" : "All categories"} />
+                  <SelectValue placeholder={t('allCategories')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_VALUE}>
-                    {language === "fr" ? "Toutes les catégories" : "All Categories"}
+                    {t('allCategories')}
                   </SelectItem>
                   {categories.map((c) => (
                     <SelectItem key={c.categoryId} value={String(c.categoryId)}>
@@ -275,15 +273,15 @@ export default function BiEquipmentPage() {
             <div className="flex flex-col gap-1.5 min-w-[180px]">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <Filter className="h-3 w-3" />
-                {language === "fr" ? "Département" : "Department"}
+                {t('department')}
               </label>
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder={language === "fr" ? "Tous" : "All departments"} />
+                  <SelectValue placeholder={t('allDepartments')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_VALUE}>
-                    {language === "fr" ? "Tous les départements" : "All Departments"}
+                    {t('allDepartments')}
                   </SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.departmentId} value={String(d.departmentId)}>
@@ -303,7 +301,7 @@ export default function BiEquipmentPage() {
                 className="gap-2 self-end h-10"
               >
                 <X className="h-4 w-4" />
-                {language === "fr" ? "Réinitialiser" : "Clear Filters"}
+                {t('clearFilters')}
               </Button>
             )}
 
@@ -323,42 +321,42 @@ export default function BiEquipmentPage() {
       {/* ── KPI CARDS ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
-          label={language === "fr" ? "Total" : "Total Equipment"}
+          label={t('totalEquipment')}
           value={kpis.total}
           icon={<Database className="h-5 w-5" />}
           colorClass="text-violet-600"
           bgClass="bg-violet-50 dark:bg-violet-900/20"
         />
         <KpiCard
-          label={language === "fr" ? "Opérationnels" : "Operational"}
+          label={t('operational')}
           value={kpis.operational}
           icon={<CheckCircle2 className="h-5 w-5" />}
           colorClass="text-emerald-600"
           bgClass="bg-emerald-50 dark:bg-emerald-900/20"
         />
         <KpiCard
-          label={language === "fr" ? "En réparation" : "Under Repair"}
+          label={t('underRepair')}
           value={kpis.underRepair}
           icon={<Wrench className="h-5 w-5" />}
           colorClass="text-amber-600"
           bgClass="bg-amber-50 dark:bg-amber-900/20"
         />
         <KpiCard
-          label={language === "fr" ? "Archivés" : "Archived"}
+          label={t('archived')}
           value={kpis.archived}
           icon={<Activity className="h-5 w-5" />}
           colorClass="text-slate-500"
           bgClass="bg-slate-100 dark:bg-slate-800/30"
         />
         <KpiCard
-          label={language === "fr" ? "Critiques" : "Critical"}
+          label={t('critical')}
           value={kpis.critical}
           icon={<AlertTriangle className="h-5 w-5" />}
           colorClass="text-rose-600"
           bgClass="bg-rose-50 dark:bg-rose-900/20"
         />
         <KpiCard
-          label={language === "fr" ? "Disponibilité" : "Availability"}
+          label={t('availability')}
           value={`${kpis.availabilityRate}%`}
           icon={<BarChart2 className="h-5 w-5" />}
           colorClass="text-cyan-600"
@@ -372,10 +370,10 @@ export default function BiEquipmentPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
           <CardHeader>
             <CardTitle className="text-base">
-              {language === "fr" ? "Équipements par catégorie" : "Equipment by Category"}
+              {t('equipmentByCategory')}
             </CardTitle>
             <CardDescription>
-              {language === "fr" ? "Répartition par type de catégorie" : "Distribution across equipment categories"}
+              {t('distributionAcrossEq')}
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[280px]">
@@ -413,10 +411,10 @@ export default function BiEquipmentPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
           <CardHeader>
             <CardTitle className="text-base">
-              {language === "fr" ? "Équipements par département" : "Equipment by Department"}
+              {t('equipmentByDepartmen')}
             </CardTitle>
             <CardDescription>
-              {language === "fr" ? "Répartition par service" : "Distribution across departments"}
+              {t('distributionAcrossDe')}
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[280px]">
@@ -457,10 +455,10 @@ export default function BiEquipmentPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
           <CardHeader>
             <CardTitle className="text-base">
-              {language === "fr" ? "Répartition par statut" : "Status Distribution"}
+              {t('statusDistribution')}
             </CardTitle>
             <CardDescription>
-              {language === "fr" ? "État opérationnel de la flotte" : "Fleet operational state breakdown"}
+              {t('fleetOperationalStat')}
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[280px] flex items-center justify-center">
@@ -494,10 +492,10 @@ export default function BiEquipmentPage() {
         <Card className="border-none bg-card/50 backdrop-blur-sm shadow-xl ring-1 ring-border">
           <CardHeader>
             <CardTitle className="text-base">
-              {language === "fr" ? "Niveau de criticité" : "Criticality Levels"}
+              {t('criticalityLevels')}
             </CardTitle>
             <CardDescription>
-              {language === "fr" ? "Exposition aux risques de la flotte" : "Fleet risk exposure profile"}
+              {t('fleetRiskExposurePro')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-2">

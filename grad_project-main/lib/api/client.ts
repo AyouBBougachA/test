@@ -86,8 +86,16 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   }
 
   const text = await response.text()
-  if (!text) return undefined as T
-  return JSON.parse(text) as T
+  const trimmed = text.trim()
+  if (!trimmed) return undefined as T
+  
+  try {
+    return JSON.parse(trimmed) as T
+  } catch (e) {
+    console.error(`Failed to parse JSON from ${url}:`, e, "Body:", text)
+    // If it's not valid JSON, but we expected T, return null or throw a cleaner error
+    return null as unknown as T
+  }
 }
 
 export async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {

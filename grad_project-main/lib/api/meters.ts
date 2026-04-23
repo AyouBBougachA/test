@@ -29,4 +29,5 @@ export const metersApi = {
     }),
 
   getThresholds: (id: number) => requestJson<MeterThreshold[]>(`/meters/${id}/thresholds`),
+  reset: (id: number) => requestJson<MeterResponse>(`/meters/${id}/reset`, { method: 'POST' }),
 }

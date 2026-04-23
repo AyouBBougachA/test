@@ -258,11 +258,15 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse updateStatus(Integer taskId, String statusStr, String actorName) {
+    public TaskResponse updateStatus(Integer taskId, String statusStr, String reason, String actorName) {
         Actor actor = getCurrentActorRequired();
         Task task = getTaskEntity(taskId);
         
         assertCanEditTask(task, actor);
+
+        if (reason != null && !reason.isBlank()) {
+            task.setBlockedReason(reason);
+        }
 
         if (Boolean.TRUE.equals(task.getIsAdHoc()) && task.getApprovalStatus() == Task.TaskApprovalStatus.PENDING) {
             throw new IllegalStateException("Cannot change status of a pending ad-hoc task. It must be approved first.");

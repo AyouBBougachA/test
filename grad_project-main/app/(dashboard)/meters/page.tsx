@@ -71,7 +71,7 @@ export default function MetersPage() {
 
   const showNotAvailable = (feature: string) => {
     toast({
-      title: language === "fr" ? "Non disponible" : "Not available",
+      title: t('notAvailable'),
       description:
         language === "fr"
           ? `${feature} n’est pas supporté par le backend.`
@@ -148,7 +148,7 @@ export default function MetersPage() {
       } catch {
         if (!cancelled) {
           setMeters([])
-          setError(language === "fr" ? "Impossible de charger les compteurs" : "Failed to load meters")
+          setError(t('failedToLoadMeters'))
         }
       } finally {
         if (!cancelled) setIsFetching(false)
@@ -265,14 +265,14 @@ export default function MetersPage() {
     try {
       const res = await metersApi.getAll()
       setMeters(res)
-      toast({ title: language === "fr" ? "Synchronisé" : "Synced" })
+      toast({ title: t('synced') })
     } catch {
       setMeters([])
       toast({
-        title: language === "fr" ? "Synchronisation impossible" : "Sync failed",
+        title: t('syncFailed'),
         variant: "destructive",
       })
-      setError(language === "fr" ? "Impossible de charger les compteurs" : "Failed to load meters")
+      setError(t('failedToLoadMeters'))
     } finally {
       setIsFetching(false)
     }
@@ -295,7 +295,7 @@ export default function MetersPage() {
     const amount = Number(logAmount)
     if (!Number.isFinite(amount) || amount <= 0) {
       toast({
-        title: language === "fr" ? "Valeur invalide" : "Invalid amount",
+        title: t('invalidAmount'),
         variant: "destructive",
       })
       return
@@ -304,7 +304,7 @@ export default function MetersPage() {
     try {
       const payload: MeterLogRequest = { operation: logOperation, amount }
       await metersApi.recordLog(selectedMeterId, payload)
-      toast({ title: language === "fr" ? "Lecture enregistrée" : "Reading recorded" })
+      toast({ title: t('readingRecorded') })
       const [all, lg] = await Promise.all([
         metersApi.getAll(),
         metersApi.getLogs(selectedMeterId),
@@ -314,7 +314,7 @@ export default function MetersPage() {
       setLogAmount("")
     } catch (err) {
       toast({
-        title: language === "fr" ? "Enregistrement impossible" : "Record failed",
+        title: t('recordFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -329,15 +329,15 @@ export default function MetersPage() {
     const value = Number(thresholdValue)
     if (!Number.isFinite(value) || value <= 0) {
       toast({
-        title: language === "fr" ? "Valeur invalide" : "Invalid threshold",
+        title: t('invalidThreshold'),
         variant: "destructive",
       })
       return
     }
     if (!thresholdLabel.trim()) {
       toast({
-        title: language === "fr" ? "Nom requis" : "Name required",
-        description: language === "fr" ? "Veuillez donner un nom au seuil." : "Please provide a name for this threshold.",
+        title: t('nameRequired'),
+        description: t('pleaseProvideANameFo'),
         variant: "destructive",
       })
       return
@@ -345,7 +345,7 @@ export default function MetersPage() {
     setIsSaving(true)
     try {
       await metersApi.createThreshold(selectedMeterId, { thresholdValue: value, label: thresholdLabel.trim() })
-      toast({ title: language === "fr" ? "Seuil ajouté" : "Threshold added" })
+      toast({ title: t('thresholdAdded') })
       const [all, th] = await Promise.all([
         metersApi.getAll(),
         metersApi.getThresholds(selectedMeterId),
@@ -356,7 +356,7 @@ export default function MetersPage() {
       setThresholdLabel("")
     } catch (err) {
       toast({
-        title: language === "fr" ? "Ajout impossible" : "Add failed",
+        title: t('addFailed'),
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -391,8 +391,8 @@ export default function MetersPage() {
       }
 
       toast({
-        title: language === 'fr' ? "Succès" : "Success",
-        description: language === 'fr' ? "Ordre de travail préventif créé." : "Preventive Work Order created.",
+        title: t('success'),
+        description: t('preventiveWorkOrderC'),
       })
 
       setAlertMeters(prev => {
@@ -405,7 +405,32 @@ export default function MetersPage() {
     } catch (err) {
       console.error("Failed to create preventive WO", err)
       toast({
-        title: language === "fr" ? "Erreur" : "Error",
+        title: t('error'),
+        description: getApiErrorMessage(err),
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const onResetMeter = async () => {
+    if (!selectedMeterId || isSaving) return
+    if (!window.confirm(language === 'fr' ? 'Voulez-vous vraiment réinitialiser ce compteur à zéro ?' : 'Are you sure you want to reset this meter to zero?')) return
+    
+    setIsSaving(true)
+    try {
+      await metersApi.reset(selectedMeterId)
+      toast({ 
+        title: language === 'fr' ? 'Compteur réinitialisé' : 'Meter reset successfully',
+        description: language === 'fr' ? 'La valeur a été remise à zéro.' : 'Value has been set to zero.'
+      })
+      const all = await metersApi.getAll()
+      setMeters(all)
+      setManageOpen(false)
+    } catch (err) {
+      toast({
+        title: language === 'fr' ? 'Échec de la réinitialisation' : 'Reset failed',
         description: getApiErrorMessage(err),
         variant: "destructive",
       })
@@ -433,7 +458,7 @@ export default function MetersPage() {
               <div className="flex items-center gap-3 text-rose-500 mb-1">
                 <div className="relative">
                   <AlertTriangle className="h-6 w-6" />
-                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-card shadow-sm animate-in zoom-in duration-500">
+                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-primary-foreground ring-2 ring-card shadow-sm animate-in zoom-in duration-500">
                     {alertMeters.length}
                   </span>
                 </div>
@@ -489,7 +514,7 @@ export default function MetersPage() {
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("meters")}</h1>
-          <p className="text-muted-foreground">{language === "fr" ? "Suivi des compteurs" : "Equipment meter tracking"}</p>
+          <p className="text-muted-foreground">{t('equipmentMeterTracki')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={onSyncAll} disabled={isFetching}>
@@ -509,7 +534,7 @@ export default function MetersPage() {
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {language === "fr" ? "Gérer le compteur" : "Manage meter"}
+              {t('manageMeter')}
             </DialogTitle>
             <DialogDescription>
               {selectedMeter ? `${selectedMeter.name} • ${selectedMeter.equipmentLabel}` : "Actions"}
@@ -518,38 +543,38 @@ export default function MetersPage() {
 
           <div className="space-y-6 pt-2">
             <div className="flex flex-col gap-2 rounded-xl bg-muted/40 p-4 border border-border/50">
-              <span className="text-xs font-bold text-muted-foreground uppercase">{language === "fr" ? "Valeur Actuelle" : "Current Value"}</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase">{t('currentValue')}</span>
               <span className="text-3xl font-black text-primary">{selectedMeter ? `${selectedMeter.value.toLocaleString()} ${selectedMeter.unit}` : "—"}</span>
             </div>
 
             <form onSubmit={onRecordLog} className="space-y-4">
-              <h4 className="text-sm font-semibold">{language === "fr" ? "Enregistrer une lecture" : "Record Reading"}</h4>
+              <h4 className="text-sm font-semibold">{t('recordReading')}</h4>
               <div className="flex gap-2 items-center">
                 <Select value={logOperation} onValueChange={(v) => setLogOperation(v as MeterOperation)}>
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Op" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ADD">{language === "fr" ? "Ajouter (+)" : "Add (+)"}</SelectItem>
-                    <SelectItem value="SUBTRACT">{language === "fr" ? "Soustraire (-)" : "Subtract (-)"}</SelectItem>
+                    <SelectItem value="ADD">{t('add')}</SelectItem>
+                    <SelectItem value="SUBTRACT">{t('subtract')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input
                   type="number"
                   value={logAmount}
                   onChange={(e) => setLogAmount(e.target.value)}
-                  placeholder={language === "fr" ? "Montant" : "Amount"}
+                  placeholder={t('amount')}
                   className="flex-1"
                   autoFocus={manageMode === "log"}
                 />
               </div>
               <Button type="submit" className="w-full font-bold" disabled={isSaving || !selectedMeterId}>
-                {language === "fr" ? "Enregistrer" : "Record"}
+                {t('record')}
               </Button>
             </form>
 
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold">{language === "fr" ? "Seuils" : "Thresholds"}</h4>
+              <h4 className="text-sm font-semibold">{t('thresholds')}</h4>
               {thresholds.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">No thresholds yet</p>
               ) : (
@@ -568,13 +593,13 @@ export default function MetersPage() {
                   type="text"
                   value={thresholdLabel}
                   onChange={(e) => setThresholdLabel(e.target.value)}
-                  placeholder={language === "fr" ? "Nom" : "Name"}
+                  placeholder={t('name')}
                 />
                 <Input
                   type="number"
                   value={thresholdValue}
                   onChange={(e) => setThresholdValue(e.target.value)}
-                  placeholder={language === "fr" ? "Valeur" : "Value"}
+                  placeholder={t('value')}
                   onKeyDown={(e) => { if (e.key === 'Enter') onCreateThreshold() }}
                 />
                 <Button onClick={() => onCreateThreshold()} variant="secondary" disabled={isSaving || !selectedMeterId}>Add</Button>
@@ -584,7 +609,7 @@ export default function MetersPage() {
             {selectedMeter && (selectedMeter.status === 'warning' || selectedMeter.status === 'critical') && (
               <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 space-y-3">
                 <p className="text-sm font-black text-orange-600 uppercase flex items-center gap-2">
-                  <Wrench className="h-4 w-4" /> {language === "fr" ? "Recommandation" : "Recommendation"}
+                  <Wrench className="h-4 w-4" /> {t('recommendation')}
                 </p>
                 <Button
                   onClick={() => handleCreatePreventiveWO(selectedMeter)}
@@ -593,13 +618,13 @@ export default function MetersPage() {
                   className="w-full font-bold"
                 >
                   {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                  {language === "fr" ? "Créer OT Préventif" : "Create Preventive WO"}
+                  {t('createPreventiveWO')}
                 </Button>
               </div>
             )}
 
             <div className="space-y-3 pt-4 border-t border-border">
-              <h4 className="text-sm font-semibold">{language === "fr" ? "Activité Récente" : "Recent Activity"}</h4>
+              <h4 className="text-sm font-semibold">{t('recentActivity')}</h4>
               <div className="space-y-2">
                 {logs.sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()).slice(0, 3).map((l) => (
                   <div key={l.logId} className="flex items-center justify-between text-sm py-1">
@@ -609,6 +634,21 @@ export default function MetersPage() {
                 ))}
                 {logs.length === 0 && <p className="text-sm text-muted-foreground italic">No history</p>}
               </div>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <Button 
+                variant="outline" 
+                className="w-full text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 border-rose-500/20"
+                onClick={onResetMeter}
+                disabled={isSaving}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isSaving && "animate-spin")} />
+                {language === 'fr' ? 'Réinitialiser le compteur' : 'Reset Meter to Zero'}
+              </Button>
+              <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                {language === 'fr' ? 'Cette action remettra la valeur actuelle à 0.' : 'This action will reset the current value to 0.'}
+              </p>
             </div>
           </div>
         </DialogContent>
@@ -675,7 +715,7 @@ export default function MetersPage() {
         </div>
         <Button
           variant="outline"
-          onClick={() => showNotAvailable(language === "fr" ? "Filtres" : "Filters")}
+          onClick={() => showNotAvailable(t('filters'))}
         >
           <Filter className="mr-2 h-4 w-4" />
           Filter
@@ -691,7 +731,7 @@ export default function MetersPage() {
         {isFetching ? (
           <Card>
             <CardContent className="py-6 text-muted-foreground">
-              {language === "fr" ? "Chargement..." : "Loading..."}
+              {t('loading')}
             </CardContent>
           </Card>
         ) : error ? (
@@ -701,7 +741,7 @@ export default function MetersPage() {
         ) : paginatedMeters.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-muted-foreground">
-              {language === "fr" ? "Aucun compteur" : "No meters"}
+              {t('noMeters')}
             </CardContent>
           </Card>
         ) : (
@@ -737,7 +777,7 @@ export default function MetersPage() {
                     </div>
                     {meter.thresholds.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        {language === "fr" ? "Seuil non défini" : "Threshold not set"}
+                        {t('thresholdNotSet')}
                       </p>
                     ) : (
                       <div className="space-y-2">
@@ -776,15 +816,15 @@ export default function MetersPage() {
                     onClick={() => openManage(meter, "logs")}
                   >
                     <Clock className="h-3 w-3" />
-                    {language === "fr" ? "Dernière lecture" : "Last reading"}: {meter.lastReading ? new Date(meter.lastReading).toLocaleString() : "—"}
+                    {t('lastReading')}: {meter.lastReading ? new Date(meter.lastReading).toLocaleString() : "—"}
                   </button>
 
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => openManage(meter, "log")}>
-                      {language === "fr" ? "Journal" : "Log"}
+                      {t('log')}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openManage(meter, "manage")}>
-                      {language === "fr" ? "Gérer" : "Manage"}
+                      {t('manage')}
                     </Button>
                   </div>
                 </CardContent>
@@ -796,16 +836,16 @@ export default function MetersPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between border border-border bg-card rounded-xl shadow-sm p-4 mt-6">
           <p className="text-sm text-muted-foreground">
-            {language === "fr" ? "Affichage" : "Showing"} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {language === "fr" ? "à" : "to"} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredMeters.length)}</span> {language === "fr" ? "sur" : "of"} <span className="font-medium">{filteredMeters.length}</span> {language === "fr" ? "résultats" : "results"}
+            {t('showing')} <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> {t('to')} <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredMeters.length)}</span> {t('of')} <span className="font-medium">{filteredMeters.length}</span> {t('results')}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 min-w-0">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
             >
-              {language === "fr" ? "Précédent" : "Previous"}
+              {t('previous')}
             </Button>
             <Button 
               variant="outline" 
@@ -813,7 +853,7 @@ export default function MetersPage() {
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
             >
-              {language === "fr" ? "Suivant" : "Next"}
+              {t('next')}
             </Button>
           </div>
         </div>

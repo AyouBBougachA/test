@@ -52,8 +52,7 @@ class AuthControllerTest {
                 .userId(1)
                 .fullName("Test User")
                 .email("user@example.com")
-                .roleName("ADMIN")
-                .roleId(1)
+                .roles(java.util.List.of(com.cmms.identity.dto.RoleResponse.builder().roleId(1).roleName("ADMIN").build()))
                 .departmentId(2)
                 .departmentName("Engineering")
                 .isActive(true)
@@ -76,7 +75,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(3600000))
                 .andExpect(jsonPath("$.user.email").value("user@example.com"))
-                .andExpect(jsonPath("$.user.roleName").value("ADMIN"));
+                .andExpect(jsonPath("$.user.roles[0].roleName").value("ADMIN"));
     }
 
     @SpringBootConfiguration

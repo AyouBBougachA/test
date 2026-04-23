@@ -21,6 +21,7 @@ import java.util.List;
 public class WorkOrdersController {
 
     private final WorkOrderService workOrderService;
+    private final com.cmms.maintenance.service.TechnicianAvailabilityService technicianAvailabilityService;
 
     @GetMapping
     @Operation(summary = "List work orders")
@@ -132,5 +133,12 @@ public class WorkOrdersController {
     @Operation(summary = "Get technician workload")
     public List<WorkloadResponse> getWorkload() {
         return workOrderService.getWorkload();
+    }
+
+    @GetMapping("/{id}/recommend-technicians")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+    @Operation(summary = "Get ranked technician recommendations for assignment")
+    public List<TechnicianRecommendationDTO> recommendTechnicians(@PathVariable(required = false) Integer id) {
+        return technicianAvailabilityService.getRecommendations(id);
     }
 }
