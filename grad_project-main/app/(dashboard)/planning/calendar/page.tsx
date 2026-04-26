@@ -14,11 +14,14 @@ import {
   isSameDay, 
   addDays, 
   eachDayOfInterval,
-  isToday
+  isToday,
+  differenceInMinutes,
+  addMinutes
 } from "date-fns"
 import { ChevronLeft, ChevronRight, Info, AlertCircle, Plus, CalendarPlus, User, Clock, MapPin, Hash } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
+import { EquipmentSelector } from "@/components/equipment-selector"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -114,18 +117,72 @@ export default function CalendarPage() {
     const wo = workOrders.find(w => w.woId === woId)
     if (!wo) return
 
-    // Keep the original time if it exists, otherwise use 09:00
     const originalTime = wo.plannedStart ? wo.plannedStart.split('T')[1] : "09:00:00"
     const newPlannedStart = format(targetDay, "yyyy-MM-dd") + "T" + originalTime
 
+    // Calculate time difference to shift other dates
+    let newPlannedEnd = null
+    let newDueDate = null
+
+    if (wo.plannedStart) {
+      const oldStart = new Date(wo.plannedStart)
+      const newStart = new Date(newPlannedStart)
+      
+      if (!isNaN(oldStart.getTime()) && !isNaN(newStart.getTime())) {
+        const diffMins = differenceInMinutes(newStart, oldStart)
+
+        if (wo.plannedEnd) {
+          const oldEnd = new Date(wo.plannedEnd)
+          if (!isNaN(oldEnd.getTime())) {
+            newPlannedEnd = format(addMinutes(oldEnd, diffMins), "yyyy-MM-dd'T'HH:mm:ss")
+          }
+        }
+        
+        if (wo.dueDate) {
+          const oldDue = new Date(wo.dueDate)
+          if (!isNaN(oldDue.getTime())) {
+            newDueDate = format(addMinutes(oldDue, diffMins), "yyyy-MM-dd'T'HH:mm:ss")
+          }
+        } else {
+          const hours = wo.estimatedDuration || wo.estimatedTimeHours || 0
+          if (hours > 0) {
+            newDueDate = format(addMinutes(newStart, hours * 60), "yyyy-MM-dd'T'HH:mm:ss")
+          }
+        }
+      }
+    } else {
+      // If there was no plannedStart before, we just use targetDay for plannedEnd (if applicable)
+      if (wo.plannedEnd) {
+        newPlannedEnd = format(targetDay, "yyyy-MM-dd") + "T" + wo.plannedEnd.split('T')[1]
+      }
+      
+      const newStart = new Date(newPlannedStart)
+      
+      if (wo.dueDate) {
+         // Just move the due date day to match target day
+         newDueDate = format(targetDay, "yyyy-MM-dd") + "T" + wo.dueDate.split('T')[1]
+      } else {
+         const hours = wo.estimatedDuration || wo.estimatedTimeHours || 0
+         if (hours > 0 && !isNaN(newStart.getTime())) {
+           newDueDate = format(addMinutes(newStart, hours * 60), "yyyy-MM-dd'T'HH:mm:ss")
+         }
+      }
+    }
+
     setIsUpdating(true)
     // Optimistic update
-    setWorkOrders(prev => prev.map(w => w.woId === woId ? { ...w, plannedStart: newPlannedStart } : w))
+    setWorkOrders(prev => prev.map(w => w.woId === woId ? { 
+      ...w, 
+      plannedStart: newPlannedStart,
+      ...(newPlannedEnd && { plannedEnd: newPlannedEnd }),
+      ...(newDueDate && { dueDate: newDueDate })
+    } : w))
 
     try {
       await workOrdersApi.reschedule(woId, { 
         plannedStart: newPlannedStart,
-        plannedEnd: wo.plannedEnd ? format(targetDay, "yyyy-MM-dd") + "T" + wo.plannedEnd.split('T')[1] : null
+        plannedEnd: newPlannedEnd,
+        dueDate: newDueDate
       })
       toast({ title: "Updated", description: `Re-scheduled to ${format(targetDay, "MMM dd")}` })
     } catch (err) {
@@ -290,18 +347,11 @@ export default function CalendarPage() {
               />
             </div>
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Equipment</label>
-              <select 
-                required
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              <EquipmentSelector
+                equipmentList={equipments}
                 value={newWO.equipmentId}
-                onChange={(e) => setNewWO({...newWO, equipmentId: e.target.value})}
-              >
-                <option value="">Select Equipment...</option>
-                {equipments.map(eq => (
-                  <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
-                ))}
-              </select>
+                onChange={(val) => setNewWO({...newWO, equipmentId: val})}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

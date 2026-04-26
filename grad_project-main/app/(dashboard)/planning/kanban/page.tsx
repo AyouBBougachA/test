@@ -17,6 +17,7 @@ import {
   Pause,
   ArrowRight
 } from "lucide-react"
+import { format, differenceInMinutes, addMinutes } from "date-fns"
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,35 @@ export default function KanbanPage() {
   const [plannedEnd, setPlannedEnd] = useState<string>("")
   const [estDuration, setEstDuration] = useState<string>("")
   const [holdNote, setHoldNote] = useState<string>("")
+
+  const handlePlannedStartChange = (newStart: string) => {
+    if (!newStart) {
+      setPlannedStart("")
+      return
+    }
+
+    const newStartDate = new Date(newStart)
+    if (isNaN(newStartDate.getTime())) {
+      setPlannedStart(newStart)
+      return
+    }
+
+    if (estDuration) {
+      const mins = parseFloat(estDuration) * 60
+      const newEndDate = addMinutes(newStartDate, mins)
+      setPlannedEnd(format(newEndDate, "yyyy-MM-dd'T'HH:mm"))
+    } else if (plannedStart && plannedEnd) {
+      const oldStartDate = new Date(plannedStart)
+      const oldEndDate = new Date(plannedEnd)
+      if (!isNaN(oldStartDate.getTime()) && !isNaN(oldEndDate.getTime())) {
+        const diffMins = differenceInMinutes(oldEndDate, oldStartDate)
+        const newEndDate = addMinutes(newStartDate, diffMins)
+        setPlannedEnd(format(newEndDate, "yyyy-MM-dd'T'HH:mm"))
+      }
+    }
+
+    setPlannedStart(newStart)
+  }
 
   const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
 
@@ -442,7 +472,7 @@ export default function KanbanPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Planned Start</Label>
-              <Input type="datetime-local" value={plannedStart} onChange={e => setPlannedStart(e.target.value)} />
+              <Input type="datetime-local" value={plannedStart} onChange={e => handlePlannedStartChange(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Planned End (Optional)</Label>

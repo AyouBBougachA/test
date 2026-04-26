@@ -289,7 +289,7 @@ export function DashboardSidebar() {
                       >
                         {item.children.map((child) => {
                           if (!canAccess(child.roles)) return null
-                          
+
                           return (
                             <Link
                               key={child.href}
@@ -338,8 +338,8 @@ export function DashboardSidebar() {
                 {!collapsed && item.href === '/meters' && meterAlertCount > 0 && (
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-rose-500 animate-pulse" />
-                    <motion.div 
-                      initial={{ scale: 0 }} 
+                    <motion.div
+                      initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm"
                     >

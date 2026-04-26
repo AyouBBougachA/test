@@ -31,7 +31,7 @@ import type { WorkOrderResponse, TaskResponse, UserResponse, ClaimPhotoResponse,
 import { useAuth } from "@/lib/auth-context"
 import { claimsApi } from "@/lib/api/claims"
 import { useI18n } from "@/lib/i18n"
-import { format } from "date-fns"
+import { format, differenceInMinutes, addMinutes } from "date-fns"
 import { usersApi } from "@/lib/api/users"
 import { inventoryApi } from "@/lib/api/inventory"
 import { metersApi } from "@/lib/api/meters"
@@ -118,6 +118,35 @@ export default function WorkOrderDetailPage() {
   const [dueDate, setDueDate] = useState("")
   const [estDuration, setEstDuration] = useState("")
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false)
+
+  const handlePlannedStartChange = (newStart: string) => {
+    if (!newStart) {
+      setPlannedStart("")
+      return
+    }
+
+    const newStartDate = new Date(newStart)
+    if (isNaN(newStartDate.getTime())) {
+      setPlannedStart(newStart)
+      return
+    }
+
+    if (estDuration) {
+      const mins = parseFloat(estDuration) * 60
+      const newEndDate = addMinutes(newStartDate, mins)
+      setDueDate(format(newEndDate, "yyyy-MM-dd'T'HH:mm"))
+    } else if (plannedStart && dueDate) {
+      const oldStartDate = new Date(plannedStart)
+      const oldEndDate = new Date(dueDate)
+      if (!isNaN(oldStartDate.getTime()) && !isNaN(oldEndDate.getTime())) {
+        const diffMins = differenceInMinutes(oldEndDate, oldStartDate)
+        const newEndDate = addMinutes(newStartDate, diffMins)
+        setDueDate(format(newEndDate, "yyyy-MM-dd'T'HH:mm"))
+      }
+    }
+
+    setPlannedStart(newStart)
+  }
 
   // Follow-on WO state
   const [isFollowOnDialogOpen, setIsFollowOnDialogOpen] = useState(false)
@@ -1289,7 +1318,7 @@ export default function WorkOrderDetailPage() {
               <Input
                 type="datetime-local"
                 value={plannedStart}
-                onChange={e => setPlannedStart(e.target.value)}
+                onChange={e => handlePlannedStartChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">

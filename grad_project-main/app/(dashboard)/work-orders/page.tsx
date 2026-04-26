@@ -52,6 +52,7 @@ import { fr, enUS, ar } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { WorkOrderTypeBadge } from "@/components/work-order-type-badge"
 import { StatusBadge } from "@/components/status-badge"
+import { EquipmentSelector } from "@/components/equipment-selector"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -214,18 +215,11 @@ export default function WorkOrdersPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Equipment</label>
-                  <select 
-                    required
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  <EquipmentSelector
+                    equipmentList={equipmentList}
                     value={newWO.equipmentId}
-                    onChange={(e) => setNewWO({...newWO, equipmentId: e.target.value})}
-                  >
-                    <option value="">Select Equipment...</option>
-                    {equipmentList.map(eq => (
-                      <option key={eq.equipmentId} value={eq.equipmentId}>{eq.name} ({eq.serialNumber})</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setNewWO({...newWO, equipmentId: val})}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">

@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { EquipmentSelector } from "@/components/equipment-selector"
 import {
   Select,
   SelectContent,
@@ -188,23 +189,13 @@ export default function NewRegulatoryPlanPage() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>{t('equipment')}</Label>
-                  <Select 
-                    onValueChange={v => setFormData({...formData, equipmentId: v})}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Select Equipment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {equipmentList.map(eq => (
-                            <SelectItem key={eq.equipmentId} value={eq.equipmentId.toString()}>
-                                {eq.name} ({eq.serialNumber})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="grid gap-2">
+                    <EquipmentSelector
+                      equipmentList={equipmentList}
+                      value={formData.equipmentId}
+                      onChange={(val) => setFormData({...formData, equipmentId: val})}
+                    />
+                  </div>
                 <div className="grid gap-2">
                   <Label>{t('priority')}</Label>
                   <Select 

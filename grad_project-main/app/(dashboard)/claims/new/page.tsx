@@ -29,6 +29,7 @@ import type {
 } from "@/lib/api/types"
 import { ApiError } from "@/lib/api/client"
 import { useToast } from "@/components/ui/use-toast"
+import { EquipmentSelector } from "@/components/equipment-selector"
 
 export default function NewClaimPage() {
   const { t, language } = useI18n()
@@ -209,25 +210,12 @@ export default function NewClaimPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t("equipment")} *</label>
-                <Select value={equipmentId} onValueChange={onEquipmentChange} required disabled={isLoadingRefs}>
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        isLoadingRefs
-                          ? t('loading')
-                          : language === "fr" ? "Sélectionnez l'équipement..." : "Select equipment..."
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipmentOptions.map((eq) => (
-                      <SelectItem key={eq.equipmentId} value={String(eq.equipmentId)}>
-                        {eq.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <EquipmentSelector
+                  equipmentList={equipmentOptions}
+                  value={equipmentId}
+                  onChange={onEquipmentChange}
+                  disabled={isLoadingRefs}
+                />
               </div>
 
               <div className="space-y-2">

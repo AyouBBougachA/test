@@ -546,7 +546,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {recentWos.reduce((acc: {name: string; count: number}[], wo) => {
+                  {recentWos.reduce((acc: { name: string; count: number }[], wo) => {
                     if (!wo.assignedToName) return acc
                     const found = acc.find(a => a.name === wo.assignedToName)
                     if (found) found.count++

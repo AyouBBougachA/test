@@ -3,21 +3,21 @@
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { 
-  Bell, 
-  ChevronDown, 
-  LogOut, 
-  Menu, 
-  Moon, 
-  Search, 
-  Settings, 
-  Sun, 
-  User, 
-  AlertCircle, 
-  Info, 
-  Clock, 
-  CheckCircle, 
-  Wrench, 
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Menu,
+  Moon,
+  Search,
+  Settings,
+  Sun,
+  User,
+  AlertCircle,
+  Info,
+  Clock,
+  CheckCircle,
+  Wrench,
   Database,
   ArrowRight,
   ShieldAlert
@@ -133,8 +133,8 @@ export function DashboardHeader() {
     try {
       const [eq, wos, claims] = await Promise.all([
         equipmentApi.search({ q }),
-        workOrdersApi.list().then(list => list.filter(w => 
-          w.title.toLowerCase().includes(q.toLowerCase()) || 
+        workOrdersApi.list().then(list => list.filter(w =>
+          w.title.toLowerCase().includes(q.toLowerCase()) ||
           w.woCode.toLowerCase().includes(q.toLowerCase())
         ).slice(0, 3)),
         claimsApi.list({ q }).then(list => Array.isArray(list) ? list.slice(0, 3) : [])
@@ -162,7 +162,7 @@ export function DashboardHeader() {
         const data = await departmentsApi.getAll()
         if (cancelled) return
         setDepartments(data.map((d) => ({ id: String(d.departmentId), name: d.departmentName })))
-        
+
         await loadNotifications()
       } catch {
         if (!cancelled) setDepartments([])
@@ -198,8 +198,8 @@ export function DashboardHeader() {
         <div className="relative hidden sm:block">
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input 
-              placeholder={t("search")} 
+            <Input
+              placeholder={t("search")}
               className="h-10 w-64 pl-9 lg:w-96 bg-muted/20 border-border/40 focus:bg-background transition-all rounded-xl"
               value={searchQuery}
               onChange={(e) => {
@@ -214,7 +214,7 @@ export function DashboardHeader() {
             {showResults && searchQuery.length >= 2 && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowResults(false)} />
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -228,11 +228,11 @@ export function DashboardHeader() {
                           <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Inventory & Equipment</p>
                           <div className="mt-1 space-y-1">
                             {searchResults.equipment.map(eq => (
-                              <SearchPreviewCard 
-                                key={eq.id} 
-                                icon={<Database className="h-4 w-4" />} 
-                                title={eq.label} 
-                                sub={eq.departmentName} 
+                              <SearchPreviewCard
+                                key={eq.id}
+                                icon={<Database className="h-4 w-4" />}
+                                title={eq.label}
+                                sub={eq.departmentName}
                                 href={`/equipment/${eq.id}`}
                                 status={eq.status}
                                 onClick={() => setShowResults(false)}
@@ -248,11 +248,11 @@ export function DashboardHeader() {
                           <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Work Orders</p>
                           <div className="mt-1 space-y-1">
                             {searchResults.wos.map(wo => (
-                              <SearchPreviewCard 
-                                key={wo.woId} 
-                                icon={<Wrench className="h-4 w-4 text-indigo-500" />} 
-                                title={wo.title} 
-                                sub={wo.woCode} 
+                              <SearchPreviewCard
+                                key={wo.woId}
+                                icon={<Wrench className="h-4 w-4 text-indigo-500" />}
+                                title={wo.title}
+                                sub={wo.woCode}
                                 href={`/work-orders/${wo.woId}`}
                                 status={wo.status}
                                 variant="indigo"
@@ -269,11 +269,11 @@ export function DashboardHeader() {
                           <p className="px-3 py-1 text-[100px] font-bold text-muted-foreground uppercase tracking-widest">Fault Reports</p>
                           <div className="mt-1 space-y-1">
                             {searchResults.claims.map(claim => (
-                              <SearchPreviewCard 
-                                key={claim.claimId} 
-                                icon={<AlertCircle className="h-4 w-4 text-rose-500" />} 
-                                title={claim.title} 
-                                sub={`#${claim.claimId}`} 
+                              <SearchPreviewCard
+                                key={claim.claimId}
+                                icon={<AlertCircle className="h-4 w-4 text-rose-500" />}
+                                title={claim.title}
+                                sub={`#${claim.claimId}`}
                                 href={`/claims/${claim.claimId}`}
                                 status={claim.statusLabel || claim.status}
                                 variant="rose"
@@ -287,7 +287,7 @@ export function DashboardHeader() {
                       {Object.values(searchResults).every(arr => arr.length === 0) && !isSearching && (
                         <div className="py-10 text-center text-muted-foreground italic text-xs">No matches found for "{searchQuery}"</div>
                       )}
-                      
+
                       {isSearching && (
                         <div className="py-10 text-center animate-pulse text-primary text-xs font-bold uppercase tracking-widest">Scanning Network...</div>
                       )}
@@ -364,9 +364,9 @@ export function DashboardHeader() {
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && <Badge variant="destructive" className="animate-pulse">{unreadCount} new</Badge>}
                 {notifications.length > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-7 px-2 text-[10px] font-bold text-primary hover:bg-primary/5 rounded-lg"
                     onClick={markAllAsRead}
                   >
@@ -384,23 +384,23 @@ export function DashboardHeader() {
                   </div>
                 ) : (
                   notifications.map(note => (
-                    <div 
-                      key={note.id} 
+                    <div
+                      key={note.id}
                       className="flex gap-3 p-4 border-b border-border/40 hover:bg-muted/30 transition-colors group relative cursor-pointer"
                       onClick={() => markRead(note.id)}
                     >
                       <div className={cn(
                         "mt-1 h-8 w-8 shrink-0 rounded-xl flex items-center justify-center border border-border/40",
                         note.type === 'WARNING' ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30" :
-                        note.type === 'RECOMMENDATION' ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30" : "bg-primary/10 text-primary"
+                          note.type === 'RECOMMENDATION' ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30" : "bg-primary/10 text-primary"
                       )}>
                         {/* Show WO type icon if the message references a known module */}
                         {note.message?.toUpperCase().includes('CORRECTIVE') ? <WorkOrderTypeIcon type="CORRECTIVE" size="sm" /> :
-                         note.message?.toUpperCase().includes('PREVENTIVE') ? <WorkOrderTypeIcon type="PREVENTIVE" size="sm" /> :
-                         note.message?.toUpperCase().includes('REGULATORY') ? <WorkOrderTypeIcon type="REGULATORY" size="sm" /> :
-                         note.message?.toUpperCase().includes('PREDICTIVE') ? <WorkOrderTypeIcon type="PREDICTIVE" size="sm" /> :
-                         note.type === 'WARNING' ? <AlertCircle className="h-4 w-4" /> :
-                         note.type === 'RECOMMENDATION' ? <Clock className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                          note.message?.toUpperCase().includes('PREVENTIVE') ? <WorkOrderTypeIcon type="PREVENTIVE" size="sm" /> :
+                            note.message?.toUpperCase().includes('REGULATORY') ? <WorkOrderTypeIcon type="REGULATORY" size="sm" /> :
+                              note.message?.toUpperCase().includes('PREDICTIVE') ? <WorkOrderTypeIcon type="PREDICTIVE" size="sm" /> :
+                                note.type === 'WARNING' ? <AlertCircle className="h-4 w-4" /> :
+                                  note.type === 'RECOMMENDATION' ? <Clock className="h-4 w-4" /> : <Info className="h-4 w-4" />}
                       </div>
                       <div className="flex flex-col gap-1 pr-6">
                         <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">
@@ -448,13 +448,13 @@ export function DashboardHeader() {
           <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl">
             <DropdownMenuLabel className="pb-4 pt-3">
               <div className="flex items-center gap-3">
-                 <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary/10 text-primary font-black"> {user?.name?.[0]} </AvatarFallback>
-                 </Avatar>
-                 <div className="flex flex-col">
-                    <span className="font-bold">{user?.name || "Guest User"}</span>
-                    <span className="text-[11px] font-normal text-muted-foreground truncate max-w-[140px]">{user?.email || "guest@demo.com"}</span>
-                 </div>
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary/10 text-primary font-black"> {user?.name?.[0]} </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="font-bold">{user?.name || "Guest User"}</span>
+                  <span className="text-[11px] font-normal text-muted-foreground truncate max-w-[140px]">{user?.email || "guest@demo.com"}</span>
+                </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -485,29 +485,29 @@ export function DashboardHeader() {
 function SearchPreviewCard({ icon, title, sub, href, status, variant = "primary", onClick }: any) {
   return (
     <Link href={href} onClick={onClick} className="block group">
-       <div className="p-3 rounded-xl border border-transparent hover:border-border/60 hover:bg-muted/30 transition-all flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-             <div className={cn(
-               "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border border-border/40 shadow-sm transition-transform group-hover:scale-105",
-               variant === 'indigo' ? "bg-indigo-500/10" : variant === 'rose' ? "bg-rose-500/10" : "bg-primary/10"
-             )}>
-                {icon}
-             </div>
-             <div className="min-w-0">
-                <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{title}</p>
-                <div className="flex items-center gap-2">
-                   <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">{sub}</p>
-                   {status && (
-                     <>
-                       <div className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                       <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase border-muted-foreground/20"> {status} </Badge>
-                     </>
-                   )}
-                </div>
-             </div>
+      <div className="p-3 rounded-xl border border-transparent hover:border-border/60 hover:bg-muted/30 transition-all flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={cn(
+            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border border-border/40 shadow-sm transition-transform group-hover:scale-105",
+            variant === 'indigo' ? "bg-indigo-500/10" : variant === 'rose' ? "bg-rose-500/10" : "bg-primary/10"
+          )}>
+            {icon}
           </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground/40 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
-       </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{title}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">{sub}</p>
+              {status && (
+                <>
+                  <div className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                  <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase border-muted-foreground/20"> {status} </Badge>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground/40 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+      </div>
     </Link>
   )
 }
