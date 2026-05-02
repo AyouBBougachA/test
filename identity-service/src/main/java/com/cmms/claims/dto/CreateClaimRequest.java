@@ -18,8 +18,9 @@ public class CreateClaimRequest {
     private Integer departmentId;
 
 
-    @NotBlank(message = "Priority is required")
     private String priority;
+
+    private String reportedSeverity;
 
     @NotBlank(message = "Description is required")
     private String description;

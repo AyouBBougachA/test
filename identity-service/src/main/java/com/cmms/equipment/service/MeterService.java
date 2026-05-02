@@ -77,6 +77,25 @@ public class MeterService {
 
         logRepository.save(log);
 
+        // Update threshold currentValues on ADD
+        if (op.equals("ADD")) {
+            List<MeterThreshold> thresholds = thresholdRepository.findByMeterId(meterId);
+            for (MeterThreshold threshold : thresholds) {
+                BigDecimal tCurrent = threshold.getCurrentValue() != null ? threshold.getCurrentValue() : BigDecimal.ZERO;
+                threshold.setCurrentValue(tCurrent.add(amount));
+                thresholdRepository.save(threshold);
+            }
+        } else if (op.equals("SUBTRACT")) {
+             List<MeterThreshold> thresholds = thresholdRepository.findByMeterId(meterId);
+             for (MeterThreshold threshold : thresholds) {
+                 BigDecimal tCurrent = threshold.getCurrentValue() != null ? threshold.getCurrentValue() : BigDecimal.ZERO;
+                 BigDecimal newCurrent = tCurrent.subtract(amount);
+                 if (newCurrent.compareTo(BigDecimal.ZERO) < 0) newCurrent = BigDecimal.ZERO;
+                 threshold.setCurrentValue(newCurrent);
+                 thresholdRepository.save(threshold);
+             }
+        }
+
         // Trigger automated maintenance checks
         meterTriggerService.evaluateMeterReadings(meter);
 
@@ -104,6 +123,7 @@ public class MeterService {
                 .meterId(meterId)
                 .thresholdValue(thresholdValue)
                 .label(label)
+                .currentValue(BigDecimal.ZERO)
                 .build();
         return thresholdRepository.save(threshold);
     }
@@ -114,13 +134,13 @@ public class MeterService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<String> checkThreshold(Integer meterId, BigDecimal value) {
+    public Optional<String> checkThreshold(Integer meterId, BigDecimal ignoredValue) {
         List<MeterThreshold> thresholds = thresholdRepository.findByMeterId(meterId);
         for (MeterThreshold threshold : thresholds) {
-            if (value != null && threshold.getThresholdValue() != null
-                    && value.compareTo(threshold.getThresholdValue()) >= 0) {
+            BigDecimal currentVal = threshold.getCurrentValue() != null ? threshold.getCurrentValue() : BigDecimal.ZERO;
+            if (threshold.getThresholdValue() != null && currentVal.compareTo(threshold.getThresholdValue()) >= 0) {
                 return Optional
-                        .of("Threshold Exceeded: Current " + value + " >= Threshold " + threshold.getThresholdValue());
+                        .of("Threshold Exceeded: Current " + currentVal + " >= Threshold " + threshold.getThresholdValue());
             }
         }
         return Optional.empty();
@@ -129,21 +149,33 @@ public class MeterService {
     @Transactional
     public Meter resetMeter(Integer meterId) {
         Meter meter = getMeterById(meterId);
-        BigDecimal oldValue = meter.getValue();
-        meter.setValue(BigDecimal.ZERO);
-        meter.setLastReadingAt(java.time.LocalDateTime.now());
+        
+        List<MeterThreshold> thresholds = thresholdRepository.findByMeterId(meterId);
+        for (MeterThreshold threshold : thresholds) {
+            threshold.setCurrentValue(BigDecimal.ZERO);
+            threshold.setLastResetAt(java.time.LocalDateTime.now());
+            thresholdRepository.save(threshold);
+        }
         
         Actor actor = getCurrentActor();
         auditLogService.log(
                 actor.userId(),
                 actor.displayName(),
-                "RESET_METER",
+                "RESET_METER_THRESHOLDS",
                 ENTITY_NAME,
                 meterId,
-                "Reset meter " + meter.getName() + " from " + oldValue + " to 0 " + meter.getUnit()
+                "Reset threshold trackers for meter " + meter.getName() + " to 0"
         );
         
-        return meterRepository.save(meter);
+        return meter;
+    }
+    
+    @Transactional
+    public void resetThresholdsForEquipment(Integer equipmentId) {
+        List<Meter> meters = meterRepository.findAllByEquipmentId(equipmentId);
+        for (Meter meter : meters) {
+            resetMeter(meter.getMeterId());
+        }
     }
 
     @Transactional

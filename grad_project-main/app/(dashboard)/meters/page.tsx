@@ -580,7 +580,7 @@ export default function MetersPage() {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {thresholds.sort((a, b) => a.thresholdValue - b.thresholdValue).map(th => (
-                    <Badge key={th.thresholdId} variant="secondary" className="px-3 py-1 text-xs">
+                    <Badge key={th.id} variant="secondary" className="px-3 py-1 text-xs">
                       {th.label && <span className="font-bold text-primary mr-1">{th.label}:</span>}
                       {th.thresholdValue.toLocaleString()}
                     </Badge>
@@ -775,24 +775,22 @@ export default function MetersPage() {
                       <span className="text-3xl font-bold">{meter.value.toLocaleString()}</span>
                       <span className="text-sm text-muted-foreground">{meter.unit}</span>
                     </div>
-                    {meter.thresholds.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t('thresholdNotSet')}
-                      </p>
-                    ) : (
+                    {meter.thresholdDetails && meter.thresholdDetails.length > 0 ? (
                       <div className="space-y-2">
-                        {meter.thresholds
+                        {meter.thresholdDetails
                           .slice()
-                          .sort((a, b) => a - b)
-                          .map((th, idx) => (
-                            <div key={`${idx}-${th}`} className="space-y-1">
+                          .sort((a, b) => a.thresholdValue - b.thresholdValue)
+                          .map((th, idx) => {
+                            const cVal = th.currentValue ?? 0;
+                            return (
+                            <div key={th.id} className="space-y-1">
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>
-                                  {language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`} • {th.toLocaleString()}
+                                  {th.label ? th.label : (language === "fr" ? `Seuil ${idx + 1}` : `Threshold ${idx + 1}`)} • {th.thresholdValue.toLocaleString()}
                                 </span>
                                 <span>
-                                  {th > 0
-                                    ? `${Math.round((meter.value / th) * 100)}%`
+                                  {th.thresholdValue > 0
+                                    ? `${Math.round((cVal / th.thresholdValue) * 100)}%`
                                     : "—"}
                                 </span>
                               </div>
@@ -800,13 +798,18 @@ export default function MetersPage() {
                                 <div
                                   className={`h-full rounded-full transition-all ${getProgressColor(meter.status)}`}
                                   style={{
-                                    width: th > 0 ? `${Math.min((meter.value / th) * 100, 100)}%` : "0%",
+                                    width: th.thresholdValue > 0 ? `${Math.min((cVal / th.thresholdValue) * 100, 100)}%` : "0%",
                                   }}
                                 />
                               </div>
                             </div>
-                          ))}
+                            )
+                          })}
                       </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {t('thresholdNotSet')}
+                      </p>
                     )}
                   </div>
 

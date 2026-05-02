@@ -67,7 +67,7 @@ function HealthProgressBar({ title, subtitle, percentage }: { title: string, sub
 }
 
 export default function BiomedicalDashboard() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const [data, setData] = useState<KpiResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 

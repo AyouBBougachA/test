@@ -20,6 +20,9 @@ public class ClaimListItemResponse {
     private String priority;
     private String priorityLabel;
 
+    private String reportedSeverity;
+    private String validatedSeverity;
+
     private String status;
     private String statusLabel;
 
@@ -36,6 +39,7 @@ public class ClaimListItemResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime closedAt;
+    private LocalDateTime dueDate;
 
     private Long photoCount;
 }

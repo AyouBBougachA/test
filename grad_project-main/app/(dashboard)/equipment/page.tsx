@@ -189,9 +189,9 @@ function mapEquipmentToForm(e: EquipmentResponse): EquipmentFormState {
     meterUnit: e.meterUnit ?? "",
     startMeterValue:
       e.startMeterValue != null && Number.isFinite(e.startMeterValue) ? String(e.startMeterValue) : "",
-    thresholds: (e.thresholds ?? []).map((t: any) => ({
-      value: String(t.value),
-      label: t.label || "",
+    thresholds: (e.thresholds ?? []).map((threshold: any) => ({
+      value: String(threshold.value),
+      label: threshold.label || "",
     })),
   }
 }
@@ -767,11 +767,11 @@ export default function EquipmentPage() {
         ? (Number.isFinite(Number(form.startMeterValue)) ? Number(form.startMeterValue) : null)
         : null,
       thresholds: form.thresholds
-        .map((t) => ({
-          value: Number(t.value),
-          label: t.label.trim() || null,
+        .map((threshold) => ({
+          value: Number(threshold.value),
+          label: threshold.label.trim() || null,
         }))
-        .filter((t) => Number.isFinite(t.value) && t.value > 0),
+        .filter((threshold) => Number.isFinite(threshold.value) && threshold.value > 0),
     }
 
     if (formMode === "edit" && editingId) {
@@ -1042,11 +1042,11 @@ export default function EquipmentPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {form.thresholds.map((t, idx) => (
+                  {form.thresholds.map((threshold, idx) => (
                     <div key={idx} className="flex items-center gap-3">
                       <Input
                         className="flex-1"
-                        value={t.label}
+                        value={threshold.label}
                         onChange={(e) =>
                           setForm((p) => ({
                             ...p,

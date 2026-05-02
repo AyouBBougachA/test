@@ -11,6 +11,9 @@ import java.util.List;
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Integer>, JpaSpecificationExecutor<WorkOrder> {
     List<WorkOrder> findByClaimId(Integer claimId);
     List<WorkOrder> findByEquipmentId(Integer equipmentId);
+    long countByEquipmentIdAndWoTypeAndCreatedAtAfter(Integer equipmentId, WorkOrder.WorkOrderType woType, java.time.LocalDateTime createdAt);
+    List<WorkOrder> findByEquipmentIdAndWoTypeAndStatusIn(Integer equipmentId, WorkOrder.WorkOrderType type, List<WorkOrder.WorkOrderStatus> statuses);
+    WorkOrder findFirstByEquipmentIdAndWoTypeAndStatusOrderByValidatedAtDesc(Integer equipmentId, WorkOrder.WorkOrderType type, WorkOrder.WorkOrderStatus status);
     List<WorkOrder> findByAssignedToUserIdAndStatusIn(Integer userId, List<WorkOrder.WorkOrderStatus> statuses);
     List<WorkOrder> findAllByCreatedAtAfter(java.time.LocalDateTime time);
     boolean existsByClaimId(Integer claimId);

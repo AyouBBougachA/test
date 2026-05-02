@@ -81,7 +81,7 @@ export interface AuditLog {
   createdAt: string
 }
 
-export type EquipmentCriticality = 'LOW' | 'MEDIUM' | 'CRITICAL'
+export type EquipmentCriticality = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 export type EquipmentStatus = 'OPERATIONAL' | 'UNDER_REPAIR' | 'ARCHIVED'
 
 export interface EquipmentResponse {
@@ -156,6 +156,7 @@ export interface MeterResponse {
   meterType: string
   lastReadingAt?: string | null
   thresholds?: Array<number>
+  thresholdDetails?: Array<MeterThreshold>
 }
 
 export type MeterOperation = 'ADD' | 'SUBTRACT'
@@ -185,7 +186,7 @@ export interface MeterLog {
 }
 
 export interface MeterThreshold {
-  thresholdId: number
+  id: number
   meterId: number
   thresholdValue: number
   label?: string | null
@@ -259,6 +260,10 @@ export interface ClaimListItemResponse {
   createdAt: string
   updatedAt?: string | null
   closedAt?: string | null
+  dueDate?: string | null
+
+  reportedSeverity?: string | null
+  validatedSeverity?: string | null
 
   photoCount?: number | null
 }
@@ -282,13 +287,71 @@ export interface ClaimResponse extends ClaimListItemResponse {
   linkedWoCode?: string | null
   resolvedAt?: string | null
   rejectedAt?: string | null
+  dueDate?: string | null
   photos?: ClaimPhotoResponse[]
+}
+
+export type PriorityDecisionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'OVERRIDDEN'
+export type SlaStatus = 'NO_DUE_DATE' | 'SAFE' | 'AT_RISK' | 'BREACHED'
+
+export interface PrioritySuggestionResponse {
+  id: number
+  claimId: number
+  claimTitle: string
+  currentPriority: ClaimPriority
+  suggestedPriority: ClaimPriority
+  finalPriority?: ClaimPriority | null
+  score: number
+  confidence: number
+  criticalityScore: number
+  serviceImpactScore: number
+  severityScore: number
+  failureHistoryScore: number
+  slaScore: number
+  createdAt: string
+  claimDueDate?: string | null
+  suggestedDueDate?: string | null
+  finalDueDate?: string | null
+  slaStatus: SlaStatus
+  decisionStatus: PriorityDecisionStatus
+  reason: string
+  recommendation: string
+}
+
+export interface PriorityDashboardResponse {
+  totalAnalyzedClaims: number
+  pendingManagerDecisions: number
+  claimsWithoutDueDate: number
+  slaAtRisk: number
+  slaBreached: number
+  criticalSuggestions: number
+  highSuggestions: number
+  acceptanceRate: number
+  averagePriorityScore: number
+}
+
+export interface AcceptPrioritySuggestionRequest {
+  note?: string
+}
+
+export interface OverridePrioritySuggestionRequest {
+  finalPriority: ClaimPriority
+  finalDueDate?: string | null
+  reason: string
+}
+
+export interface RejectPrioritySuggestionRequest {
+  reason: string
 }
 
 export interface ClaimQualificationRequest {
   priority?: string | null
   qualificationNotes?: string | null
   assignedToUserId?: number | null
+  dueDate?: string | null
+  validatedSeverity?: string | null
+  acceptSuggestedDueDate?: boolean | null
+  dueDateOverrideReason?: string | null
 }
 
 export interface ClaimAssignRequest {
@@ -317,6 +380,7 @@ export interface CreateClaimRequest {
   departmentId?: number | null
   priority: ClaimPriority | string
   description: string
+  reportedSeverity?: string | null
 }
 
 export interface UpdateClaimRequest {
@@ -324,6 +388,8 @@ export interface UpdateClaimRequest {
   priority: ClaimPriority | string
   description: string
   departmentId?: number | null
+  reportedSeverity?: string | null
+  validatedSeverity?: string | null
 }
 
 export type WorkOrderType = 'CORRECTIVE' | 'PREVENTIVE' | 'PREDICTIVE' | 'REGULATORY'
@@ -376,6 +442,9 @@ export interface WorkOrderResponse {
   completedTasks?: number
   hasPendingAdHocTasks?: boolean
   hasCriticalFailure?: boolean
+  predictiveOutcome?: string | null
+  predictiveOutcomeNotes?: string | null
+  predictiveOutcomeAt?: string | null
 }
 
 export interface WorkOrderStatusHistoryResponse {
@@ -436,10 +505,14 @@ export interface WorkOrderStatusUpdateRequest {
   status: string
   note?: string | null
   forceClose?: boolean
+  predictiveOutcome?: string | null
+  predictiveOutcomeNotes?: string | null
 }
 
 export interface ValidateWorkOrderRequest {
   validationNotes: string
+  predictiveOutcome?: string | null
+  predictiveOutcomeNotes?: string | null
 }
 
 export interface ScheduleWorkOrderRequest {
@@ -678,10 +751,43 @@ export interface KpiResponse {
 export interface PredictionResponse {
   equipmentId: number
   equipmentName: string
-  riskScore: number
+  equipmentCode?: string | null
+  location?: string | null
+  departmentName?: string | null
+
+  criticality?: string | null
+  criticalityMultiplier: number
+
+  ageYears: number
+  ageRisk: number
+
+  correctiveWoCount: number
+  failureHistoryRisk: number
+
+  meterThresholdRisk: number
+  meterStatusSummary?: string | null
+
+  predictiveOutcomeCredit: number
+  latestPredictiveWoId?: number | null
+  latestPredictiveWoStatus?: string | null
+  latestPredictiveOutcome?: string | null
+  latestPredictiveValidatedAt?: string | null
+  interventionState: string
+
+  pofScore: number
+  finalRiskScore: number
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+
   recommendation: string
-  factors: string[]
+  suggestedWorkOrderType: string
+  suggestedSeverity: string
+  suggestedPriority: string
+  shouldSuggestWorkOrder: boolean
+
+  reasons: string[]
+
+  lastFailureDate?: string | null
+  lastMaintenanceDate?: string | null
 }
 
 export interface TaskTemplateItem {
@@ -732,4 +838,140 @@ export interface CreateTaskTemplateRequest {
   requiresDocument: boolean
   isActive: boolean
   items: TaskTemplateItemRequest[]
+}
+
+// --- Failure Analysis ---
+
+export interface FailureAnalysisParams {
+  analysisPeriodDays?: number
+  departmentId?: number | string
+  severity?: string
+  minClaims?: number
+  minAffectedEquipment?: number
+}
+
+export interface FailureAnalysisReportSummary {
+  id: string
+  type: string
+  title: string
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+  scopeLabel: string
+  mainFinding: string
+  claimCount: number
+  affectedEquipmentCount: number
+  equipmentCount: number
+  baselineMultiplier: number
+  generatedAt: string
+}
+
+export interface FailureAnalysisPeriod {
+  from: string
+  to: string
+  days: number
+}
+
+export interface FailureAnalysisScope {
+  departmentId: number
+  departmentName: string
+  manufacturer?: string
+  model?: string
+  category?: string
+  supplier?: string
+}
+
+export interface FailureAnalysisSummary {
+  mainFinding: string
+  businessSignal: string
+  generatedAt: string
+}
+
+export interface FailureAnalysisMetrics {
+  equipmentCount: number
+  affectedEquipmentCount: number
+  affectedEquipmentRatio: number
+  claimCount: number
+  openClaimCount: number
+  highPriorityClaimCount: number
+  convertedToWorkOrderCount: number
+  claimsPerEquipment: number
+  baselineClaimsPerEquipment: number
+  baselineMultiplier: number
+  underRepairCount: number
+  totalCost: number
+  totalActualCost?: number
+  averageCostPerWorkOrder?: number
+  groupShareOfTotalCost?: number
+  costConcentrationRatio?: number
+  partUsageCount?: number
+  quantityUsed?: number
+  totalPartCost?: number
+  underRepairRatio?: number
+  criticalEquipmentUnderRepairCount?: number
+  conversionRate?: number
+  baselineConversionRate?: number
+  openWorkOrderCount?: number
+  purchaseDate?: string
+  commissioningDate?: string
+  warrantyEndDate?: string
+  daysToFirstClaim?: number
+  daysBeforeWarrantyEnd?: number
+}
+
+export interface FailureAnalysisAffectedEquipment {
+  equipmentId: number
+  assetCode: string
+  name: string
+  manufacturer?: string
+  model?: string
+  departmentName: string
+  status?: string
+  criticality?: string
+  claimCount: number
+  openClaimCount: number
+  workOrderCount: number
+}
+
+export interface FailureAnalysisClaim {
+  claimId: number
+  claimCode: string
+  equipmentId: number
+  equipmentName: string
+  status: string
+  priority: string
+  createdAt: string
+  linkedWorkOrderId?: number
+}
+
+export interface FailureAnalysisWorkOrder {
+  workOrderId: number
+  workOrderCode: string
+  equipmentId: number
+  status: string
+  type: string
+  createdAt: string
+  completedAt?: string
+  actualCost?: number
+  actualTimeHours?: number
+}
+
+export interface FailureAnalysisTimelineEvent {
+  date: string
+  eventType: string
+  label: string
+}
+
+export interface FailureAnalysisReportDetail {
+  id: string
+  type: string
+  title: string
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+  period: FailureAnalysisPeriod
+  scope: FailureAnalysisScope
+  summary: FailureAnalysisSummary
+  metrics: FailureAnalysisMetrics
+  detectionExplanation: string[]
+  affectedEquipment: FailureAnalysisAffectedEquipment[]
+  claims: FailureAnalysisClaim[]
+  workOrders: FailureAnalysisWorkOrder[]
+  timeline: FailureAnalysisTimelineEvent[]
 }

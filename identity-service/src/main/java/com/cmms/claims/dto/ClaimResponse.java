@@ -19,6 +19,9 @@ public class ClaimResponse {
     private String priority;
     private String priorityLabel;
 
+    private String reportedSeverity;
+    private String validatedSeverity;
+
     private String status;
     private String statusLabel;
 
@@ -43,6 +46,7 @@ public class ClaimResponse {
     private LocalDateTime closedAt;
     private LocalDateTime resolvedAt;
     private LocalDateTime rejectedAt;
+    private LocalDateTime dueDate;
 
     private Long                  photoCount;
     private List<ClaimPhotoResponse> photos;

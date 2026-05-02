@@ -55,7 +55,7 @@ const CHART_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8
 const ALL_VALUE = "__all__"
 
 export default function BiEquipmentPage() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
 
   // --- raw data ---
   const [allEquipment, setAllEquipment] = useState<EquipmentResponse[]>([])

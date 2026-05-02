@@ -44,7 +44,8 @@ export default function NewClaimPage() {
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [priority, setPriority] = useState("MEDIUM")
+  const [priority, setPriority] = useState("")
+  const [reportedSeverity, setReportedSeverity] = useState("DEGRADED_PERFORMANCE")
   const [equipmentId, setEquipmentId] = useState("")
   const [departmentId, setDepartmentId] = useState("")
   const [photos, setPhotos] = useState<File[]>([])
@@ -119,7 +120,8 @@ export default function NewClaimPage() {
       const created = await claimsApi.create({
         title: title.trim(),
         description: description.trim(),
-        priority,
+        priority: priority || undefined,
+        reportedSeverity,
         equipmentId: Number(equipmentId),
         departmentId: Number(departmentId),
       })
@@ -242,10 +244,38 @@ export default function NewClaimPage() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  {language === "fr" ? "Sévérité rapportée" : "Reported Severity"} *
+                </label>
+                <Select value={reportedSeverity} onValueChange={setReportedSeverity} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === "fr" ? "Sélectionner la sévérité" : "Select severity"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAFETY_RISK">
+                      {language === "fr" ? "Risque de sécurité" : "Safety Risk"}
+                    </SelectItem>
+                    <SelectItem value="SERVICE_BLOCKING">
+                      {language === "fr" ? "Service bloqué" : "Service Blocking"}
+                    </SelectItem>
+                    <SelectItem value="DEGRADED_PERFORMANCE">
+                      {language === "fr" ? "Performance dégradée" : "Degraded Performance"}
+                    </SelectItem>
+                    <SelectItem value="MINOR_DEFECT">
+                      {language === "fr" ? "Défaut mineur" : "Minor Defect"}
+                    </SelectItem>
+                    <SelectItem value="COSMETIC_OR_INFO">
+                      {language === "fr" ? "Cosmétique ou Info" : "Cosmetic or Info"}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t("priority")} *</label>
-                <Select value={priority} onValueChange={setPriority} required>
+                <label className="text-sm font-medium">{t("priority")} ({language === "fr" ? "Optionnel" : "Optional"})</label>
+                <Select value={priority} onValueChange={setPriority}>
                   <SelectTrigger>
                     <SelectValue placeholder={t('selectPriority')} />
                   </SelectTrigger>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useI18n } from "@/lib/i18n"
 
 export default function ReportsPage() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
 
   return (
     <div className="space-y-6">

@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils"
 
 export function RegulatoryDuePopup() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const router = useRouter()
   const [plans, setPlans] = useState<RegulatoryPlanResponse[]>([])
   const [isOpen, setIsOpen] = useState(false)
