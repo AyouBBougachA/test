@@ -37,8 +37,18 @@ public class RestockController {
     @PostMapping("/{id}/approve")
     @Operation(summary = "Approve and execute restock")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
-    public void approve(@PathVariable Integer id, @RequestParam Integer reviewerId) {
-        inventoryService.approveRestock(id, reviewerId);
+    public void approve(
+            @PathVariable Integer id,
+            @RequestParam Integer reviewerId,
+            @RequestParam(required = false) Integer actualQuantity) {
+        inventoryService.approveRestock(id, reviewerId, actualQuantity);
+    }
+
+    @PostMapping("/{id}/reject")
+    @Operation(summary = "Reject restock request")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+    public void reject(@PathVariable Integer id, @RequestParam Integer reviewerId) {
+        inventoryService.rejectRestock(id, reviewerId);
     }
     
     @GetMapping("/valuation")

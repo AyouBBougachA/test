@@ -167,6 +167,10 @@ export default function WorkOrderDetailPage() {
   const [selectedPartId, setSelectedPartId] = useState("")
   const [partQty, setPartQty] = useState("1")
   const [selectedPartTaskId, setSelectedPartTaskId] = useState("")
+  
+  const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false)
+  const [restockPartId, setRestockPartId] = useState<number | null>(null)
+  const [restockQty, setRestockQty] = useState(10)
 
   const { t } = useI18n()
 
@@ -478,9 +482,30 @@ export default function WorkOrderDetailPage() {
       setPartQty("1")
       setSelectedPartTaskId("")
       loadData()
+    } catch (e: any) {
+      console.error(e)
+      if (e.message?.includes("Insufficient stock")) {
+        setRestockPartId(parseInt(selectedPartId))
+        setIsRestockDialogOpen(true)
+      } else {
+        alert("Failed to add part. Check stock levels.")
+      }
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleRequestRestock = async () => {
+    if (!restockPartId || !user?.id) return
+    try {
+      setActionLoading('request-restock')
+      await inventoryApi.requestRestock(restockPartId, restockQty, user.id)
+      setIsRestockDialogOpen(false)
+      setRestockPartId(null)
+      alert("Restock request submitted successfully.")
     } catch (e) {
       console.error(e)
-      alert("Failed to add part. Check stock levels.")
+      alert("Failed to submit restock request.")
     } finally {
       setActionLoading(null)
     }
@@ -1106,22 +1131,74 @@ export default function WorkOrderDetailPage() {
               </div>
               <div className="space-y-2">
                  <Label>Link to Execution Step (Optional)</Label>
-                 <select 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={selectedPartTaskId}
-                    onChange={e => setSelectedPartTaskId(e.target.value)}
-                 >
-                    <option value="">General Work Order usage</option>
-                    {tasks.map(t => (
-                      <option key={t.taskId} value={t.taskId}>#{t.taskId} - {(t.description || "").substring(0, 40)}...</option>
-                    ))}
-                 </select>
+                 <div className="flex gap-2">
+                   <select 
+                      className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={selectedPartTaskId}
+                      onChange={e => setSelectedPartTaskId(e.target.value)}
+                   >
+                      <option value="">General Work Order usage</option>
+                      {tasks.map(t => (
+                        <option key={t.taskId} value={t.taskId}>#{t.taskId} - {(t.description || "").substring(0, 40)}...</option>
+                      ))}
+                   </select>
+                   {selectedPartId && (
+                     <Button 
+                       type="button" 
+                       variant="outline" 
+                       size="sm" 
+                       className="border-amber-200 text-amber-600 hover:bg-amber-50"
+                       onClick={() => {
+                         setRestockPartId(parseInt(selectedPartId))
+                         setIsRestockDialogOpen(true)
+                       }}
+                     >
+                       <Package className="h-4 w-4 mr-1" />
+                       Restock
+                     </Button>
+                   )}
+                 </div>
               </div>
            </div>
            <DialogFooter>
               <Button onClick={handleAddPart} disabled={actionLoading === 'add-part'}>
                 {actionLoading === 'add-part' ? "Linking..." : "Link Part to WO"}
               </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* RESTOCK REQUEST DIALOG */}
+       <Dialog open={isRestockDialogOpen} onOpenChange={setIsRestockDialogOpen}>
+         <DialogContent className="sm:max-w-md">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2">
+               <Package className="h-5 w-5 text-amber-500" />
+               Insufficient Stock: Request Restock
+             </DialogTitle>
+             <DialogDescription>
+               The requested part is out of stock. You can submit a restock request to the maintenance manager.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+               <Label>Quantity to Request</Label>
+               <Input 
+                 type="number" 
+                 value={restockQty} 
+                 onChange={e => setRestockQty(parseInt(e.target.value))} 
+               />
+             </div>
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)}>Cancel</Button>
+             <Button 
+               onClick={handleRequestRestock} 
+               disabled={actionLoading === 'request-restock'}
+               className="bg-amber-600 hover:bg-amber-700 text-white"
+             >
+               {actionLoading === 'request-restock' ? "Submitting..." : "Submit Restock Request"}
+             </Button>
            </DialogFooter>
          </DialogContent>
        </Dialog>

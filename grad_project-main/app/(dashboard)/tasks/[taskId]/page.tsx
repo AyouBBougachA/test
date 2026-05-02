@@ -30,11 +30,12 @@ import {
 } from "@/components/ui/breadcrumb"
 import { StatusBadge } from "@/components/status-badge"
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { tasksApi } from "@/lib/api/tasks"
 import { TaskResponse } from "@/lib/api/types"
 import { format } from "date-fns"
@@ -61,6 +62,7 @@ export default function TaskDetailPage() {
   const [notes, setNotes] = useState("")
   const [actualDuration, setActualDuration] = useState("")
   const [blockedReason, setBlockedReason] = useState("")
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null)
 
   const loadTask = async () => {
     try {
@@ -101,11 +103,17 @@ export default function TaskDetailPage() {
   }
 
   const handleStatus = async (status: string) => {
+    console.log("Task action triggered:", status, "taskId:", task?.taskId)
     if (!task) return
     try {
+      setIsSaving(true)
       await tasksApi.updateStatus(task.taskId, status)
       await loadTask()
-    } catch (e) { console.error(e) }
+    } catch (e) { 
+      console.error("Task action failed:", e) 
+    } finally { 
+      setIsSaving(false) 
+    }
   }
 
   const handleSave = async () => {
@@ -210,7 +218,12 @@ export default function TaskDetailPage() {
   const isPendingApproval = task.approvalStatus === 'PENDING'
   const isReplanRequested = task.approvalStatus === 'REPLAN_REQUESTED'
   const isInProgress = task.status === 'IN_PROGRESS'
-  const isManager = user?.roleName?.toUpperCase() === 'ADMIN' || user?.roleName?.toUpperCase() === 'MAINTENANCE_MANAGER'
+  const isManager = user?.hasRole('ADMIN', 'MAINTENANCE_MANAGER')
+  const isTechnician = user?.hasRole('TECHNICIAN')
+
+  const getPhotoForType = (type: 'BEFORE' | 'AFTER') => {
+    return task.photos?.find(p => p.type === type)
+  }
 
   return (
     <div className="space-y-6">
@@ -254,8 +267,14 @@ export default function TaskDetailPage() {
               <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">Active Timer</span>
               <span className="text-3xl font-black font-mono leading-none">{fmt(elapsedSeconds)}</span>
             </div>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full border border-border bg-background shadow-sm">
-              <PauseCircle className="h-5 w-5 text-muted-foreground" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={cn("h-10 w-10 rounded-full border border-border bg-background shadow-sm", isInProgress && "text-blue-600 animate-pulse")}
+              onClick={() => handleStatus(isInProgress ? 'TODO' : 'IN_PROGRESS')}
+              disabled={isSaving}
+            >
+              {isInProgress ? <PauseCircle className="h-5 w-5" /> : <Play className="h-5 w-5" />}
             </Button>
           </CardContent>
         </Card>
@@ -284,19 +303,68 @@ export default function TaskDetailPage() {
       {/* ACTIONS ROW */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-3">
-          <Button onClick={() => handleStatus('IN_PROGRESS')} className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-lg shadow-primary/20 transition-all">
-             <Play className="h-4 w-4 fill-current" /> Start Timer
-          </Button>
-          <Button variant="outline" onClick={() => handleStatus('BLOCKED')} className="h-11 px-6 border-destructive/20 text-destructive hover:bg-destructive/5 hover:border-destructive/30 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2">
-             <AlertCircle className="h-4 w-4" /> Block
-          </Button>
-          <Button variant="outline" onClick={() => handleDirectReplan()} className="h-11 px-6 border-primary/20 text-primary hover:bg-primary/5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2">
-             <History className="h-4 w-4" /> Replan Task
-          </Button>
+          {!isDone && (
+            <>
+              {!isInProgress ? (
+                <Button 
+                  onClick={() => handleStatus('IN_PROGRESS')} 
+                  disabled={isSaving}
+                  className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-lg shadow-primary/20 transition-all"
+                >
+                  <Play className="h-4 w-4 fill-current" /> Start Timer
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => handleStatus('TODO')} 
+                  disabled={isSaving}
+                  className="h-11 px-6 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-lg shadow-amber-600/20"
+                >
+                  <PauseCircle className="h-4 w-4" /> Stop Timer
+                </Button>
+              )}
+              
+              <Button 
+                variant="outline" 
+                onClick={() => handleStatus('BLOCKED')} 
+                disabled={isSaving}
+                className="h-11 px-6 border-destructive/20 text-destructive hover:bg-destructive/5 hover:border-destructive/30 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2"
+              >
+                <AlertCircle className="h-4 w-4" /> Block
+              </Button>
+
+              {isManager && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleDirectReplan()} 
+                  disabled={isSaving}
+                  className="h-11 px-6 border-primary/20 text-primary hover:bg-primary/5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2"
+                >
+                  <History className="h-4 w-4" /> Replan Task
+                </Button>
+              )}
+
+              {isTechnician && task.status === 'BLOCKED' && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleReplanRequest(blockedReason || "Technical constraint")} 
+                  disabled={isSaving}
+                  className="h-11 px-6 border-amber-500 text-amber-600 hover:bg-amber-50 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2"
+                >
+                  <AlertTriangle className="h-4 w-4" /> Request Replan
+                </Button>
+              )}
+            </>
+          )}
         </div>
-        <Button onClick={() => handleStatus('DONE')} className="h-11 px-8 bg-success hover:bg-success/90 text-success-foreground font-black uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-lg shadow-success/10">
-           <CheckCircle2 className="h-4 w-4" /> Mark Complete
-        </Button>
+        {!isDone && (
+          <Button 
+            onClick={() => handleStatus('DONE')} 
+            disabled={isSaving}
+            className="h-11 px-8 bg-success hover:bg-success/90 text-success-foreground font-black uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-lg shadow-success/10"
+          >
+            <CheckCircle2 className="h-4 w-4" /> Mark Complete
+          </Button>
+        )}
       </div>
 
       {/* MIDDLE SECTION: INSTRUCTIONS & CHECKLIST (2/3) vs OBSERVATIONS (1/3) */}
@@ -376,18 +444,66 @@ export default function TaskDetailPage() {
         </CardHeader>
         <CardContent className="p-6">
           <div className="grid grid-cols-2 gap-6">
-            {(['BEFORE', 'AFTER'] as const).map(type => (
-              <div key={type} className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{type === 'BEFORE' ? 'Pre' : 'Post'}</p>
-                <div className="aspect-[21/9] rounded-2xl border-2 border-dashed border-border bg-muted/10 flex flex-col items-center justify-center gap-3 transition-all hover:bg-muted/20 group cursor-pointer relative">
-                  <div className="h-12 w-12 rounded-full bg-background shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Camera className="h-6 w-6 text-muted-foreground/40" />
+            {(['BEFORE', 'AFTER'] as const).map(type => {
+              const photo = getPhotoForType(type)
+              return (
+                <div key={type} className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{type === 'BEFORE' ? 'Pre-Execution' : 'Post-Execution'}</p>
+                  <div 
+                    className="aspect-[21/9] rounded-2xl border-2 border-dashed border-border bg-muted/10 flex flex-col items-center justify-center gap-3 transition-all hover:bg-muted/20 group cursor-pointer relative overflow-hidden"
+                    onClick={() => {
+                      if (photo) {
+                        setPreviewImage({ 
+                          url: `/tasks/${task.taskId}/photos/${photo.photoId}/download`, 
+                          title: `${type === 'BEFORE' ? 'Pre' : 'Post'}-Execution Proof` 
+                        })
+                      }
+                    }}
+                  >
+                    {photo ? (
+                      <>
+                        <AuthenticatedImage 
+                          path={`/tasks/${task.taskId}/photos/${photo.photoId}/download`}
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-zoom-in"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            className="h-10 w-10 rounded-full"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePhotoDelete(photo.photoId)
+                            }}
+                            disabled={isUploading}
+                          >
+                            <XCircle className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-12 w-12 rounded-full bg-background shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                          {isUploading ? (
+                            <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Camera className="h-6 w-6 text-muted-foreground/40" />
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-muted-foreground">{isUploading ? 'Uploading...' : 'Click to upload proof'}</p>
+                        <input 
+                          type="file" 
+                          className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+                          onChange={e => handlePhotoUpload(e, type)} 
+                          accept="image/*" 
+                          disabled={isUploading || isDone}
+                        />
+                      </>
+                    )}
                   </div>
-                  <p className="text-xs font-bold text-muted-foreground">Click to upload</p>
-                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handlePhotoUpload(e, type)} accept="image/*" />
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </CardContent>
       </Card>
@@ -404,6 +520,24 @@ export default function TaskDetailPage() {
            <TaskTimeline logs={task.auditLogs || []} />
         </CardContent>
       </Card>
+      {/* Image Preview Lightbox */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-black/95 border-none">
+          <DialogHeader className="absolute top-4 left-4 z-10">
+            <DialogTitle className="text-white bg-black/50 px-3 py-1 rounded-lg backdrop-blur-sm border border-white/10 uppercase text-[10px] font-black tracking-widest">
+              {previewImage?.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center w-full h-full min-h-[50vh]">
+            {previewImage && (
+              <AuthenticatedImage 
+                path={previewImage.url} 
+                className="max-w-full max-h-[85vh] object-contain shadow-2xl" 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

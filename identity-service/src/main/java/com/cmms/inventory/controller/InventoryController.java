@@ -46,9 +46,20 @@ public class InventoryController {
 
     @PatchMapping("/{id}/stock")
     @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
-    @Operation(summary = "Update stock level for a part")
+    @Operation(summary = "Update total stock level for a part")
     public SparePartResponse updateStock(@PathVariable Integer id, @RequestParam Integer quantity) {
         return inventoryService.updateStock(id, quantity);
+    }
+
+    @PostMapping("/{id}/add-stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTENANCE_MANAGER')")
+    @Operation(summary = "Increment stock level for a part")
+    public void addStock(
+            @PathVariable Integer id,
+            @RequestParam Integer amount,
+            @RequestParam Integer actorId,
+            @RequestParam String actorName) {
+        inventoryService.addStock(id, amount, actorId, actorName);
     }
 
     @PostMapping("/usage")

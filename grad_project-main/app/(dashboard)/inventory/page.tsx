@@ -62,7 +62,7 @@ const fadeInUp = {
 
 export default function InventoryPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const [parts, setParts] = useState<SparePartResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -80,6 +80,15 @@ export default function InventoryPage() {
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false)
   const [selectedPartForRestock, setSelectedPartForRestock] = useState<number | null>(null)
   const [restockQty, setRestockQty] = useState(10)
+
+  // Manager specific states
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false)
+  const [selectedRequestForApproval, setSelectedRequestForApproval] = useState<any | null>(null)
+  const [approvalQty, setApprovalQty] = useState<number>(0)
+
+  const [isDirectAddDialogOpen, setIsDirectAddDialogOpen] = useState(false)
+  const [selectedPartForDirectAdd, setSelectedPartForDirectAdd] = useState<number | null>(null)
+  const [directAddQty, setDirectAddQty] = useState(10)
 
   const [newPart, setNewPart] = useState({
     name: "",
@@ -122,10 +131,32 @@ export default function InventoryPage() {
     }
   }
 
-  const handleApproveRestock = async (id: number) => {
+  const handleApproveRestock = async () => {
+    if (!selectedRequestForApproval || !user?.id) return
+    try {
+      await inventoryApi.approveRestock(selectedRequestForApproval.requestId, user.id, approvalQty)
+      setIsApprovalDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const handleDirectAddStock = async () => {
+    if (!selectedPartForDirectAdd || !user?.id) return
+    try {
+      await inventoryApi.addStock(selectedPartForDirectAdd, directAddQty, user.id, user.fullName || user.email)
+      setIsDirectAddDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const handleRejectRestock = async (id: number) => {
     if (!user?.id) return
     try {
-      await inventoryApi.approveRestock(id, user.id)
+      await inventoryApi.rejectRestock(id, user.id)
       loadData()
     } catch (error) {
       console.error(error)
@@ -367,7 +398,18 @@ export default function InventoryPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 min-w-0">
                         <Button size="sm" variant="outline" className="h-8 shadow-sm">Details</Button>
-                        <Button size="sm" className="h-8 bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20" onClick={() => handleApproveRestock(req.requestId)}>Approve Arrival</Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleRejectRestock(req.requestId)}>Decline</Button>
+                        <Button 
+                          size="sm" 
+                          className="h-8 bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20" 
+                          onClick={() => {
+                            setSelectedRequestForApproval(req)
+                            setApprovalQty(req.quantity)
+                            setIsApprovalDialogOpen(true)
+                          }}
+                        >
+                          Approve Arrival
+                        </Button>
                       </div>
                     </div>
                   )
@@ -462,12 +504,19 @@ export default function InventoryPage() {
                               size="sm" 
                               className="h-8 gap-1 px-2 border border-transparent hover:border-amber-500/20 hover:text-amber-500 transition-all"
                               onClick={() => {
-                                setSelectedPartForRestock(part.partId)
-                                setIsRestockDialogOpen(true)
+                                if (user?.roleName === 'MAINTENANCE_MANAGER' || user?.roleName === 'ADMIN') {
+                                  setSelectedPartForDirectAdd(part.partId)
+                                  setDirectAddQty(10)
+                                  setIsDirectAddDialogOpen(true)
+                                } else {
+                                  setSelectedPartForRestock(part.partId)
+                                  setRestockQty(10)
+                                  setIsRestockDialogOpen(true)
+                                }
                               }}
                              >
                               <History className="h-4 w-4" />
-                              Restock
+                              {user?.roleName === 'MAINTENANCE_MANAGER' || user?.roleName === 'ADMIN' ? 'Add Stock' : 'Restock'}
                              </Button>
                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                <Edit2 className="h-4 w-4" />
@@ -509,7 +558,7 @@ export default function InventoryPage() {
         </Card>
       </motion.div>
 
-      {/* Restock Request Dialog */}
+      {/* Restock Request Dialog (Technicians/Fall-through) */}
       <Dialog open={isRestockDialogOpen} onOpenChange={setIsRestockDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -531,6 +580,66 @@ export default function InventoryPage() {
           <div className="flex justify-end gap-3">
              <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)}>Cancel</Button>
              <Button onClick={handleCreateRestock} className="bg-primary text-primary-foreground shadow-lg shadow-primary/20">Submit Request</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manager Approval Dialog with adjustment */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Approve Stock Arrival</DialogTitle>
+            <DialogDescription>
+              Confirm receipt of parts. You can adjust the quantity if the actual delivery differs.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Arrival Quantity</label>
+              <Input 
+                type="number" 
+                value={approvalQty}
+                onChange={(e) => setApprovalQty(parseInt(e.target.value))}
+              />
+              {selectedRequestForApproval && approvalQty !== selectedRequestForApproval.quantity && (
+                <p className="text-xs text-amber-600 font-medium italic">
+                  Note: Requested quantity was {selectedRequestForApproval.quantity}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+             <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancel</Button>
+             <Button onClick={handleApproveRestock} className="bg-amber-600 text-white shadow-lg shadow-amber-600/20 font-bold">Confirm & Add to Stock</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Direct Add Stock Dialog (Managers Only) */}
+      <Dialog open={isDirectAddDialogOpen} onOpenChange={setIsDirectAddDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Stock Addition</DialogTitle>
+            <DialogDescription>
+              Directly increment the stock level for this item. This bypasses the request/approval workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Amount to Add</label>
+              <Input 
+                type="number" 
+                value={directAddQty}
+                onChange={(e) => setDirectAddQty(parseInt(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                This will be logged as a direct inventory reception.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+             <Button variant="outline" onClick={() => setIsDirectAddDialogOpen(false)}>Cancel</Button>
+             <Button onClick={handleDirectAddStock} className="bg-primary text-primary-foreground shadow-lg shadow-primary/20">Add Directly</Button>
           </div>
         </DialogContent>
       </Dialog>

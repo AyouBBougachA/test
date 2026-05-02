@@ -26,6 +26,11 @@ export const inventoryApi = {
       method: 'PATCH',
     }),
 
+  addStock: (id: number, amount: number, actorId: number, actorName: string) =>
+    requestJson<void>(withQuery(`/inventory/${id}/add-stock`, { amount, actorId, actorName }), {
+      method: 'POST'
+    }),
+
   usePart: (data: UsePartRequest) =>
     requestJson<PartUsageResponse>('/inventory/usage', {
       method: 'POST',
@@ -44,8 +49,13 @@ export const inventoryApi = {
   getPendingRestocks: () => 
     requestJson<any[]>('/inventory/restock/pending'),
 
-  approveRestock: (id: number, reviewerId: number) =>
-    requestJson<void>(withQuery(`/inventory/restock/${id}/approve`, { reviewerId }), {
+  approveRestock: (id: number, reviewerId: number, actualQuantity?: number) =>
+    requestJson<void>(withQuery(`/inventory/restock/${id}/approve`, { reviewerId, actualQuantity }), {
+      method: 'POST'
+    }),
+
+  rejectRestock: (id: number, reviewerId: number) =>
+    requestJson<void>(withQuery(`/inventory/restock/${id}/reject`, { reviewerId }), {
       method: 'POST'
     }),
 

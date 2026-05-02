@@ -179,7 +179,8 @@ export default function RolesPage() {
   const roleUserCounts = useMemo(() => {
     const map = new Map<string, number>()
     for (const u of users) {
-      const role = (u.roleName ?? "").toUpperCase()
+      const roleName = u.roles && u.roles.length > 0 ? u.roles[0].roleName : ""
+      const role = (roleName ?? "").toUpperCase()
       map.set(role, (map.get(role) ?? 0) + 1)
     }
     return map

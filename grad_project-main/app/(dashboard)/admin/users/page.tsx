@@ -206,12 +206,13 @@ export default function UsersPage() {
   const openEdit = (u: UserResponse) => {
     setEditorMode("edit")
     setEditingUserId(u.userId)
+    const primaryRole = u.roles && u.roles.length > 0 ? u.roles[0] : null
     setForm({
       fullName: u.fullName ?? "",
       email: u.email ?? "",
       phoneNumber: u.phoneNumber ?? "",
       password: "",
-      roleId: u.roleId != null ? String(u.roleId) : (roles.length > 0 ? String(roles[0].roleId) : ""),
+      roleId: primaryRole ? String(primaryRole.roleId) : (roles.length > 0 ? String(roles[0].roleId) : ""),
       departmentId: u.departmentId != null ? String(u.departmentId) : NONE_SELECT_VALUE,
       isActive: u.isActive,
     })
@@ -230,8 +231,7 @@ export default function UsersPage() {
     if (!fullName || !email || !Number.isFinite(roleId) || roleId <= 0) {
       toast({
         title: t('missingRequiredField'),
-        description:
-          t('fullNameEmailAndRole'),
+        description: t('fullNameEmailAndRole'),
         variant: "destructive",
       })
       return
@@ -246,22 +246,22 @@ export default function UsersPage() {
         if (!password || password.length < 8) {
           toast({
             title: t('invalidPassword'),
-            description:
-              t('passwordMustBeAtLeas'),
+            description: t('passwordMustBeAtLeas'),
             variant: "destructive",
           })
+          setIsSaving(false)
           return
         }
 
         const payload: CreateUserRequest = {
           fullName,
           email,
-          phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
+          phoneNumber: form.phoneNumber.trim() || null,
           password,
           roleIds: [roleId],
           departmentId,
           isActive: form.isActive,
-        } as unknown as CreateUserRequest
+        }
 
         await usersApi.create(payload)
         toast({ title: t('userCreated') })
@@ -271,12 +271,20 @@ export default function UsersPage() {
         const payload: UpdateUserRequest = {
           fullName: fullName || undefined,
           email: email || undefined,
-          phoneNumber: form.phoneNumber.trim() ? form.phoneNumber.trim() : null,
+          phoneNumber: form.phoneNumber.trim() || null,
           roleIds: [roleId],
           departmentId,
-        } as unknown as UpdateUserRequest
-        if (password && password.trim().length > 0) {
+        }
+        if (password && password.trim().length >= 8) {
           payload.password = password
+        } else if (password && password.trim().length > 0) {
+          toast({
+            title: t('invalidPassword'),
+            description: t('passwordMustBeAtLeas'),
+            variant: "destructive",
+          })
+          setIsSaving(false)
+          return
         }
 
         await usersApi.update(editingUserId, payload)
@@ -379,7 +387,7 @@ export default function UsersPage() {
         u.userId,
         u.fullName,
         u.email,
-        u.roleName,
+        u.roles && u.roles.length > 0 ? u.roles[0].roleName : "",
         u.departmentName,
         u.isActive,
       ])
@@ -631,7 +639,9 @@ export default function UsersPage() {
                       <tr key={u.userId} className="border-b border-border hover:bg-muted/30 transition-colors">
                         <td className="py-4 px-6 text-foreground font-medium">{u.fullName}</td>
                         <td className="py-4 px-6 text-muted-foreground">{u.email}</td>
-                        <td className="py-4 px-6 text-muted-foreground">{getRoleLabel(u.roleName, language)}</td>
+                        <td className="py-4 px-6 text-muted-foreground">
+                          {getRoleLabel(u.roles && u.roles.length > 0 ? u.roles[0].roleName : null, language)}
+                        </td>
                         <td className="py-4 px-6 text-muted-foreground">{u.departmentName || "—"}</td>
                         <td className="py-4 px-6">
                           <Badge
@@ -669,7 +679,7 @@ export default function UsersPage() {
                               size="sm"
                               variant="ghost"
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              disabled={(!!user && u.userId === user.id) || (u.roleName ?? "").toUpperCase() === "ADMIN"}
+                              disabled={(!!user && u.userId === user.id) || (u.roles && u.roles.length > 0 && u.roles[0].roleName.toUpperCase() === "ADMIN")}
                               onClick={() => askDelete(u)}
                             >
                               <Trash2 className="h-4 w-4" />

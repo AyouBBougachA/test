@@ -123,6 +123,32 @@ public class InventoryService {
     }
 
     @Transactional
+    public void addStock(Integer id, Integer amount, Integer actorId, String actorName) {
+        SparePart part = sparePartRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Spare part not found"));
+        
+        part.setQuantityInStock(part.getQuantityInStock() + amount);
+        sparePartRepository.save(part);
+
+        // Log Transaction
+        transactionRepository.save(com.cmms.bi.entity.InventoryTransaction.builder()
+                .partId(id)
+                .quantityChange(amount)
+                .transactionType("RECEPTION")
+                .createdBy(actorId)
+                .build());
+
+        auditLogService.log(
+                actorId,
+                actorName,
+                "ADD_STOCK",
+                ENTITY_NAME,
+                id,
+                "Directly added " + amount + " to " + part.getName() + " (Total: " + part.getQuantityInStock() + ")"
+        );
+    }
+
+    @Transactional
     public com.cmms.inventory.entity.RestockRequest createRestockRequest(Integer partId, Integer quantity, Integer userId) {
         com.cmms.inventory.entity.RestockRequest request = com.cmms.inventory.entity.RestockRequest.builder()
                 .partId(partId)
@@ -140,7 +166,7 @@ public class InventoryService {
     }
 
     @Transactional
-    public void approveRestock(Integer requestId, Integer reviewerId) {
+    public void approveRestock(Integer requestId, Integer reviewerId, Integer actualQuantity) {
         com.cmms.inventory.entity.RestockRequest request = restockRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
         
@@ -151,24 +177,45 @@ public class InventoryService {
         SparePart part = sparePartRepository.findById(request.getPartId())
                 .orElseThrow(() -> new ResourceNotFoundException("Part not found"));
 
+        int quantityToAdd = actualQuantity != null ? actualQuantity : request.getQuantity();
+
         // Update Stock
-        part.setQuantityInStock(part.getQuantityInStock() + request.getQuantity());
+        part.setQuantityInStock(part.getQuantityInStock() + quantityToAdd);
         sparePartRepository.save(part);
 
         // Update Request
         request.setStatus(com.cmms.inventory.entity.RestockRequest.RestockStatus.APPROVED);
         request.setReviewedBy(reviewerId);
         request.setReviewedAt(java.time.LocalDateTime.now());
+        if (actualQuantity != null) {
+            request.setNotes("Approved with adjusted quantity: " + actualQuantity + " (Requested: " + request.getQuantity() + ")");
+        }
         restockRepository.save(request);
 
         // Log Transaction
         transactionRepository.save(com.cmms.bi.entity.InventoryTransaction.builder()
                 .partId(part.getPartId())
-                .quantityChange(request.getQuantity())
+                .quantityChange(quantityToAdd)
                 .transactionType("RECEPTION")
                 .referenceId(requestId)
                 .createdBy(reviewerId)
                 .build());
+    }
+
+    @Transactional
+    public void rejectRestock(Integer requestId, Integer reviewerId) {
+        com.cmms.inventory.entity.RestockRequest request = restockRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+
+        if (request.getStatus() != com.cmms.inventory.entity.RestockRequest.RestockStatus.PENDING) {
+            throw new IllegalStateException("Request is already " + request.getStatus());
+        }
+
+        // Update Request
+        request.setStatus(com.cmms.inventory.entity.RestockRequest.RestockStatus.REJECTED);
+        request.setReviewedBy(reviewerId);
+        request.setReviewedAt(java.time.LocalDateTime.now());
+        restockRepository.save(request);
     }
 
     @Transactional
