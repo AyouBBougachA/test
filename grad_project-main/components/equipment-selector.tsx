@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useMemo, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { EquipmentResponse } from "@/lib/api/types"

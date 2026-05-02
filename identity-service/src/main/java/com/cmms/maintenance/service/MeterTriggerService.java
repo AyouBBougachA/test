@@ -61,14 +61,15 @@ public class MeterTriggerService {
         List<MeterThreshold> thresholds = thresholdRepository.findByMeterId(meter.getMeterId());
         for (MeterThreshold threshold : thresholds) {
             BigDecimal thresholdVal = threshold.getThresholdValue();
+            BigDecimal thresholdCurrent = threshold.getCurrentValue() != null ? threshold.getCurrentValue() : BigDecimal.ZERO;
             
             // Critical RECOMMENDATION (100%)
-            if (currentValue.compareTo(thresholdVal) >= 0) {
-                sendThresholdAlert(meter, threshold, "RECOMMENDATION", thresholdVal);
+            if (thresholdCurrent.compareTo(thresholdVal) >= 0) {
+                sendThresholdAlert(meter, threshold, "RECOMMENDATION", thresholdVal, thresholdCurrent);
             } 
             // Warning Alert (80%)
-            else if (currentValue.compareTo(thresholdVal.multiply(BigDecimal.valueOf(0.8))) >= 0) {
-                sendThresholdAlert(meter, threshold, "WARNING", thresholdVal);
+            else if (thresholdCurrent.compareTo(thresholdVal.multiply(BigDecimal.valueOf(0.8))) >= 0) {
+                sendThresholdAlert(meter, threshold, "WARNING", thresholdVal, thresholdCurrent);
             }
         }
     }
@@ -80,9 +81,9 @@ public class MeterTriggerService {
         notifyManagers("RECOMMENDATION", msg, meter.getMeterId());
     }
 
-    private void sendThresholdAlert(Meter meter, MeterThreshold status, String type, BigDecimal thresholdValue) {
-        String msg = String.format("%s: Meter '%s' (Equipment ID: %d) has reached %s %s (Threshold: %s %s).",
-            type, meter.getName(), meter.getEquipmentId(), meter.getValue(), meter.getUnit(), thresholdValue, meter.getUnit());
+    private void sendThresholdAlert(Meter meter, MeterThreshold status, String type, BigDecimal thresholdValue, BigDecimal thresholdCurrent) {
+        String msg = String.format("%s: Meter '%s' (Equipment ID: %d) has reached %s %s since last reset (Threshold: %s %s).",
+            type, meter.getName(), meter.getEquipmentId(), thresholdCurrent, meter.getUnit(), thresholdValue, meter.getUnit());
         
         notifyManagers(type, msg, meter.getMeterId());
     }

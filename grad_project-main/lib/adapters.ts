@@ -144,13 +144,14 @@ export type UiMeterStatus = 'normal' | 'warning' | 'critical'
 
 export interface UiMeterCard {
   id: number
-  equipmentId: number // Added missing field
+  equipmentId: number
   displayId: string
   name: string
   equipmentLabel: string
   value: number
   unit: string
   thresholds: number[]
+  thresholdDetails: import('@/lib/api/types').MeterThreshold[]
   primaryThreshold: number | null
   status: UiMeterStatus
   lastReading: string | null
@@ -163,9 +164,22 @@ export function mapMeterResponseToUiCard(meter: MeterResponse): UiMeterCard {
 
   const thresholds = (meter.thresholds ?? []).filter((t) => typeof t === 'number' && Number.isFinite(t))
   const primaryThreshold = thresholds.length > 0 ? Math.max(...thresholds) : null
+  const thresholdDetails = meter.thresholdDetails ?? []
 
   let status: UiMeterStatus = 'normal'
-  if (primaryThreshold && primaryThreshold > 0) {
+  
+  if (thresholdDetails.length > 0) {
+    let highestRatio = 0;
+    for (const th of thresholdDetails) {
+      if (th.thresholdValue > 0) {
+        const cVal = th.currentValue ?? 0;
+        const ratio = cVal / th.thresholdValue;
+        if (ratio > highestRatio) highestRatio = ratio;
+      }
+    }
+    if (highestRatio >= 1) status = 'critical'
+    else if (highestRatio >= 0.8) status = 'warning'
+  } else if (primaryThreshold && primaryThreshold > 0) {
     const ratio = safeValue / primaryThreshold
     if (ratio >= 1) status = 'critical'
     else if (ratio >= 0.8) status = 'warning'
@@ -173,13 +187,14 @@ export function mapMeterResponseToUiCard(meter: MeterResponse): UiMeterCard {
 
   return {
     id: meter.meterId,
-    equipmentId: meter.equipmentId, // Map the equipment ID
+    equipmentId: meter.equipmentId,
     displayId: formatDisplayId('MTR', meter.meterId),
     name: safeName,
     equipmentLabel: meter.equipmentName ? `${meter.equipmentName}` : `Equipment #${meter.equipmentId}`,
     value: safeValue,
     unit: safeUnit,
     thresholds,
+    thresholdDetails,
     primaryThreshold,
     status,
     lastReading: meter.lastReadingAt ?? null,

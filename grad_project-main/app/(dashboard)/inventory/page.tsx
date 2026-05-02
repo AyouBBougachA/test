@@ -62,7 +62,7 @@ const fadeInUp = {
 
 export default function InventoryPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth()
-  const { language, t } = useI18n()
+  const { t } = useI18n()
   const [parts, setParts] = useState<SparePartResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)

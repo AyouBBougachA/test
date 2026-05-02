@@ -296,9 +296,9 @@ export default function AssetDetailPage() {
                   ) : (
                     <div className="space-y-4">
                       {workOrders.map(wo => (
-                        <div key={wo.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                        <div key={wo.woId} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
                           <div>
-                            <Link href={`/work-orders/${wo.id}`} className="font-medium hover:underline flex items-center gap-2">
+                            <Link href={`/work-orders/${wo.woId}`} className="font-medium hover:underline flex items-center gap-2">
                               <Wrench className="h-4 w-4 text-blue-500" />
                               {wo.title}
                             </Link>

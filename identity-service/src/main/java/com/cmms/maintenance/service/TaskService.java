@@ -343,9 +343,9 @@ public class TaskService {
                     techName + " completed task: \"" + taskLabel + "\" on WO-" + task.getWoId(),
                     task.getWoId());
         } else if (newStatus == Task.TaskStatus.BLOCKED) {
-            String reason = task.getBlockedReason() != null ? " — " + task.getBlockedReason() : "";
+            String blockedReasonSuffix = task.getBlockedReason() != null ? " — " + task.getBlockedReason() : "";
             notificationService.notifyAdminAndManagers("TASK_BLOCKED",
-                    "⚠️ Blocked: \"" + taskLabel + "\" by " + techName + reason + " on WO-" + task.getWoId(),
+                "⚠️ Blocked: \"" + taskLabel + "\" by " + techName + blockedReasonSuffix + " on WO-" + task.getWoId(),
                     task.getWoId());
         } else if (newStatus == Task.TaskStatus.FAIL) {
             notificationService.notifyAdminAndManagers("TASK_FAILED",

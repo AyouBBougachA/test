@@ -36,8 +36,16 @@ public class Claim {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "priority", nullable = false, length = 20)
+    @Column(name = "priority", length = 20)
     private ClaimPriority priority;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reported_severity", length = 50)
+    private ClaimSeverity reportedSeverity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "validated_severity", length = 50)
+    private ClaimSeverity validatedSeverity;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)
@@ -75,4 +83,7 @@ public class Claim {
 
     @Column(name = "rejected_at")
     private LocalDateTime rejectedAt;
+
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
 }

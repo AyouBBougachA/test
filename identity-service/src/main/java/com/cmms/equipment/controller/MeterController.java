@@ -81,7 +81,8 @@ public class MeterController {
         String equipmentName = equipmentRepository.findById(meter.getEquipmentId())
                 .map(equipment -> equipment.getName())
                 .orElse(null);
-        List<java.math.BigDecimal> thresholds = meterService.getThresholds(meter.getMeterId()).stream()
+        List<MeterThreshold> thresholdObjects = meterService.getThresholds(meter.getMeterId());
+        List<java.math.BigDecimal> thresholds = thresholdObjects.stream()
                 .map(MeterThreshold::getThresholdValue)
                 .toList();
 
@@ -95,6 +96,7 @@ public class MeterController {
                 .meterType(meter.getMeterType())
                 .lastReadingAt(meter.getLastReadingAt())
                 .thresholds(thresholds == null ? Collections.emptyList() : thresholds)
+                .thresholdDetails(thresholdObjects == null ? Collections.emptyList() : thresholdObjects)
                 .build();
     }
 }

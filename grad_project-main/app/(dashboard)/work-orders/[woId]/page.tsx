@@ -24,6 +24,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { workOrdersApi } from "@/lib/api/work-orders"
 import { tasksApi } from "@/lib/api/tasks"
 import { taskTemplatesApi } from "@/lib/api/task-templates"
@@ -74,7 +77,7 @@ function getStatusBadge(status: string) {
 }
 
 export default function WorkOrderDetailPage() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const { user } = useAuth()
   const params = useParams<{ woId: string }>()
   const woId = Number(params?.woId)
@@ -96,6 +99,8 @@ export default function WorkOrderDetailPage() {
   const [secondaryAssignedUserIds, setSecondaryAssignedUserIds] = useState<string[]>([])
   const [completionNotes, setCompletionNotes] = useState("")
   const [validationNotes, setValidationNotes] = useState("")
+  const [predictiveOutcome, setPredictiveOutcome] = useState("")
+  const [predictiveOutcomeNotes, setPredictiveOutcomeNotes] = useState("")
 
   // Task creation state
   const [newTaskTitle, setNewTaskTitle] = useState("")
@@ -171,8 +176,6 @@ export default function WorkOrderDetailPage() {
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false)
   const [restockPartId, setRestockPartId] = useState<number | null>(null)
   const [restockQty, setRestockQty] = useState(10)
-
-  const { t } = useI18n()
 
   const loadData = async () => {
     if (!Number.isFinite(woId)) {
@@ -272,7 +275,11 @@ export default function WorkOrderDetailPage() {
       } else if (action === 'complete') {
         await workOrdersApi.updateStatus(woId, { status: 'COMPLETED', note: completionNotes })
       } else if (action === 'validate') {
-        await workOrdersApi.validate(woId, { validationNotes })
+        await workOrdersApi.validate(woId, { 
+          validationNotes,
+          predictiveOutcome: wo?.woType === 'PREDICTIVE' ? predictiveOutcome || undefined : undefined,
+          predictiveOutcomeNotes: wo?.woType === 'PREDICTIVE' ? predictiveOutcomeNotes || undefined : undefined
+        })
       } else if (action === 'close') {
         await workOrdersApi.close(woId)
       } else if (action === 'cancel') {
@@ -701,9 +708,42 @@ export default function WorkOrderDetailPage() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle>Validate Intervention</DialogTitle></DialogHeader>
-                    <Textarea placeholder="Validation remarks..." value={validationNotes} onChange={e => setValidationNotes(e.target.value)} />
+                    <div className="space-y-4 py-2">
+                      {wo.woType === 'PREDICTIVE' && (
+                        <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
+                          <div className="space-y-2">
+                            <Label>Predictive Inspection Outcome <span className="text-rose-500">*</span></Label>
+                            <Select value={predictiveOutcome} onValueChange={setPredictiveOutcome}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select inspection result..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="NO_ISSUE_FOUND">No Issue Found (Healthy)</SelectItem>
+                                <SelectItem value="ISSUE_FOUND_RESOLVED">Issue Found & Resolved</SelectItem>
+                                <SelectItem value="MONITORING_REQUIRED">Monitoring Required</SelectItem>
+                                <SelectItem value="UNCONFIRMED">Unconfirmed / Inconclusive</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {predictiveOutcome && (
+                            <div className="space-y-2">
+                              <Label>Outcome Details</Label>
+                              <Textarea 
+                                placeholder="Describe the findings of the predictive inspection..." 
+                                value={predictiveOutcomeNotes} 
+                                onChange={e => setPredictiveOutcomeNotes(e.target.value)} 
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label>Validation Remarks</Label>
+                        <Textarea placeholder="Validation remarks..." value={validationNotes} onChange={e => setValidationNotes(e.target.value)} />
+                      </div>
+                    </div>
                     <DialogFooter>
-                      <Button onClick={() => handleAction('validate')} disabled={actionLoading === 'validate'}>Validate & Accept</Button>
+                      <Button onClick={() => handleAction('validate')} disabled={actionLoading === 'validate' || (wo.woType === 'PREDICTIVE' && !predictiveOutcome)}>Validate & Accept</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

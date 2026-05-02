@@ -36,7 +36,7 @@ function KpiCard({label,sub,value,icon,trend,colorClass,bgClass,higherIsBetter=t
 }
 
 export default function MaintenanceDashboard(){
-  const {language}=useI18n()
+  const { t, language } = useI18n()
   const [kpi,setKpi]=useState<KpiResponse|null>(null)
   const [wos,setWos]=useState<WorkOrderResponse[]>([])
   const [depts,setDepts]=useState<DepartmentResponse[]>([])

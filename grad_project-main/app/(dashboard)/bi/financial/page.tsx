@@ -59,7 +59,7 @@ function KpiCard({ title, value, trend, icon, color, inverseTrend = false }: any
 }
 
 export default function FinancialDashboard() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const [data, setData] = useState<KpiResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 

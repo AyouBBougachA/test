@@ -83,6 +83,11 @@ public class WorkOrderResponse {
     private String        closedBy;
     private String        cancellationNotes;
 
+    // ── Predictive Outcome ────────────────────────────────────
+    private String        predictiveOutcome;
+    private String        predictiveOutcomeNotes;
+    private LocalDateTime predictiveOutcomeAt;
+
     // ── Auditing ──────────────────────────────────────────────
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -18,5 +18,6 @@ public class UpdateClaimRequest {
     private String description;
 
     private Integer departmentId;
-
+    private String reportedSeverity;
+    private String validatedSeverity;
 }

@@ -19,4 +19,5 @@ public class MeterResponse {
     private String meterType;
     private LocalDateTime lastReadingAt;
     private List<BigDecimal> thresholds;
+    private List<com.cmms.equipment.entity.MeterThreshold> thresholdDetails;
 }

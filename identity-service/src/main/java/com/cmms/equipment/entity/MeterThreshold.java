@@ -32,4 +32,11 @@ public class MeterThreshold {
     @Column(name = "auto_recommend")
     @Builder.Default
     private Boolean autoRecommend = true;
+
+    @Column(name = "current_value", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal currentValue = BigDecimal.ZERO;
+
+    @Column(name = "last_reset_at")
+    private java.time.LocalDateTime lastResetAt;
 }

@@ -39,6 +39,8 @@ export default function EditClaimPage() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [priority, setPriority] = useState("MEDIUM")
+  const [reportedSeverity, setReportedSeverity] = useState("")
+  const [validatedSeverity, setValidatedSeverity] = useState("")
   const [departmentId, setDepartmentId] = useState("")
   const [photos, setPhotos] = useState<File[]>([])
 
@@ -69,6 +71,8 @@ export default function EditClaimPage() {
         setDescription(claimRes.description ?? "")
         setPriority(String(claimRes.priority ?? "MEDIUM"))
         setDepartmentId(claimRes.departmentId ? String(claimRes.departmentId) : "")
+        setReportedSeverity(claimRes.reportedSeverity ?? "")
+        setValidatedSeverity(claimRes.validatedSeverity ?? "")
       } catch (err) {
         if (cancelled) return
         if (err instanceof ApiError) {
@@ -109,6 +113,8 @@ export default function EditClaimPage() {
         description: description.trim(),
         priority,
         departmentId: Number(departmentId),
+        reportedSeverity: reportedSeverity || undefined,
+        validatedSeverity: validatedSeverity || undefined,
       })
 
       if (photos.length > 0) {
@@ -235,6 +241,38 @@ export default function EditClaimPage() {
                         {t("low")}
                       </div>
                     </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Reported Severity</label>
+                <Select value={reportedSeverity} onValueChange={setReportedSeverity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAFETY_RISK">Safety Risk</SelectItem>
+                    <SelectItem value="SERVICE_BLOCKING">Service Blocking</SelectItem>
+                    <SelectItem value="DEGRADED_PERFORMANCE">Degraded Performance</SelectItem>
+                    <SelectItem value="MINOR_DEFECT">Minor Defect</SelectItem>
+                    <SelectItem value="COSMETIC_OR_INFO">Cosmetic or Info</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Validated Severity</label>
+                <Select value={validatedSeverity} onValueChange={setValidatedSeverity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAFETY_RISK">Safety Risk</SelectItem>
+                    <SelectItem value="SERVICE_BLOCKING">Service Blocking</SelectItem>
+                    <SelectItem value="DEGRADED_PERFORMANCE">Degraded Performance</SelectItem>
+                    <SelectItem value="MINOR_DEFECT">Minor Defect</SelectItem>
+                    <SelectItem value="COSMETIC_OR_INFO">Cosmetic or Info</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

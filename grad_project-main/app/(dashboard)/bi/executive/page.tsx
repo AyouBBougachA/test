@@ -38,7 +38,7 @@ function KpiCard({label,sub,value,icon,trend,colorClass,bgClass,colorVar,bgColor
 }
 
 export default function ExecutiveDashboard(){
-  const {language}=useI18n()
+  const {language,t}=useI18n()
   const [kpi,setKpi]=useState<KpiResponse|null>(null)
   const [wos,setWos]=useState<WorkOrderResponse[]>([])
   const [depts,setDepts]=useState<DepartmentResponse[]>([])

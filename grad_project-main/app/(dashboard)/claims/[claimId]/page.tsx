@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { AlertTriangle, ArrowLeft, Pencil, Wrench, CheckCircle, UserPlus, XCircle } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Pencil, Wrench, CheckCircle, UserPlus, XCircle, Activity, Check, Edit2, X, Zap } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,10 @@ import { ApiError } from "@/lib/api/client"
 import { useI18n } from "@/lib/i18n"
 import { useAuth } from "@/lib/auth-context"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { aiApi } from "@/lib/api/ai"
+import type { PrioritySuggestionResponse, ClaimPriority } from "@/lib/api/types"
+import { toast } from "sonner"
 import { WorkOrderLifecycleFlow } from "@/components/work-orders/WorkOrderLifecycleFlow"
 import {
   Dialog,
@@ -100,7 +104,23 @@ export default function ClaimDetailsPage() {
   const [isConverting, setIsConverting] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [qualifyNotes, setQualifyNotes] = useState("")
+  const [qualifyDueDate, setQualifyDueDate] = useState("")
+  const [qualifySeverity, setQualifySeverity] = useState("")
   const [assignUserId, setAssignUserId] = useState<string>("")
+
+  // AI Prioritization states
+  const [suggestion, setSuggestion] = useState<PrioritySuggestionResponse | null>(null)
+  const [isCalculatingAI, setIsCalculatingAI] = useState(false)
+  
+  // Dialog States for AI
+  const [isOverrideOpen, setIsOverrideOpen] = useState(false)
+  const [isRejectOpen, setIsRejectOpen] = useState(false)
+  
+  // Form States for AI Actions
+  const [overridePriority, setOverridePriority] = useState<ClaimPriority>("MEDIUM")
+  const [overrideDueDate, setOverrideDueDate] = useState("")
+  const [actionReason, setActionReason] = useState("")
+
 
   useEffect(() => {
     if (!Number.isFinite(claimId)) {
@@ -117,7 +137,12 @@ export default function ClaimDetailsPage() {
       setPhotosError(null)
       try {
         const claimRes = await claimsApi.getById(claimId)
-        if (!cancelled) setClaim(claimRes)
+        if (!cancelled) {
+          setClaim(claimRes)
+          if (claimRes.reportedSeverity) {
+            setQualifySeverity(claimRes.reportedSeverity)
+          }
+        }
         
         if (claimRes.linkedWoId) {
           try {
@@ -256,13 +281,107 @@ export default function ClaimDetailsPage() {
     if (!claim) return
     setActionLoading("qualify")
     try {
-      await claimsApi.qualify(claim.claimId, { qualificationNotes: qualifyNotes })
+      const payload: any = { 
+        qualificationNotes: qualifyNotes,
+        validatedSeverity: qualifySeverity || undefined
+      }
+      if (qualifyDueDate) {
+        payload.dueDate = new Date(qualifyDueDate).toISOString()
+      }
+      await claimsApi.qualify(claim.claimId, payload)
       const claimRes = await claimsApi.getById(claimId)
       setClaim(claimRes)
+      setQualifyDueDate("")
+      setQualifyNotes("")
+      setQualifySeverity("")
+      
+      // Reload suggestion
+      loadSuggestion()
     } catch (err) {
       setError(t('qualificationFailed'))
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const loadSuggestion = async () => {
+    try {
+      const res = await aiApi.getSuggestionByClaimId(claimId)
+      setSuggestion(res)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // Expected if no suggestion exists yet
+        setSuggestion(null)
+      } else {
+        console.error("Failed to load AI suggestion", e)
+        setSuggestion(null)
+      }
+    }
+  }
+
+  // Load suggestion after initial claim load
+  useEffect(() => {
+    if (claimId && user && (user.roleName === 'ADMIN' || user.roleName === 'MAINTENANCE_MANAGER')) {
+      loadSuggestion()
+    }
+  }, [claimId, user])
+
+  const handleCalculateAI = async () => {
+    setIsCalculatingAI(true)
+    try {
+      const res = await aiApi.calculateClaimPriority(claimId)
+      setSuggestion(res)
+      toast.success("Priority analyzed successfully")
+    } catch (e) {
+      toast.error("Failed to analyze priority")
+    } finally {
+      setIsCalculatingAI(false)
+    }
+  }
+
+  const handleAcceptAI = async () => {
+    if (!suggestion) return
+    try {
+      const res = await aiApi.acceptPrioritySuggestion(suggestion.id)
+      setSuggestion(res)
+      toast.success("Suggestion accepted. Claim updated.")
+      const claimRes = await claimsApi.getById(claimId)
+      setClaim(claimRes)
+    } catch (e) {
+      toast.error("Failed to accept suggestion")
+    }
+  }
+
+  const handleOverrideAI = async () => {
+    if (!suggestion || !actionReason) return
+    try {
+      const payload: any = { finalPriority: overridePriority, reason: actionReason }
+      if (overrideDueDate) {
+        payload.finalDueDate = new Date(overrideDueDate).toISOString()
+      }
+      const res = await aiApi.overridePrioritySuggestion(suggestion.id, payload)
+      setSuggestion(res)
+      setIsOverrideOpen(false)
+      setActionReason("")
+      setOverrideDueDate("")
+      toast.success("Priority overridden. Claim updated.")
+      const claimRes = await claimsApi.getById(claimId)
+      setClaim(claimRes)
+    } catch (e) {
+      toast.error("Failed to override priority")
+    }
+  }
+
+  const handleRejectAI = async () => {
+    if (!suggestion || !actionReason) return
+    try {
+      const res = await aiApi.rejectPrioritySuggestion(suggestion.id, { reason: actionReason })
+      setSuggestion(res)
+      setIsRejectOpen(false)
+      setActionReason("")
+      toast.success("Suggestion rejected.")
+    } catch (e) {
+      toast.error("Failed to reject suggestion")
     }
   }
 
@@ -338,11 +457,37 @@ export default function ClaimDetailsPage() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader><DialogTitle>Qualify Claim</DialogTitle></DialogHeader>
-                      <Textarea 
-                        placeholder="Resolution or qualification notes..." 
-                        value={qualifyNotes} 
-                        onChange={e => setQualifyNotes(e.target.value)} 
-                      />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Validated Severity *</label>
+                          <select 
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                            value={qualifySeverity} 
+                            onChange={(e) => setQualifySeverity(e.target.value)}
+                            required
+                          >
+                            <option value="">Select severity...</option>
+                            <option value="SAFETY_RISK">Safety Risk</option>
+                            <option value="SERVICE_BLOCKING">Service Blocking</option>
+                            <option value="DEGRADED_PERFORMANCE">Degraded Performance</option>
+                            <option value="MINOR_DEFECT">Minor Defect</option>
+                            <option value="COSMETIC_OR_INFO">Cosmetic or Info</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Due date (Optional)</label>
+                          <Input 
+                            type="datetime-local" 
+                            value={qualifyDueDate} 
+                            onChange={(e) => setQualifyDueDate(e.target.value)} 
+                          />
+                        </div>
+                        <Textarea 
+                          placeholder="Resolution or qualification notes..." 
+                          value={qualifyNotes} 
+                          onChange={e => setQualifyNotes(e.target.value)} 
+                        />
+                      </div>
                       <DialogFooter>
                          <Button onClick={handleQualify} disabled={actionLoading === "qualify"}>Confirm Qualification</Button>
                       </DialogFooter>
@@ -350,31 +495,8 @@ export default function ClaimDetailsPage() {
                   </Dialog>
                 )}
                 
-                {/* ASSIGN */}
-                {['QUALIFIED'].includes(claim.status ?? "") && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="gap-2 text-violet-600 border-violet-200">
-                         <UserPlus className="h-4 w-4" />
-                         {t('assign')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Assign Technician</DialogTitle></DialogHeader>
-                      <select 
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" 
-                        value={assignUserId} 
-                        onChange={e => setAssignUserId(e.target.value)}
-                      >
-                        <option value="">Select Technician...</option>
-                        {technicians.map(t => <option key={t.userId} value={t.userId}>{t.fullName}</option>)}
-                      </select>
-                      <DialogFooter>
-                         <Button onClick={handleAssign} disabled={actionLoading === "assign"}>Confirm Assignment</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
+                {/* ASSIGN button removed as per request - now inherited through WO conversion */}
+
 
                 {/* CONVERT */}
                 {['QUALIFIED', 'ASSIGNED'].includes(claim.status ?? "") && !claim.linkedWoId && (
@@ -480,10 +602,209 @@ export default function ClaimDetailsPage() {
                 </p>
                 <p className="font-medium text-foreground">{claim.assignedToName ?? "-"}</p>
               </div>
+              {claim.dueDate && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className="font-medium text-foreground">{new Date(claim.dueDate).toLocaleDateString()}</p>
+                </div>
+              )}
+              {claim.reportedSeverity && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Reported Severity</p>
+                  <p className="font-medium text-foreground">{claim.reportedSeverity.replace('_', ' ')}</p>
+                </div>
+              )}
+              {claim.validatedSeverity && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Validated Severity</p>
+                  <p className="font-medium text-foreground text-indigo-600">{claim.validatedSeverity.replace('_', ' ')}</p>
+                </div>
+              )}
             </div>
           ) : null}
         </CardContent>
       </Card>
+
+      {user && (user.roleName === 'ADMIN' || user.roleName === 'MAINTENANCE_MANAGER') && (
+        <Card className="border-indigo-100 shadow-sm overflow-hidden">
+          <div className="h-1 bg-indigo-600 w-full" />
+          <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-indigo-900">
+                <Zap className="h-5 w-5 text-indigo-500" />
+                Automatic Prioritization
+              </CardTitle>
+              {suggestion ? (
+                <div className="flex gap-2">
+                  {suggestion.decisionStatus === "PENDING" && (
+                    <>
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs" onClick={handleAcceptAI}>
+                        <Check className="h-3 w-3 mr-1" /> Accept
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-amber-200 text-amber-700 bg-amber-50 h-8 text-xs hover:bg-amber-100" onClick={() => setIsOverrideOpen(true)}>
+                        <Edit2 className="h-3 w-3 mr-1" /> Override
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 bg-rose-50 h-8 text-xs hover:bg-rose-100" onClick={() => setIsRejectOpen(true)}>
+                        <X className="h-3 w-3 mr-1" /> Reject
+                      </Button>
+                    </>
+                  )}
+                  {suggestion.decisionStatus !== "PENDING" && (
+                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                      {suggestion.decisionStatus}
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100" onClick={handleCalculateAI} disabled={isCalculatingAI}>
+                  {isCalculatingAI ? <Activity className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+                  {isCalculatingAI ? "Analyzing..." : "Calculate AI Priority"}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {suggestion ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Suggested Priority</p>
+                      <Badge className={getPriorityColor(suggestion.suggestedPriority)} variant="outline">
+                        {suggestion.suggestedPriority}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">AI Score</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold">{suggestion.score}</span>
+                        <span className="text-xs text-muted-foreground">/ 100</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">SLA Status</p>
+                      <Badge variant="secondary" className={
+                        suggestion.slaStatus === 'BREACHED' ? 'bg-rose-100 text-rose-700' : 
+                        suggestion.slaStatus === 'AT_RISK' ? 'bg-amber-100 text-amber-700' : 
+                        suggestion.slaStatus === 'SAFE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                      }>
+                        {suggestion.slaStatus.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    {suggestion.suggestedDueDate && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Suggested Due Date</p>
+                        <span className="text-sm font-medium">{new Date(suggestion.suggestedDueDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    <div className="col-span-2 mt-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">Score Breakdown</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="flex justify-between items-center border-b border-border/40 pb-1">
+                          <span>Criticality (30%)</span>
+                          <span className="font-medium">{suggestion.criticalityScore}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-border/40 pb-1">
+                          <span>Service Impact (25%)</span>
+                          <span className="font-medium">{suggestion.serviceImpactScore}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-border/40 pb-1">
+                          <span>Severity (20%)</span>
+                          <span className="font-medium">{suggestion.severityScore}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-border/40 pb-1">
+                          <span>Failure Hist. (15%)</span>
+                          <span className="font-medium">{suggestion.failureHistoryScore}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-border/40 pb-1">
+                          <span>Age/SLA (10%)</span>
+                          <span className="font-medium">{suggestion.slaScore}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 font-bold text-indigo-600">
+                          <span>Final Total</span>
+                          <span>{suggestion.score}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 border-l border-border/50 pl-6">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Reasoning</p>
+                    <p className="text-sm bg-muted/30 p-3 rounded-lg border border-border/40 text-foreground/80">
+                      {suggestion.reason}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Recommendation</p>
+                    <p className="text-sm text-indigo-700 dark:text-indigo-400 font-medium">
+                      {suggestion.recommendation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <div className="bg-indigo-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Zap className="h-6 w-6 text-indigo-400" />
+                </div>
+                <p className="text-sm text-muted-foreground">No AI priority analysis exists for this claim yet.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={isOverrideOpen} onOpenChange={setIsOverrideOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override AI Suggestion</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Priority</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={overridePriority} onChange={(e) => setOverridePriority(e.target.value as ClaimPriority)}>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Due Date (Optional)</label>
+              <Input type="datetime-local" value={overrideDueDate} onChange={(e) => setOverrideDueDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason for Override <span className="text-rose-500">*</span></label>
+              <Textarea placeholder="Required justification..." value={actionReason} onChange={(e) => setActionReason(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsOverrideOpen(false)}>Cancel</Button>
+            <Button onClick={handleOverrideAI} disabled={!actionReason}>Confirm Override</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRejectOpen} onOpenChange={setIsRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject AI Suggestion</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">This will discard the AI's suggestion without altering the claim.</p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason for Rejection <span className="text-rose-500">*</span></label>
+              <Textarea placeholder="Required justification..." value={actionReason} onChange={(e) => setActionReason(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRejectOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRejectAI} disabled={!actionReason}>Reject Suggestion</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {linkedWo && (
         <Card className="border-indigo-100 shadow-xl overflow-hidden">

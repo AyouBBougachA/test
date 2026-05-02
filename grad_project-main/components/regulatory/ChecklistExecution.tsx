@@ -36,7 +36,7 @@ interface ChecklistExecutionProps {
 }
 
 export function ChecklistExecution({ woId, isEditable = true }: ChecklistExecutionProps) {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const { toast } = useToast()
   
   const [checklist, setChecklist] = useState<WoChecklist | null>(null)

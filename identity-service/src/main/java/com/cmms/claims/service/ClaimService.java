@@ -16,6 +16,7 @@ import com.cmms.identity.service.AuditLogService;
 import com.cmms.identity.repository.AuditLogRepository;
 import com.cmms.maintenance.entity.WorkOrder;
 import com.cmms.maintenance.repository.WorkOrderRepository;
+import com.cmms.ai.service.PriorityScoringService;
 import com.cmms.identity.entity.AuditLog;
 import com.cmms.identity.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,8 @@ public class ClaimService {
     private final AuditLogService auditLogService;
     private final AuditLogRepository auditLogRepository;
 
+    private final PriorityScoringService priorityScoringService;
+
     @Transactional(readOnly = true)
     public List<ClaimListItemResponse> listClaims(
             String status,
@@ -85,23 +88,35 @@ public class ClaimService {
                 .stream()
                 .collect(Collectors.toMap(Equipment::getEquipmentId, Function.identity()));
 
-        Set<Integer> userIds = new HashSet<>();
-        for (Claim claim : claims) {
-            if (claim.getRequesterId() != null) userIds.add(claim.getRequesterId());
-            if (claim.getAssignedToUserId() != null) userIds.add(claim.getAssignedToUserId());
-        }
-        Map<Integer, User> usersById = userRepository.findAllById(userIds)
-                .stream()
-                .collect(Collectors.toMap(User::getUserId, Function.identity()));
-
         Map<Integer, Department> departmentsById = departmentRepository.findAllById(
                         claims.stream().map(Claim::getDepartmentId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Department::getDepartmentId, Function.identity()));
 
+        Set<Integer> woIds = claims.stream().map(Claim::getLinkedWoId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Integer, WorkOrder> woById = woIds.isEmpty() ? Collections.emptyMap() : workOrderRepository.findAllById(woIds)
+                .stream()
+                .collect(Collectors.toMap(WorkOrder::getWoId, Function.identity()));
+
+        Set<Integer> userIds = new HashSet<>();
+        for (Claim claim : claims) {
+            if (claim.getRequesterId() != null) userIds.add(claim.getRequesterId());
+            if (claim.getAssignedToUserId() != null) userIds.add(claim.getAssignedToUserId());
+            
+            WorkOrder linkedWo = claim.getLinkedWoId() == null ? null : woById.get(claim.getLinkedWoId());
+            if (linkedWo != null && linkedWo.getAssignedToUserId() != null) {
+                userIds.add(linkedWo.getAssignedToUserId());
+            }
+        }
+        Map<Integer, User> usersById = userIds.isEmpty() ? Collections.emptyMap() : userRepository.findAllById(userIds)
+                .stream()
+                .collect(Collectors.toMap(User::getUserId, Function.identity()));
 
         return claims.stream()
-                .map(claim -> toListItemResponse(claim, equipmentById, usersById, departmentsById))
+                .map(claim -> {
+                    WorkOrder linkedWo = claim.getLinkedWoId() == null ? null : woById.get(claim.getLinkedWoId());
+                    return toListItemResponse(claim, equipmentById, usersById, departmentsById, linkedWo);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -150,7 +165,15 @@ public class ClaimService {
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found with ID: " + finalDepartmentId));
         }
 
-        ClaimPriority parsedPriority = parsePriorityRequired(request.getPriority());
+        ClaimPriority parsedPriority = null;
+        if (request.getPriority() != null && !request.getPriority().isBlank()) {
+            parsedPriority = parsePriorityRequired(request.getPriority());
+        }
+        
+        ClaimSeverity reportedSeverity = null;
+        if (request.getReportedSeverity() != null && !request.getReportedSeverity().isBlank()) {
+            reportedSeverity = ClaimSeverity.valueOf(request.getReportedSeverity().trim().toUpperCase());
+        }
 
         Claim claim = Claim.builder()
                 .requesterId(actor.userId)
@@ -158,6 +181,7 @@ public class ClaimService {
                 .title(request.getTitle().trim())
                 .description(request.getDescription().trim())
                 .priority(parsedPriority)
+                .reportedSeverity(reportedSeverity)
                 .status(ClaimStatus.NEW)
                 .assignedToUserId(null)
                 .departmentId(finalDepartmentId)
@@ -208,8 +232,15 @@ public class ClaimService {
 
         claim.setTitle(request.getTitle().trim());
         claim.setDescription(request.getDescription().trim());
-        claim.setPriority(parsePriorityRequired(request.getPriority()));
+        claim.setPriority(parsePriorityOrNull(request.getPriority()));
         claim.setDepartmentId(finalDepartmentId);
+
+        if (request.getReportedSeverity() != null) {
+            claim.setReportedSeverity(parseSeverityOrNull(request.getReportedSeverity()));
+        }
+        if (request.getValidatedSeverity() != null) {
+            claim.setValidatedSeverity(parseSeverityOrNull(request.getValidatedSeverity()));
+        }
 
         Claim saved = claimRepository.save(claim);
 
@@ -244,6 +275,15 @@ public class ClaimService {
             claim.setQualificationNotes(request.getQualificationNotes().trim());
         }
 
+        // Set dueDate if provided by manager during qualification
+        if (request.getDueDate() != null) {
+            claim.setDueDate(request.getDueDate());
+        }
+
+        if (request.getValidatedSeverity() != null && !request.getValidatedSeverity().isBlank()) {
+            claim.setValidatedSeverity(ClaimSeverity.valueOf(request.getValidatedSeverity().trim().toUpperCase()));
+        }
+
         ClaimStatus oldStatus = claim.getStatus();
         ClaimStatus newStatus;
 
@@ -260,14 +300,21 @@ public class ClaimService {
 
         saveStatusHistory(saved.getClaimId(), oldStatus, newStatus, actor.displayName, null);
 
+        String auditDetails = "Qualified claim " + formatClaimCode(saved.getClaimId()) + " (" + statusLabel(newStatus) + ")";
+        if (saved.getDueDate() != null) {
+            auditDetails += ", dueDate=" + saved.getDueDate();
+        }
+
         auditLogService.log(
                 actor.userId,
                 actor.displayName,
                 "QUALIFY_CLAIM",
                 ENTITY_NAME,
                 saved.getClaimId(),
-                "Qualified claim " + formatClaimCode(saved.getClaimId()) + " (" + statusLabel(newStatus) + ")"
+                auditDetails
         );
+
+        priorityScoringService.calculatePrioritySuggestion(saved.getClaimId());
 
         return toClaimResponse(saved);
     }
@@ -361,11 +408,15 @@ public class ClaimService {
             throw new IllegalStateException("This claim has already been converted to a Work Order");
         }
 
+        // Removed strict priority/dueDate check to allow conversion before AI calculation or validation.
+        // Falls back to MEDIUM if priority is missing.
+
         WorkOrder wo = WorkOrder.builder()
                 .claimId(claim.getClaimId())
                 .equipmentId(claim.getEquipmentId())
                 .woType(WorkOrder.WorkOrderType.CORRECTIVE)
                 .priority(mapPriority(claim.getPriority()))
+                .dueDate(claim.getDueDate())
                 .status(WorkOrder.WorkOrderStatus.CREATED)
                 .title("WO: " + claim.getTitle())
                 .description(claim.getDescription())
@@ -481,11 +532,17 @@ public class ClaimService {
             Claim claim,
             Map<Integer, Equipment> equipmentById,
             Map<Integer, User> usersById,
-            Map<Integer, Department> departmentsById
+            Map<Integer, Department> departmentsById,
+            WorkOrder linkedWo
     ) {
         Equipment equipment = claim.getEquipmentId() == null ? null : equipmentById.get(claim.getEquipmentId());
         User requester = claim.getRequesterId() == null ? null : usersById.get(claim.getRequesterId());
-        User assignee = claim.getAssignedToUserId() == null ? null : usersById.get(claim.getAssignedToUserId());
+        
+        Integer effectiveAssigneeId = claim.getAssignedToUserId();
+        if (linkedWo != null && linkedWo.getAssignedToUserId() != null) {
+            effectiveAssigneeId = linkedWo.getAssignedToUserId();
+        }
+        User assignee = effectiveAssigneeId == null ? null : usersById.get(effectiveAssigneeId);
         Department dept = claim.getDepartmentId() == null ? null : departmentsById.get(claim.getDepartmentId());
 
         long photoCount = claim.getClaimId() == null ? 0 : claimPhotoRepository.countByClaimId(claim.getClaimId());
@@ -499,17 +556,20 @@ public class ClaimService {
                 .equipmentName(equipment == null ? null : equipment.getName())
                 .priority(claim.getPriority() == null ? null : claim.getPriority().name())
                 .priorityLabel(priorityLabel(claim.getPriority()))
+                .reportedSeverity(claim.getReportedSeverity() == null ? null : claim.getReportedSeverity().name())
+                .validatedSeverity(claim.getValidatedSeverity() == null ? null : claim.getValidatedSeverity().name())
                 .status(claim.getStatus() == null ? null : claim.getStatus().name())
                 .statusLabel(statusLabel(claim.getStatus()))
                 .requesterId(claim.getRequesterId())
                 .requesterName(requester == null ? null : requester.getFullName())
-                .assignedToUserId(claim.getAssignedToUserId())
+                .assignedToUserId(effectiveAssigneeId)
                 .assignedToName(assignee == null ? null : assignee.getFullName())
                 .departmentId(claim.getDepartmentId())
                 .departmentName(dept == null ? null : dept.getDepartmentName())
                 .createdAt(claim.getCreatedAt())
                 .updatedAt(claim.getUpdatedAt())
                 .closedAt(claim.getClosedAt())
+                .dueDate(claim.getDueDate())
                 .photoCount(photoCount)
                 .build();
     }
@@ -517,7 +577,15 @@ public class ClaimService {
     private ClaimResponse toClaimResponse(Claim claim) {
         Equipment equipment = claim.getEquipmentId() == null ? null : equipmentRepository.findById(claim.getEquipmentId()).orElse(null);
         User requester = claim.getRequesterId() == null ? null : userRepository.findById(claim.getRequesterId()).orElse(null);
-        User assignee = claim.getAssignedToUserId() == null ? null : userRepository.findById(claim.getAssignedToUserId()).orElse(null);
+        
+        Integer effectiveAssigneeId = claim.getAssignedToUserId();
+        if (claim.getLinkedWoId() != null) {
+            WorkOrder wo = workOrderRepository.findById(claim.getLinkedWoId()).orElse(null);
+            if (wo != null && wo.getAssignedToUserId() != null) {
+                effectiveAssigneeId = wo.getAssignedToUserId();
+            }
+        }
+        User assignee = effectiveAssigneeId == null ? null : userRepository.findById(effectiveAssigneeId).orElse(null);
         Department dept = claim.getDepartmentId() == null ? null : departmentRepository.findById(claim.getDepartmentId()).orElse(null);
 
         List<ClaimPhotoResponse> photos = claim.getClaimId() == null
@@ -538,11 +606,13 @@ public class ClaimService {
                 .equipmentName(equipment == null ? null : equipment.getName())
                 .priority(claim.getPriority() == null ? null : claim.getPriority().name())
                 .priorityLabel(priorityLabel(claim.getPriority()))
+                .reportedSeverity(claim.getReportedSeverity() == null ? null : claim.getReportedSeverity().name())
+                .validatedSeverity(claim.getValidatedSeverity() == null ? null : claim.getValidatedSeverity().name())
                 .status(claim.getStatus() == null ? null : claim.getStatus().name())
                 .statusLabel(statusLabel(claim.getStatus()))
                 .requesterId(claim.getRequesterId())
                 .requesterName(requester == null ? null : requester.getFullName())
-                .assignedToUserId(claim.getAssignedToUserId())
+                .assignedToUserId(effectiveAssigneeId)
                 .assignedToName(assignee == null ? null : assignee.getFullName())
                 .departmentId(claim.getDepartmentId())
                 .departmentName(dept == null ? null : dept.getDepartmentName())
@@ -555,6 +625,7 @@ public class ClaimService {
                 .closedAt(claim.getClosedAt())
                 .resolvedAt(claim.getResolvedAt())
                 .rejectedAt(claim.getRejectedAt())
+                .dueDate(claim.getDueDate())
                 .photoCount(photoCount)
                 .photos(photos)
                 .build();
@@ -698,6 +769,18 @@ public class ClaimService {
             return (root, cq, cb) -> cb.equal(root.get("requesterId"), actor.userId);
         }
         return (root, cq, cb) -> cb.disjunction();
+    }
+
+    private static ClaimSeverity parseSeverityOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeEnumInput(value);
+        try {
+            return ClaimSeverity.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private static ClaimPriority parsePriorityRequired(String value) {

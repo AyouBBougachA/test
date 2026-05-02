@@ -39,7 +39,7 @@ const fadeInUp = {
 }
 
 export default function NotificationsPage() {
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const { user } = useAuth()
   const [notifications, setNotifications] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)

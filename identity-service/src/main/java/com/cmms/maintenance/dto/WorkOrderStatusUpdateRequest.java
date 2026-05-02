@@ -13,4 +13,7 @@ public class WorkOrderStatusUpdateRequest {
     private String note;
     /** Manager override: close even if tasks are incomplete */
     private Boolean forceClose;
+    
+    private String predictiveOutcome;
+    private String predictiveOutcomeNotes;
 }

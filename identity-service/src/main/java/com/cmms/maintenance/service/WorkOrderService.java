@@ -63,6 +63,7 @@ public class WorkOrderService {
     private final com.cmms.identity.service.AuditLogService auditLogService;
     private final WorkOrderLaborRepository laborRepository;
     private final PartUsageRepository partUsageRepository;
+    private final com.cmms.equipment.service.MeterService meterService;
 
     private static final String ENTITY_NAME = "WorkOrder";
 
@@ -91,11 +92,35 @@ public class WorkOrderService {
 
         validateAssignment(equipment, request.getAssignedToUserId(), request.getSecondaryAssigneeIds());
 
+        WorkOrder.WorkOrderPriority priority;
+        LocalDateTime dueDate = request.getDueDate();
+        Integer equipmentId = equipment.getEquipmentId();
+
+        if (request.getClaimId() != null) {
+            Claim claim = claimRepository.findById(request.getClaimId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Claim not found"));
+            
+            if (claim.getPriority() == null || claim.getDueDate() == null) {
+                throw new IllegalStateException("This claim must have a validated priority and due date before creating a work order.");
+            }
+
+            priority = switch (claim.getPriority()) {
+                case CRITICAL -> WorkOrder.WorkOrderPriority.CRITICAL;
+                case HIGH -> WorkOrder.WorkOrderPriority.HIGH;
+                case MEDIUM -> WorkOrder.WorkOrderPriority.MEDIUM;
+                case LOW -> WorkOrder.WorkOrderPriority.LOW;
+            };
+            dueDate = claim.getDueDate();
+            equipmentId = claim.getEquipmentId();
+        } else {
+            priority = WorkOrder.WorkOrderPriority.valueOf(request.getPriority().toUpperCase());
+        }
+
         WorkOrder wo = WorkOrder.builder()
                 .claimId(request.getClaimId())
-                .equipmentId(equipment.getEquipmentId())
+                .equipmentId(equipmentId)
                 .woType(WorkOrder.WorkOrderType.valueOf(request.getWoType().toUpperCase()))
-                .priority(WorkOrder.WorkOrderPriority.valueOf(request.getPriority().toUpperCase()))
+                .priority(priority)
                 .status(WorkOrder.WorkOrderStatus.CREATED)
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -103,7 +128,7 @@ public class WorkOrderService {
                 .parentWoId(request.getParentWoId())
                 .estimatedTimeHours(request.getEstimatedTimeHours())
                 .estimatedCost(request.getEstimatedCost())
-                .dueDate(request.getDueDate())
+                .dueDate(dueDate)
                 .isArchived(false)
                 .build();
 
@@ -129,6 +154,14 @@ public class WorkOrderService {
                         .userId(secondaryId)
                         .build());
             }
+        }
+
+        // Sync assignee back to linked claim
+        if (saved.getClaimId() != null && saved.getAssignedToUserId() != null) {
+            claimRepository.findById(saved.getClaimId()).ifPresent(claim -> {
+                claim.setAssignedToUserId(saved.getAssignedToUserId());
+                claimRepository.save(claim);
+            });
         }
 
         saveStatusHistory(saved.getWoId(), null, saved.getStatus(), actor.displayName, "Work Order generated");
@@ -224,6 +257,14 @@ public class WorkOrderService {
 
         WorkOrder saved = workOrderRepository.save(wo);
 
+        // Sync assignee back to linked claim
+        if (saved.getClaimId() != null) {
+            claimRepository.findById(saved.getClaimId()).ifPresent(claim -> {
+                claim.setAssignedToUserId(saved.getAssignedToUserId());
+                claimRepository.save(claim);
+            });
+        }
+
         auditLogService.log(
                 actor.userId,
                 actor.displayName,
@@ -268,6 +309,34 @@ public class WorkOrderService {
             wo.setActualCost(computeActualCost(wo.getWoId()));
         }
 
+        if (newStatus == WorkOrder.WorkOrderStatus.COMPLETED || newStatus == WorkOrder.WorkOrderStatus.VALIDATED) {
+            if (wo.getWoType() == WorkOrder.WorkOrderType.PREDICTIVE) {
+                if (request.getPredictiveOutcome() != null && !request.getPredictiveOutcome().trim().isEmpty()) {
+                    try {
+                        wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.valueOf(request.getPredictiveOutcome()));
+                        wo.setPredictiveOutcomeNotes(request.getPredictiveOutcomeNotes());
+                        wo.setPredictiveOutcomeAt(LocalDateTime.now());
+                    } catch (IllegalArgumentException e) {
+                        // Invalid enum value, ignore or default to UNCONFIRMED
+                        wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.UNCONFIRMED);
+                        wo.setPredictiveOutcomeAt(LocalDateTime.now());
+                    }
+                } else if (newStatus == WorkOrder.WorkOrderStatus.VALIDATED && wo.getPredictiveOutcome() == null) {
+                    wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.UNCONFIRMED);
+                    wo.setPredictiveOutcomeAt(LocalDateTime.now());
+                }
+            }
+        }
+
+        boolean isCompleting = (newStatus == WorkOrder.WorkOrderStatus.COMPLETED || newStatus == WorkOrder.WorkOrderStatus.VALIDATED || newStatus == WorkOrder.WorkOrderStatus.CLOSED);
+        boolean wasNotComplete = (oldStatus != WorkOrder.WorkOrderStatus.COMPLETED && oldStatus != WorkOrder.WorkOrderStatus.VALIDATED && oldStatus != WorkOrder.WorkOrderStatus.CLOSED);
+
+        if (isCompleting && wasNotComplete) {
+            if ((wo.getWoType() == WorkOrder.WorkOrderType.PREVENTIVE || wo.getWoType() == WorkOrder.WorkOrderType.PREDICTIVE) && wo.getEquipmentId() != null) {
+                meterService.resetThresholdsForEquipment(wo.getEquipmentId());
+            }
+        }
+
         WorkOrder saved = workOrderRepository.save(wo);
         saveStatusHistory(saved.getWoId(), oldStatus, newStatus, actor.displayName, request.getNote());
 
@@ -299,6 +368,22 @@ public class WorkOrderService {
         wo.setValidatedAt(LocalDateTime.now());
         wo.setValidatedBy(actor.displayName);
         wo.setActualCost(computeActualCost(wo.getWoId()));
+
+        if (wo.getWoType() == WorkOrder.WorkOrderType.PREDICTIVE) {
+            if (request.getPredictiveOutcome() != null && !request.getPredictiveOutcome().trim().isEmpty()) {
+                try {
+                    wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.valueOf(request.getPredictiveOutcome()));
+                    wo.setPredictiveOutcomeNotes(request.getPredictiveOutcomeNotes());
+                    wo.setPredictiveOutcomeAt(LocalDateTime.now());
+                } catch (IllegalArgumentException e) {
+                    wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.UNCONFIRMED);
+                    wo.setPredictiveOutcomeAt(LocalDateTime.now());
+                }
+            } else if (wo.getPredictiveOutcome() == null) {
+                wo.setPredictiveOutcome(WorkOrder.PredictiveOutcome.UNCONFIRMED);
+                wo.setPredictiveOutcomeAt(LocalDateTime.now());
+            }
+        }
 
         WorkOrder saved = workOrderRepository.save(wo);
         saveStatusHistory(saved.getWoId(), oldStatus, saved.getStatus(), actor.displayName, "Manager validated");
@@ -697,6 +782,9 @@ public class WorkOrderService {
                     .closedAt(wo.getClosedAt())
                     .closedBy(wo.getClosedBy())
                     .cancellationNotes(wo.getCancellationNotes())
+                    .predictiveOutcome(wo.getPredictiveOutcome() != null ? wo.getPredictiveOutcome().name() : null)
+                    .predictiveOutcomeNotes(wo.getPredictiveOutcomeNotes())
+                    .predictiveOutcomeAt(wo.getPredictiveOutcomeAt())
                     .createdAt(wo.getCreatedAt())
                     .updatedAt(wo.getUpdatedAt())
                     .totalTasks((long) tasks.size())

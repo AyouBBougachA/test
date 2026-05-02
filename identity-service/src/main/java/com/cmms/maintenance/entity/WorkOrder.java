@@ -131,6 +131,17 @@ public class WorkOrder {
     @Column(name = "has_critical_failure")
     private Boolean hasCriticalFailure = false;
 
+    // ── Predictive Outcome ────────────────────────────────────
+    @Enumerated(EnumType.STRING)
+    @Column(name = "predictive_outcome")
+    private PredictiveOutcome predictiveOutcome;
+
+    @Column(name = "predictive_outcome_notes")
+    private String predictiveOutcomeNotes;
+
+    @Column(name = "predictive_outcome_at")
+    private LocalDateTime predictiveOutcomeAt;
+
     // ── Auditing ──────────────────────────────────────────────
     @Builder.Default
     @Column(name = "is_archived")
@@ -173,5 +184,12 @@ public class WorkOrder {
         CLOSED,
         /** Cancelled before execution */
         CANCELLED
+    }
+
+    public enum PredictiveOutcome {
+        NO_ISSUE_FOUND,
+        ISSUE_FOUND_RESOLVED,
+        MONITORING_REQUIRED,
+        UNCONFIRMED
     }
 }

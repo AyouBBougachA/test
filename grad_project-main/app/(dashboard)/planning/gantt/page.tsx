@@ -42,7 +42,7 @@ const fadeInUp = {
 
 export default function PlanningGanttPage() {
   const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth()
-  const { language } = useI18n()
+  const { language, t } = useI18n()
   const [workOrders, setWorkOrders] = useState<WorkOrderResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly")
