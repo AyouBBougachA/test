@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: ./identity-service
+      dockerfile: Dockerfile
+    container_name: cmms-backend
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://host.docker.internal:5432/cmms_db?stringtype=unspecified
+      DB_USERNAME: mohaimen
+      DB_PASSWORD: mohaimen1234
+      HIBERNATE_DDL_AUTO: update
+      JWT_SECRET: ZmFsbGJhY2stc2VjcmV0LWtleS1mb3ItY21tcy1pZGVudGl0eS1zZXJ2aWNlLTI1Ng==
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      STORAGE_LOCATION: /app/uploads/documents
+      CLAIM_PHOTOS_STORAGE_LOCATION: /app/uploads/claim-photos
+      BOOTSTRAP_ADMIN_ENABLED: "true"
+      BOOTSTRAP_ADMIN_EMAIL: admin@hospital.com
+      BOOTSTRAP_ADMIN_PASSWORD: admin123456
+      BOOTSTRAP_ADMIN_FORCE: "false"
+    ports:
+      - "8081:8081"
+    volumes:
+      - cmms_uploads:/app/uploads
+    networks:
+      - cmms-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./grad_project-main
+      dockerfile: Dockerfile
+    container_name: cmms-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8081
+    ports:
+      - "3000:3000"
+    networks:
+      - cmms-network
+
+volumes:
+  cmms_uploads:
+
+networks:
+  cmms-network:
+    driver: bridge

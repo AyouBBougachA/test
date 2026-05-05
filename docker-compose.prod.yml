@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cmms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cmms_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - cmms_postgres_data:/var/lib/postgresql/data
+    networks:
+      - cmms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d cmms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY_LOWER}/backend:latest
+    container_name: cmms-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/cmms_db?stringtype=unspecified
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      HIBERNATE_DDL_AUTO: validate
+    ports:
+      - "8081:8081"
+    volumes:
+      - cmms_uploads:/app/uploads
+    networks:
+      - cmms-network
+
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY_LOWER}/frontend:latest
+    container_name: cmms-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://${VPS_IP}:8081
+    ports:
+      - "3000:3000"
+    networks:
+      - cmms-network
+
+volumes:
+  cmms_postgres_data:
+  cmms_uploads:
+
+networks:
+  cmms-network:
+    driver: bridge
