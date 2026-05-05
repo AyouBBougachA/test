@@ -15,7 +15,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: cmms_db
+          POSTGRES_DB: acmms
           POSTGRES_USER: mohaimen
           POSTGRES_PASSWORD: mohaimen1234
         ports:
@@ -40,9 +40,9 @@ jobs:
       - name: Run backend tests
         run: mvn -f identity-service/pom.xml test
         env:
-          DB_URL: jdbc:postgresql://localhost:5432/cmms_db?stringtype=unspecified
-          DB_USERNAME: mohaimen
-          DB_PASSWORD: mohaimen1234
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/acmms?stringtype=unspecified
+          SPRING_DATASOURCE_USERNAME: mohaimen
+          SPRING_DATASOURCE_PASSWORD: mohaimen1234
 
   frontend-check:
     name: Frontend Lint and Build
@@ -65,7 +65,7 @@ jobs:
 
       - name: Lint frontend
         working-directory: grad_project-main
-        run: npm run lint
+        run: npx next lint .
 
       - name: Build frontend
         working-directory: grad_project-main
